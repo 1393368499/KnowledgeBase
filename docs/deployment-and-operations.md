@@ -196,6 +196,17 @@ for p in 10001 8000 8002 8003; do ss -ltn | grep -q ":$p " && \
 | `KB_MODEL_LIMIT_PREFIX` | `kb:model:slots` | 闸门的 Redis 键前缀（与业务队列的键完全不重叠） |
 | `KB_MODEL_LIMIT_REDIS_URL` | 空（复用 `CELERY_BROKER_URL`，即专用 **DB14**） | 闸门用的 Redis；**不要**指向 DB0（那是共享业务队列） |
 
+### 安全基线开关（2026-10-22 审计收口，`config/settings.py`）
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | 开发占位值 | `DJANGO_DEBUG=0` 时**必须显式设置**；仍是那个公开占位字面量时，导入期直接 `ImproperlyConfigured`（会阻止容器启动）。pytest 进程改用进程内随机密钥，不要求测试环境配密钥。 |
+| `KB_HTTPS_ONLY` | `0` | 置 `1` 一次性打开 HTTPS 全套：`SECURE_SSL_REDIRECT`、`SECURE_PROXY_SSL_HEADER`（`X-Forwarded-Proto: https`）、`SESSION_COOKIE_SECURE`、`CSRF_COOKIE_SECURE`、HSTS（含子域与 preload）。默认关闭是因为本机部署形状是 `http://127.0.0.1:8800` 明文回环。 |
+| `KB_HSTS_SECONDS` | 打开时 `31536000`，否则 `0` | HSTS 时长；建议先设小值（如 `3600`）试跑，确认没有明文混用再调大。 |
+| `KB_CSRF_TRUSTED_ORIGINS` | 空 | 逗号分隔的可信来源，例如 `https://kb.example.com`；经反代换域名访问时**必填**，否则表单 POST 会 403。 |
+
+> 探针脱敏：`/api/v1/health/live/` 与 `/api/v1/health/ready/` 无需鉴权（容器 `HEALTHCHECK` 没有凭据），因此响应体**只含状态词**（`ok` / `error` / `pending` / `missing`）；数据库异常原文、未应用迁移名、向量库绝对路径只写服务端日志。
+
 ### 跨进程模型并发闸门（2026-10-15 实装，`apps/knowledge/ratelimit.py`）
 
 **为什么进程内熔断器不够**：`resilience.CircuitBreaker` 是**进程内**状态，多进程下"同时打给 AS711 的请求数"也是每进程各算一份；web（检索/对话）与 worker（入库嵌入）同时开跑时会叠加，而 AS711 上四个模型服务跑在同一台机器上。
