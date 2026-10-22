@@ -1,0 +1,64 @@
+# 构建上下文排除清单（部署审查要求：密钥与数据绝不能进镜像）
+#
+# 注意：Dockerfile 已改为**显式 COPY**（只复制 config/ apps/ governance/ manage.py
+# / requirements.txt），所以本文件是**第二道防线**——即便将来有人改回 `COPY . .`，
+# 下面这些也不会进镜像。
+
+# --- 密钥与本地配置 ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+deploy/worker/*.env
+!deploy/worker/worker.env.example
+
+# --- 虚拟环境与缓存 ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# --- 业务数据与数据库：绝不进镜像 ---
+media/
+media/raw/
+raw_data/
+vector_data/
+*.vhdx
+db/
+*.sqlite
+*.sqlite3
+*.db
+artifacts/
+
+# --- 测试与文档：运行镜像不需要 ---
+tests/
+docs/
+README.md
+pytest.ini
+
+# --- 临时/诊断脚本（顶层遗留文件，曾会被 COPY . . 带进镜像）---
+.tmp*
+_tmp/
+_tmp*
+_probe_*
+knowledge-base-prototype.html
+
+# --- 版本控制与压缩包 ---
+.git/
+.gitignore
+.github/
+*.zip
+*.tar
+*.tar.gz
+
+# --- 日志 ---
+*.log
+logs/
+tmp/

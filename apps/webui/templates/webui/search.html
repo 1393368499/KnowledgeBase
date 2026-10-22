@@ -1,0 +1,88 @@
+{% extends "webui/base.html" %}
+{% load static %}
+{% block title %}搜索 · 智库{% endblock %}
+
+{% block main %}
+{% comment %}
+  搜索 —— 结构照搬原型 viewSearch()：
+    .content > .page-header
+    .card
+      .search-box：关键词输入 + 搜索按钮
+      筛选行：模式 / 信息库 / 归属部门 / 资料性质 / 金额下限 / 应用筛选 / 清空
+      热词行
+    「找到 N 条」+ 生效筛选标签
+    .result 结果卡 + 空态 + 分页
+  接口：
+    - 关键词/结构化筛选 → GET /api/v1/knowledge/files/...（**服务端**过滤与服务端计数）
+    - 混合检索（语义+关键词+重排）→ POST /api/v1/knowledge/search/（保留原能力）
+{% endcomment %}
+<div class="content fade-in">
+  <div class="page-header">
+    <h2>搜索</h2>
+    <p>关键词 + 部门 / 客户 / 资料性质 / 金额一起用，筛选在本页真实生效。</p>
+  </div>
+
+  <div class="card">
+    <div class="search-box">
+      <input id="q" placeholder="搜文件名或正文内容，例如：质保期 / 合同">
+      <button class="btn primary" id="search-run">搜索</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      {% comment %}
+        智能检索合并文件名、正文与语义召回；文件名/完整编号命中优先，
+        其余候选通过模型重排，最多显示 10 条且不分页。
+      {% endcomment %}
+      <label class="field">模式
+        <select id="mode" title="智能检索会调模型重排：优先展示文件名和完整编号命中，再结合正文与语义召回，最多显示 10 条、不分页；只搜文件名 / 只搜正文可翻页。">
+          <option value="hybrid">智能检索（文件名 + 正文，最多 10 条）</option>
+          <option value="filename">只搜文件名（可翻页）</option>
+          <option value="content">只搜正文（可翻页）</option>
+        </select></label>
+      <label class="field">归属部门
+        <select id="department"><option value="">不限</option></select></label>
+      {% comment %}
+        归属客户：页面文案（:22）与 kb-search.js 一直按它的存在写（loadFacets 会
+        把 /files/facets/ 的 customers 填进来），但 DOM 里此前没有这个控件 →
+        客户维度界面不可达、kb-search.js 里三处守卫是死代码。这里补上。
+      {% endcomment %}
+      <label class="field">归属客户
+        <select id="customer"><option value="">不限</option></select></label>
+      <label class="field">资料性质
+        <select id="nature"><option value="">不限</option></select></label>
+      <label class="field">金额下限（万元）
+        <input id="amount_min" type="number" placeholder="不限" style="min-width:110px"></label>
+      <button class="btn sm" id="search-apply">应用筛选</button>
+      <button class="btn sm" id="search-reset">清空</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="hint" id="hot-label">热词：</span>
+      <span id="hot-chips"></span>
+    </div>
+  </div>
+
+  <div class="row" style="margin:16px 0 10px">
+    <span class="card-title" style="margin:0" id="result-count">输入关键词或选一个筛选条件</span>
+    <span id="active-tags"></span>
+  </div>
+
+  {% comment %}
+    「资料性质」筛选的说明区（kb-search.js 的 showNatureNote 填写）：
+    选「待识别」时把**真实条数**说出来（0 条就是"没有待识别（未识别性质）的资料"）；
+    检索失败时这里是空的 —— 失败原因由结果区显示服务端 detail，不渲染成 0 条。
+  {% endcomment %}
+  <div id="search-nature-note"></div>
+
+  <div id="search-results"></div>
+  <div id="search-empty"></div>
+
+  <div class="row pager" id="search-pager" style="justify-content:flex-end;display:none">
+    <span class="hint" id="search-page-info">—</span>
+    <button class="btn sm" id="search-prev" disabled>上一页</button>
+    <button class="btn sm" id="search-next" disabled>下一页</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'webui/kb-search.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+{% endblock %}

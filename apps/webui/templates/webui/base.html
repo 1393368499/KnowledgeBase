@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}智库{% endblock %}</title>
+{# 设计系统：**原样取自 knowledge-base-prototype.html 的 <style>**，不要在这里做"优化" #}
+<link rel="stylesheet" href="{% static 'webui/kb-proto.css' %}?v={{ KB_ASSET_VERSION }}">
+  <link rel="stylesheet" href="{% static 'webui/kb-preview.css' %}?v={{ KB_ASSET_VERSION }}">
+  {% comment %}
+    非原型样式（kb-home.css）改为**全站加载**：它从"只有首页用"扩成共享样式表，
+    因为「性质」显示（`.nature-label` / `.nature-select`）在文件管理页与搜索页也要用，
+    而不再各自复制一段样式。文件名保持 kb-home.css 不动（历史引用都指向它）。
+    加载顺序在 kb-proto.css 之后，所以这里的规则可以覆盖原型样式（原型 CSS 只读）。
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'webui/kb-home.css' %}?v={{ KB_ASSET_VERSION }}">
+{% block head_extra %}{% endblock %}
+</head>
+<body{% if request.user.is_staff or request.user.is_superuser %} data-system-admin="1"{% endif %}>
+{% comment %}
+  渲染 {% csrf_token %} 会同时下发 csrftoken cookie。
+  前端的 KB.csrfToken() 从 cookie 读它；缺了它，上传/保存/确认这类
+  非 GET 请求会全部 403（我重写 base.html 时漏掉过，被测试抓出来）。
+{% endcomment %}
+{% csrf_token %}
+
+{# ===== 顶部导航栏（与原型 .navbar 完全同构）===== #}
+<header class="navbar">
+  {% comment %}
+    窄屏（≤960px）导航入口：原型 CSS 在 @media 里直接 .sidebar{display:none}，
+    于是窄屏上完全没有导航 —— 这里补 ☰ 抽屉；桌面端按钮 display:none，行为不变。
+  {% endcomment %}
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button"
+          aria-controls="sidebar" aria-expanded="false" title="展开导航">☰</button>
+  <a class="brand" href="{% url 'webui:home' %}" style="text-decoration:none;color:inherit">
+    <span class="brand-mark" aria-hidden="true"></span><b>智库</b>
+  </a>
+  {# 徽标由 JS 填**真实**环境状态（模型可用性 / 是否离线），不是"原型演示" #}
+  <span class="badge" id="env-badge">检测中…</span>
+  <span class="grow"></span>
+  {% comment %}
+    当前用户 + 退出登录：这两个入口此前只写在 _navbar.html 里，而那个模板
+    **从未被 include**，于是登录后无法登出（后端 webui:logout 早已就绪）。
+  {% endcomment %}
+  <span class="small muted" id="navbar-user">{{ request.user.username }}</span>
+  <form method="post" action="{% url 'webui:logout' %}" style="margin:0">
+    {# Django 的 CSRF 要求 token 在表单**内部**：放在 body 顶部的那个不够，缺了它 POST 会 403（浏览器验收抓到过） #}
+    {% csrf_token %}
+    <button type="submit" class="btn sm" title="退出登录">退出</button>
+  </form>
+  {% comment %}
+    顶部导航的「清理与重置」按钮已按要求移除（它不是真实清理动作，只是说明入口）；
+    清理一律走文件管理 / 信息库页的受控删除流程。
+    注意：必须用 comment 标签而不是花括号井号 —— Django 的后者**只识别单行**，
+    写成多行会被当成普通文本**原样渲染到页面上**（真实发生过：页头出现注释文字）。
+  {% endcomment %}
+</header>
+
+{# ===== 左侧导航（220px，由 JS 按原型 renderSidebar 渲染）===== #}
+<nav class="sidebar" id="sidebar"></nav>
+{# 窄屏抽屉遮罩：点它关闭导航（桌面端不显示，见 kb-preview.css） #}
+<div class="sidebar-mask" id="sidebar-mask"></div>
+
+{# ===== 主内容区 ===== #}
+<main class="main" id="main">{% block main %}{% endblock %}</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="{% static 'webui/kb-common.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+<script src="{% static 'webui/kb-progress.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+<script src="{% static 'webui/kb-nav.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

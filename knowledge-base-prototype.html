@@ -1,0 +1,2624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>知识库 AI 会话原型 · 单文件版</title>
+<style>
+/* ===== 与 React 版 src/styles/globals.css 同一套设计变量与骨架 ===== */
+:root{
+  --navbar-height:52px; --sidebar-width:220px;
+  --color-bg:#fafafa; --color-surface:#fff;
+  --color-dark:#171717; --color-text:#171717; --color-text-secondary:#737373;
+  --color-border:#e5e5e5; --color-divider:#f0f0f0;
+  --color-success:#2e7d32; --color-warning:#c4943a; --color-error:#c62828;
+  --font-mono:"SFMono-Regular","JetBrains Mono",Menlo,Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--color-bg); color:var(--color-text);
+  font-family:Inter,"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px; line-height:1.65; -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit}
+/* ===== 顶部导航栏（同 .app-navbar）===== */
+.navbar{
+  position:fixed; inset:0 0 auto 0; height:var(--navbar-height); z-index:1000;
+  background:var(--color-surface); border-bottom:1px solid var(--color-border);
+  display:flex; align-items:center; gap:12px; padding:0 20px;
+}
+.brand{display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; white-space:nowrap}
+.brand b{font-weight:700}
+.navbar .badge{
+  font-size:9px; line-height:1; letter-spacing:.04em; color:var(--color-text-secondary);
+  border:1px solid var(--color-border); padding:4px 7px; border-radius:2px; background:#fcfcfc;
+}
+.grow{flex:1}
+/* ===== 左侧导航（同 .app-sidebar + .sidebar-menu）===== */
+.sidebar{
+  position:fixed; top:var(--navbar-height); bottom:0; left:0; width:var(--sidebar-width); z-index:900;
+  background:var(--color-surface); border-right:1px solid var(--color-border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sidebar-menu{list-style:none; margin:0; padding:0}
+.nav-item{
+  height:44px; display:flex; align-items:center; gap:10px; padding:0 16px;
+  font-size:13px; color:var(--color-text-secondary); cursor:pointer;
+  border-left:3px solid transparent; transition:background .12s,color .12s,border-color .12s;
+}
+.nav-item:hover{background:#f7f7f7; color:var(--color-text)}
+.nav-item.on{background:#f5f5f5; color:var(--color-dark); font-weight:600; border-left-color:var(--color-dark)}
+.nav-icon{width:18px; text-align:center; font-size:13px; opacity:.9}
+.session-block{
+  flex:1; min-height:0; display:flex; flex-direction:column;
+  border-top:1px solid var(--color-divider); margin-top:8px; padding-top:8px;
+}
+.session-block-head{display:flex; align-items:center; gap:6px; padding:2px 16px 6px}
+.session-block-title{font-size:11px; letter-spacing:.06em; color:var(--color-text-secondary)}
+.session-list{flex:1; overflow:auto; padding:0 8px 8px}
+.session-item{padding:8px 10px; border-radius:2px; cursor:pointer; margin-bottom:2px}
+.session-item:hover{background:#f7f7f7}
+.session-item.active{background:#f0f0f0}
+.session-item-title{font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.session-item-meta{font-size:10.5px; color:var(--color-text-secondary)}
+.sidebar-foot{
+  border-top:1px solid var(--color-divider); padding:10px 16px; font-size:11px;
+  color:var(--color-text-secondary); display:flex; align-items:center; gap:8px;
+}
+/* ===== 主内容区（同 .app-content）===== */
+.main{position:fixed; top:var(--navbar-height); left:var(--sidebar-width); right:0; bottom:0; overflow:auto; background:var(--color-bg)}
+.content{max-width:1440px; padding:24px 32px 40px}
+.page-header{margin:0 0 14px}
+.page-header h2{margin:0; font-size:20px; font-weight:700; letter-spacing:-.01em}
+.page-header p{margin:2px 0 0; font-size:12px; color:var(--color-text-secondary)}
+/* ===== 通用组件 ===== */
+.btn{
+  appearance:none; border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text);
+  padding:6px 12px; border-radius:2px; font-size:12.5px; cursor:pointer; transition:border-color .12s,background .12s,color .12s;
+}
+.btn:hover{border-color:var(--color-dark)}
+.btn.sm{padding:4px 10px; font-size:12px}
+.btn.primary{background:var(--color-dark); border-color:var(--color-dark); color:#fff}
+.btn.primary:hover{background:#000}
+.btn.ghost{border-color:transparent; background:transparent; padding:2px 8px}
+.btn.ghost:hover{border-color:var(--color-border)}
+.btn:disabled{opacity:.4; cursor:not-allowed}
+.btn.danger,.table-actions .danger{color:var(--color-error)}
+.card{background:var(--color-surface); border:1px solid var(--color-border); border-radius:2px; padding:16px; margin-bottom:14px}
+.card-title{font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:8px}
+.stat-card{
+  background:var(--color-surface); border:1px solid var(--color-border); border-radius:2px; padding:14px 16px;
+  transition:border-color .15s;
+}
+.stat-card:hover{border-color:var(--color-dark)}
+.stat-value{font-family:var(--font-mono); font-size:26px; font-weight:700; line-height:1.25}
+.stat-label{font-size:12px; color:var(--color-text-secondary); margin-top:2px}
+.grid-2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px}
+.grid-3{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px}
+.row{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.field{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--color-text-secondary)}
+.field input,.field select,.search-box input{
+  border:1px solid var(--color-border); background:#fff; border-radius:2px; padding:6px 8px;
+  font-size:13px; font-family:inherit; color:var(--color-text); min-width:150px;
+}
+.field input:focus,.field select:focus,.search-box input:focus,.composer-input:focus{outline:none; border-color:var(--color-dark)}
+.tag{
+  display:inline-flex; align-items:center; height:20px; padding:0 7px; border-radius:2px; font-size:11px;
+  border:1px solid var(--color-border); color:var(--color-text-secondary); background:#fcfcfc; white-space:nowrap;
+}
+.tag.ok{color:var(--color-success); border-color:#cfe3d0; background:#f4faf4}
+.tag.warn{color:var(--color-warning); border-color:#ece0c6; background:#fdfaf2}
+.tag.info{color:var(--color-dark); border-color:#dcdcdc; background:#f7f7f7}
+.tag.bad{color:var(--color-error); border-color:#eed3d3; background:#fdf5f5}
+.muted{color:var(--color-text-secondary)}
+.tiny{font-size:11.5px}
+.mono{font-family:var(--font-mono)}
+.hint{font-size:11.5px; color:var(--color-text-secondary)}
+.status-dot{display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px; vertical-align:middle; background:#a3a3a3}
+.status-dot.completed{background:var(--color-success)}
+.status-dot.processing{background:var(--color-warning)}
+.status-dot.pending{background:#8a8a8a}
+.status-dot.failed{background:var(--color-error)}
+.status-dot.archived{background:#c4c4c4}
+.progress{height:3px; background:var(--color-divider); margin-top:5px; overflow:hidden}
+.progress i{display:block; height:100%; background:var(--color-dark)}
+.empty-state{padding:8px 0}
+.name{display:flex; align-items:center; gap:6px; font-size:13px; min-width:0}
+.name b{font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px}
+.err-text{color:var(--color-error); font-size:12px}
+.notice-bar{
+  border:1px solid #ece0c6; background:#fdfaf2; color:#6b5424; font-size:12px;
+  padding:8px 12px; border-radius:2px;
+}
+.fade-in{animation:fadeIn .22s ease}
+@keyframes fadeIn{from{opacity:0; transform:translateY(3px)} to{opacity:1; transform:none}}
+/* ===== 首页 ===== */
+.chat-main{display:flex; flex-direction:column; height:100%; background:var(--color-surface)}
+.chat-header{
+  flex:0 0 auto; height:52px; display:flex; align-items:center; gap:10px;
+  padding:0 32px; border-bottom:1px solid var(--color-border); background:var(--color-surface);
+}
+.chat-title{font-size:13.5px; font-weight:600}
+.chat-header-meta{font-size:11.5px; color:var(--color-text-secondary)}
+.chat-scroll{flex:1; min-height:0; overflow:auto; padding:0}
+.chat-inner{max-width:980px; margin:0 auto; padding:20px 24px 28px}
+/* 首页第一屏（会话为空时） */
+.welcome{padding:14px 0 6px; max-width:900px}
+.welcome h1{margin:0 0 8px; font-size:29px; font-weight:700; letter-spacing:-.01em; line-height:1.3}
+.welcome .lead{margin:0 0 22px; font-size:13px; line-height:1.85; color:var(--color-text-secondary); max-width:700px}
+.welcome .card-title{margin:22px 0 10px; font-size:13px}
+.quick{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px}
+.welcome .card{cursor:pointer}
+.welcome .card:hover{border-color:var(--color-dark)}
+.welcome .notice{margin-top:20px; border:1px solid #ece0c6; background:#fdfaf2; color:#6b5424; padding:9px 12px; border-radius:2px; font-size:11.5px}
+.chat-head{
+  flex:0 0 auto; height:52px; display:flex; align-items:center; gap:10px;
+  padding:0 32px; border-bottom:1px solid var(--color-border); background:var(--color-surface);
+}
+.chat-head h2{margin:0; font-size:13.5px; font-weight:600}
+.chat-head .meta{font-size:11.5px; color:var(--color-text-secondary)}
+.chat{display:flex; flex-direction:column; height:100%}
+.chat-foot{border-top:1px solid var(--color-border); background:var(--color-surface); padding:10px 24px 12px}
+.chat-foot .composer{border:0; padding:0}
+.chat-foot textarea{
+  width:100%; border:1px solid var(--color-border); border-radius:2px; resize:none;
+  padding:9px 11px; font-family:inherit; font-size:13.5px; line-height:1.7; min-height:54px;
+}
+.chat-foot textarea:focus{outline:none; border-color:var(--color-dark)}
+.composer-bar{display:flex; align-items:center; gap:8px; margin-top:6px}
+.msg{display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--color-divider)}
+.msg .who{
+  flex:0 0 26px; height:26px; border-radius:2px; display:flex; align-items:center; justify-content:center;
+  font-size:11px; background:#f0f0f0; color:var(--color-text-secondary);
+}
+.msg.assistant .who{background:var(--color-dark); color:#fff}
+.msg .body{flex:1; min-width:0}
+.msg .bubble{font-size:13.5px; line-height:1.8; white-space:pre-wrap; word-break:break-word}
+.msg .bubble b{font-weight:600}
+.pager{display:flex; align-items:center; gap:8px; margin-top:8px}
+.empty{padding:20px; text-align:center; color:var(--color-text-secondary); font-size:12.5px}
+.navbar .brand{cursor:pointer}
+.home-scroll{padding:0}
+.home-wrap{max-width:940px; margin:0 auto; padding:30px 24px 40px}
+.home-head{margin-bottom:20px}
+.home-hello{font-size:12px; color:var(--color-text-secondary); margin-bottom:4px}
+.home-title{margin:0; font-size:29px; font-weight:700; letter-spacing:-.01em; line-height:1.3}
+.home-sub{margin:8px 0 0; font-size:13px; line-height:1.85; color:var(--color-text-secondary); max-width:720px}
+.home-stats{
+  display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1px;
+  background:var(--color-border); border:1px solid var(--color-border); margin-bottom:22px;
+}
+.home-stat{
+  appearance:none; border:0; background:var(--color-surface); padding:12px 14px; text-align:left;
+  cursor:pointer; display:flex; flex-direction:column; gap:2px; transition:background .12s;
+}
+.home-stat:hover{background:#fafafa}
+.home-stat b{font-family:var(--font-mono); font-size:23px; font-weight:700; line-height:1.2}
+.home-stat i{font-style:normal; font-size:11.5px; color:var(--color-text-secondary)}
+.home-block{margin-bottom:22px}
+.home-block-head{
+  display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:10px;
+}
+.home-block-head em{margin-left:auto; font-style:normal; font-size:11px; color:var(--color-text-secondary); font-weight:400}
+.home-ops{display:flex; flex-wrap:wrap; gap:8px}
+.home-op{
+  appearance:none; border:1px solid var(--color-border); background:var(--color-surface);
+  padding:6px 11px; border-radius:2px; font-size:12.5px; cursor:pointer; color:var(--color-text);
+  transition:border-color .12s,background .12s;
+}
+.home-op:hover{border-color:var(--color-dark); background:#fafafa}
+.home-op-note{margin-top:10px; font-size:11.5px; color:var(--color-text-secondary)}
+.home-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:10px}
+.home-card{
+  appearance:none; text-align:left; display:flex; gap:10px; align-items:flex-start;
+  border:1px solid var(--color-border); background:var(--color-surface); padding:13px 14px;
+  border-radius:2px; cursor:pointer; transition:border-color .12s;
+}
+.home-card:hover{border-color:var(--color-dark)}
+.home-card-icon{font-size:14px; line-height:1.4}
+.home-card-body{display:flex; flex-direction:column; gap:3px}
+.home-card-body b{font-size:13px; font-weight:600}
+.home-card-body i{font-style:normal; font-size:11.5px; color:var(--color-text-secondary); line-height:1.6}
+.home-tags{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px}
+.home-links{display:flex; flex-wrap:wrap; gap:8px}
+.home-foot{
+  margin-top:6px; border:1px solid #ece0c6; background:#fdfaf2; border-radius:2px;
+  padding:9px 12px; font-size:11.5px; color:#6b5424;
+}
+.home-foot a{color:inherit}
+/* ===== 聊天消息 ===== */
+.msg-row{display:flex; gap:10px; padding:12px 0; border-bottom:1px solid var(--color-divider)}
+.msg-avatar{
+  flex:0 0 26px; height:26px; border-radius:2px; display:flex; align-items:center; justify-content:center;
+  font-size:11px; background:#f0f0f0; color:var(--color-text-secondary);
+}
+.role-assistant .msg-avatar{background:var(--color-dark); color:#fff}
+.msg-body{flex:1; min-width:0}
+.msg-bubble{font-size:13.5px; line-height:1.8; white-space:pre-wrap; word-break:break-word}
+.msg-bubble b{font-weight:600}
+.msg-meta{font-size:11px; color:var(--color-text-secondary); margin-top:6px}
+/* ===== 操作卡 ===== */
+.op-card{border:1px solid var(--color-border); border-radius:2px; margin-top:10px; background:var(--color-surface)}
+.op-card.state-awaiting_confirm{border-color:#e2cf9f; background:#fffdf7}
+.op-card.state-failed{border-color:#eed3d3}
+.op-head{display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--color-divider)}
+.op-area{font-size:10.5px; letter-spacing:.05em; color:var(--color-text-secondary); border:1px solid var(--color-border); padding:2px 6px; border-radius:2px}
+.op-title{font-size:13px; font-weight:600}
+.op-state{margin-left:auto; font-size:11.5px; color:var(--color-text-secondary); display:flex; align-items:center; gap:5px}
+.op-body{padding:11px 12px}
+.op-details{margin:0 0 8px; padding-left:18px; font-size:12.5px; color:#404040}
+.op-warning{font-size:12px; color:#8a6d1f; background:#fdf6e3; border:1px solid #ece0c6; padding:7px 9px; border-radius:2px; margin-bottom:8px}
+.op-actions{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.op-running{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--color-text-secondary)}
+.op-result{display:flex; flex-direction:column; gap:8px}
+.op-summary{font-size:12.5px}
+.op-output{margin:0; padding-left:18px; font-size:12.5px; color:#404040}
+.op-stats{display:flex; flex-wrap:wrap; gap:8px}
+.op-stat{display:flex; flex-direction:column; border:1px solid var(--color-border); padding:5px 9px; border-radius:2px; min-width:74px}
+.op-stat b{font-family:var(--font-mono); font-size:15px; line-height:1.3}
+.op-stat i{font-style:normal; font-size:10.5px; color:var(--color-text-secondary)}
+.op-link{font-size:12.5px; color:var(--color-dark); text-decoration:underline}
+.spinner{
+  display:inline-block; width:11px; height:11px; border:1.6px solid var(--color-border);
+  border-top-color:var(--color-dark); border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ===== 输入区 ===== */
+.composer{flex:0 0 auto; border-top:1px solid var(--color-border); background:var(--color-surface); padding:10px 24px 12px}
+.composer-inner{max-width:980px; margin:0 auto}
+.composer-hint{display:flex; align-items:center; gap:10px; font-size:11px; color:var(--color-text-secondary); margin-bottom:6px}
+.composer-hint-main{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.composer-box{border:1px solid var(--color-border); border-radius:2px; background:#fff}
+.composer-box:focus-within{border-color:var(--color-dark)}
+.composer-input{
+  width:100%; border:0; resize:none; padding:9px 11px 4px; font-family:inherit; font-size:13.5px;
+  line-height:1.7; background:transparent; color:var(--color-text); min-height:52px;
+}
+.composer-actions{display:flex; align-items:center; gap:8px; padding:6px 9px 8px}
+.composer-left{display:flex; align-items:center; gap:6px; flex:1; min-width:0}
+.composer-right{display:flex; align-items:center; gap:6px}
+/* ===== 表格 ===== */
+.table{width:100%; border-collapse:collapse; font-size:12.5px}
+.table th{
+  text-align:left; font-weight:500; color:var(--color-text-secondary); font-size:11.5px; padding:8px 10px;
+  border-bottom:1px solid var(--color-border); background:#fcfcfc; white-space:nowrap;
+}
+.table td{padding:9px 10px; border-bottom:1px solid var(--color-divider); vertical-align:middle}
+.table tr:hover td{background:#fcfcfc}
+.table tr.row-on td{background:#fbfbfb}
+.table-actions{display:flex; flex-wrap:wrap; gap:8px}
+.table-actions button{
+  appearance:none; border:0; background:none; padding:0; font-size:12px; color:var(--color-text-secondary);
+  cursor:pointer; text-decoration:underline; text-underline-offset:3px;
+}
+.table-actions button:hover{color:var(--color-dark)}
+.search-box{display:flex; gap:8px}
+.search-box input{flex:1; min-width:0}
+.segmented{display:inline-flex; background:#f0f0f0; padding:2px; border-radius:2px}
+.segmented button{
+  appearance:none; border:0; background:transparent; font-size:12.5px; padding:5px 14px;
+  cursor:pointer; border-radius:2px; color:var(--color-text-secondary);
+}
+.segmented button:hover{color:var(--color-text)}
+.segmented button.on{background:var(--color-surface); color:var(--color-text); font-weight:600}
+.pager button{margin-left:0}
+.table input[type="checkbox"],.content input[type="checkbox"]{accent-color:var(--color-dark)}
+.quick-chip{
+  appearance:none; border:1px solid var(--color-border); background:#fff; border-radius:2px;
+  padding:3px 9px; font-size:11.5px; color:var(--color-text-secondary); cursor:pointer;
+}
+.quick-chip:hover{border-color:var(--color-dark); color:var(--color-dark)}
+/* ===== 检索结果 ===== */
+.result{border:1px solid var(--color-border); border-radius:2px; padding:12px 14px; margin-bottom:10px; background:#fff}
+.result .meta{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11.5px; color:var(--color-text-secondary)}
+.result .chunk{margin-top:8px; font-size:12.5px; line-height:1.8; border-left:2px solid var(--color-dark); padding-left:12px; color:#404040}
+.result em{background:var(--color-dark); color:#fff; font-style:normal; padding:0 2px}
+/* ===== 时间线 ===== */
+.timeline{border-left:1px solid var(--color-border); margin-left:4px; padding-left:14px}
+.ev{position:relative; padding:6px 0; font-size:12.5px}
+.ev::before{content:""; position:absolute; left:-19px; top:11px; width:7px; height:7px; border-radius:50%; background:#c4c4c4; border:1px solid #fff}
+.ev .kvs{font-size:11px; color:var(--color-text-secondary)}
+.kvs{display:flex; gap:10px; flex-wrap:wrap}
+/* ===== 弹层 ===== */
+.mask{position:fixed; inset:0; background:rgba(0,0,0,.32); z-index:2000; display:flex; align-items:center; justify-content:center; padding:24px}
+.modal{background:#fff; border-radius:2px; width:min(880px,96vw); max-height:88vh; display:flex; flex-direction:column}
+.modal-head{display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid var(--color-border)}
+.modal-body{padding:16px; overflow:auto; flex:1}
+.modal-foot{padding:10px 16px; border-top:1px solid var(--color-border); display:flex; justify-content:flex-end; gap:8px}
+.paper{font-size:13px; line-height:1.85; color:#333}
+.paper h3{font-size:13px; margin:14px 0 6px}
+.paper table{border-collapse:collapse; font-size:12px; margin-bottom:8px}
+.paper th,.paper td{border:1px solid var(--color-border); padding:5px 9px}
+.toast{
+  position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(8px); z-index:3000;
+  background:var(--color-dark); color:#fff; font-size:12.5px; padding:8px 14px; border-radius:2px;
+  opacity:0; pointer-events:none; transition:opacity .18s,transform .18s;
+}
+.toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
+/* ===== 窄屏 ===== */
+@media (max-width:960px){
+  .sidebar{display:none}
+  .main{left:0}
+  .content{padding:18px 14px 32px}
+  .chat-header{padding:0 14px}
+  .home-wrap{padding:20px 14px 32px}
+  .home-title{font-size:23px}
+  .home-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .home-cards{grid-template-columns:1fr}
+  .composer{padding:10px 14px}
+}
+    /* —— 图标（统一几何字形，不用 emoji）—— */
+    .ic-file { font-size: 13px; line-height: 1; color: var(--color-text-secondary); display: inline-block; width: 14px; text-align: center; }
+    .ic-file.t-pdf { color: #d9414e; }
+    .ic-file.t-docx { color: #2f6fd0; }
+    .ic-file.t-xlsx { color: #1f8a4c; }
+    .ic-file.t-pptx { color: #d97a1f; }
+    .ic-file.t-image { color: #7c53c3; }
+    .ic-file.t-txt { color: var(--color-text-secondary); }
+    .ic-lib { color: var(--color-text-secondary); font-size: 13px; }
+    .home-card-icon { font-size: 13px; line-height: 1; color: var(--color-text-secondary); display: inline-block; width: 14px; text-align: center; }
+    .ic-spark { color: var(--color-text-secondary); font-size: 11px; }
+    .ic-warn { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px;
+      border: 1px solid currentColor; border-radius: 50%; font-size: 10px; font-weight: 700; line-height: 1;
+      vertical-align: -2px; margin-right: 2px; }
+    .lib-chip { display: inline-block; padding: 1px 6px; border: 1px solid var(--color-border); border-radius: 2px;
+      font-size: 11.5px; color: var(--color-text-secondary); white-space: nowrap; }
+    .brand-mark { width: 14px; height: 14px; border-radius: 3px; background: var(--color-text-primary); display: inline-block; }
+
+</style>
+</head>
+<body>
+<header class="navbar">
+  <div class="brand" data-nav="#/"><span class="brand-mark" aria-hidden="true"></span><b>知识库 AI 会话原型</b></div>
+  <span class="badge">原型演示 · 本地模拟</span>
+  <span class="grow"></span>
+  <button class="btn sm" id="btn-reset">重置演示数据</button>
+</header>
+<nav class="sidebar" id="sidebar"></nav>
+<main class="main" id="main"></main>
+<div class="toast" id="toast"></div>
+<script>
+/* ---------------- 1. 基础工具 ---------------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const MONO = (n) => (typeof n === 'number' ? n.toLocaleString('zh-CN') : String(n ?? ''));
+function fmtSize(bytes) {
+  if (!bytes) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  let v = bytes, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
+  return (i === 0 ? v : v.toFixed(1)) + ' ' + u[i];
+}
+const pad = (n) => String(n).padStart(2, '0');
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+const uid = (p) => p + '-' + Math.random().toString(36).slice(2, 9);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function toast(text) {
+  const t = $('#toast');
+  t.textContent = text; t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1800);
+}
+const safeStore = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* file:// 或隐私模式下静默降级为内存态 */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+
+/* ---------------- 2. 演示数据（唯一数据源） ---------------- */
+const DIM = 2048;                    // 默认向量维度（与 React 版 constants.EMBEDDING_DIMS 一致）
+const CHUNK = 512;
+const BUILTIN_LIBS = ['产品信息库', '企业信息库', '项目信息库'];
+const SOURCE_TEXT = { session: '示例资料', upload: '页面内上传', index: '目录索引' };
+const STATUS_TEXT = { pending: '待处理', processing: '处理中', completed: '已完成', failed: '失败', archived: '已归档' };
+const STATUS_ORDER = ['pending', 'processing', 'completed', 'failed', 'archived'];
+
+const SEEDS = [
+  // 会话示例资料：同时出现在「文件管理」与 AI 会话资料区（bridge 语义）
+  ['PRD-信息库v1.md', '产品信息库/产品需求', 18432, 'completed', 12, 26, '华东石化股份有限公司', '产品部', '产品需求', 0, 'mat-sample-001'],
+  ['接口设计说明.md', '产品信息库/技术接口', 24576, 'completed', 8, 24, '华东石化股份有限公司', '产品部', '技术文档', 0, 'mat-sample-002'],
+  ['2026-02-18 产品评审.md', '企业信息库/会议纪要', 12288, 'completed', 6, 21, '浙能电力集团', '企业事务部', '会议纪要', 0, 'mat-sample-003'],
+  ['现场沟通记录.md', '企业信息库/客户往来', 8192, 'completed', 5, 19, '浙能电力集团', '企业事务部', '沟通记录', 0, 'mat-sample-004'],
+  ['同类产品对比.md', '项目信息库/市场调研', 15360, 'completed', 7, 17, '万华化学集团', '项目部', '市场调研', 0, 'mat-sample-005'],
+  // 合同类资料：数据总览的客户/部门分组、搜索筛选都基于这批数据
+  ['华东石化检维修服务合同.pdf', '项目信息库/华东石化检维修/合同', 8388608, 'completed', 132, 12, '华东石化股份有限公司', '项目部', '合同协议', 1286.4],
+  ['华东石化检维修项目技术协议.pdf', '项目信息库/华东石化检维修/技术', 7340032, 'completed', 118, 12, '华东石化股份有限公司', '项目部', '技术文档', 1286.4],
+  ['华东石化现场施工安全交底记录.doc', '项目信息库/华东石化检维修/现场', 942080, 'completed', 26, 11, '华东石化股份有限公司', '项目部', '现场记录', 1286.4],
+  ['华东石化设备验收报告.pdf', '项目信息库/华东石化检维修/验收', 2097152, 'completed', 34, 10, '华东石化股份有限公司', '项目部', '验收报告', 1286.4],
+  ['浙能电厂密封改造合同.pdf', '项目信息库/浙能电厂密封改造/合同', 6291456, 'completed', 104, 11, '浙能电力集团', '项目部', '合同协议', 864.0],
+  ['浙能电厂密封改造方案.docx', '项目信息库/浙能电厂密封改造/技术', 3670016, 'completed', 78, 11, '浙能电力集团', '项目部', '技术方案', 864.0],
+  ['浙能电厂项目结算清单.xlsx', '项目信息库/浙能电厂密封改造/结算', 1310720, 'completed', 22, 9, '浙能电力集团', '财务部', '结算清单', 864.0],
+  ['万华化学年度框架采购合同.pdf', '项目信息库/万华化学年度框架/合同', 9175040, 'completed', 148, 10, '万华化学集团', '项目部', '合同协议', 2140.0],
+  ['万华化学年度框架技术规格书.pdf', '项目信息库/万华化学年度框架/技术', 5767168, 'completed', 96, 10, '万华化学集团', '项目部', '技术规格', 2140.0],
+  ['万华化学项目结算清单.xlsx', '项目信息库/万华化学年度框架/结算', 1048576, 'processing', 0, 4, '万华化学集团', '财务部', '结算清单', 2140.0],
+  ['恒力石化公用工程改造合同.pdf', '项目信息库/恒力石化公用工程/合同', 7864320, 'completed', 126, 9, '恒力石化集团', '项目部', '合同协议', 1560.0],
+  ['恒力石化公用工程改造方案.docx', '项目信息库/恒力石化公用工程/技术', 4194304, 'completed', 82, 9, '恒力石化集团', '项目部', '技术方案', 1560.0],
+  ['恒力石化付款节点确认单.xlsx', '项目信息库/恒力石化公用工程/结算', 786432, 'completed', 18, 8, '恒力石化集团', '财务部', '结算清单', 1560.0],
+  ['供应商准入管理办法.pdf', '企业信息库/采购管理', 2654208, 'completed', 47, 20, '集团内部', '采购部', '管理制度', 0],
+  ['供应商名录 2026.xlsx', '企业信息库/采购管理', 892928, 'completed', 21, 18, '集团内部', '采购部', '供应商信息', 0],
+  ['质量管理体系文件.pdf', '企业信息库/质量体系', 5242880, 'failed', 0, 17, '集团内部', '质量部', '管理制度', 0, null, '文件加密，无法解析文本内容'],
+  ['产品需求文档 v3.2.pdf', '产品信息库/产品需求', 4812336, 'completed', 86, 16, '华东石化股份有限公司', '产品部', '产品需求', 0],
+  ['用户操作手册.pdf', '产品信息库/使用文档', 6120448, 'pending', 0, 26, '华东石化股份有限公司', '产品部', '使用文档', 0],
+  ['版本发布记录 2026.xlsx', '产品信息库/版本记录', 486400, 'archived', 12, 57600, '华东石化股份有限公司', '产品部', '版本记录', 0],
+];
+
+const extOf = (name) => (name.split('.').pop() || '').toLowerCase();
+function fileType(name) {
+  const e = extOf(name);
+  if (['doc', 'docx'].includes(e)) return 'docx';
+  if (['ppt', 'pptx'].includes(e)) return 'pptx';
+  if (['xls', 'xlsx', 'csv'].includes(e)) return 'xlsx';
+  if (['png', 'jpg', 'jpeg'].includes(e)) return 'image';
+  if (['md', 'txt'].includes(e)) return 'txt';
+  return e;
+}
+const TYPE_ICON = { pdf: '▬', docx: '▭', pptx: '▮', xlsx: '▯', image: '◪', txt: '▫' };
+
+function libraryOf(dir) {
+  return String(dir || '').split('/')[0].trim() || '未归档';
+}
+function knownLibraries() {
+  const out = LIBRARIES.slice();
+  FILES.forEach((f) => {
+    const name = libraryOf(f.directory_path);
+    if (name && !out.includes(name)) out.push(name);
+  });
+  return out;
+}
+function libraryCounts() {
+  const m = {};
+  FILES.forEach((f) => {
+    const name = libraryOf(f.directory_path);
+    m[name] = (m[name] || 0) + 1;
+  });
+  return m;
+}
+function registerLibrary(name) {
+  const n = String(name || '').trim();
+  if (!n || n === '未归档') return null;
+  if (!LIBRARIES.includes(n)) { LIBRARIES.push(n); persist(); }
+  return n;
+}
+
+function buildFiles() {
+  const now = Date.now();
+  return SEEDS.map((s, i) => {
+    const [name, dir, size, status, chunks, minutes, customer, department, nature, amount, materialId, error] = s;
+    const done = status === 'completed' || status === 'archived';
+    return {
+      id: materialId ? `file-${materialId}` : `file-demo-${String(i + 1).padStart(3, '0')}`,
+      original_name: name,
+      file_type: fileType(name),
+      file_size: size,
+      status,
+      error_message: error,
+      chunk_count: chunks,
+      character_count: chunks * CHUNK,
+      directory_path: dir,
+      customer, department, nature,
+      amount_wan: amount,
+      material_id: materialId || undefined,
+      source: materialId ? 'session' : 'index',
+      progress: status === 'processing' ? 42 : undefined,
+      created_at: new Date(now - minutes * 60000).toISOString(),
+      updated_at: new Date(now - minutes * 30000).toISOString(),
+      parsed_at: done ? new Date(now - minutes * 45000).toISOString() : undefined,
+      summary: `${nature}，共 ${chunks} 段，来源：${materialId ? '示例资料' : '目录索引'}`,
+    };
+  });
+}
+
+let LIBRARIES = BUILTIN_LIBS.slice();
+let FILES = buildFiles();
+let currentLibrary = BUILTIN_LIBS[0];
+let TASKS = [];                       // 添加卡：一句话把资料加进信息库
+let ANNOS = [
+  { id: 'anno-demo-001', query: '质保期多久', file_id: 'file-demo-006', file_name: '华东石化检维修服务合同.pdf',
+    rating: 'inaccurate', issues: '检索结果与问题不匹配', status: 'pending', result_note: '', created_at: new Date(Date.now() - 3600e3).toISOString() },
+  { id: 'anno-demo-002', query: '预付款比例', file_id: 'file-demo-010', file_name: '浙能电厂密封改造合同.pdf',
+    rating: 'accurate', issues: '', status: 'done', result_note: '已人工复核：与合同第 4.2 条一致', created_at: new Date(Date.now() - 7200e3).toISOString() },
+];
+const AGENT_EVENTS = [
+  { time: new Date(Date.now() - 300e3).toISOString(), type: 'watchdog', message: '解析看门狗巡检完成，未发现停滞任务' },
+  { time: new Date(Date.now() - 900e3).toISOString(), type: 'task', message: '任务 T-2026-0311 解析完成（86 段）' },
+  { time: new Date(Date.now() - 1800e3).toISOString(), type: 'annotation', message: '收到 1 条检索反馈，已排入重扫队列' },
+  { time: new Date(Date.now() - 3600e3).toISOString(), type: 'circuit', message: '熔断器状态 closed，失败 0 次' },
+  { time: new Date(Date.now() - 5400e3).toISOString(), type: 'learning', message: '学习策略命中 2 次：目录层级优先' },
+];
+const SERVERS = {
+  embedding: { name: '向量服务', alive: true, endpoint: 'http://10.0.0.21:8000', latency_ms: 22, detail: 'bge-large-zh-v1.5 · ' + DIM + ' 维' },
+  ocr:       { name: 'OCR 服务', alive: true, endpoint: 'http://10.0.0.21:8001', latency_ms: 31, detail: 'PaddleOCR PP-OCRv4' },
+  llm:       { name: '大模型服务', alive: true, endpoint: 'http://10.0.0.22:11434', latency_ms: 46, detail: 'qwen2.5:14b' },
+};
+const CONFIG = {
+  database: { type: 'ChromaDB', url: '本地模拟（原型不联网）', vector: 'HNSW' },
+  storage: { type: '本地资料库', endpoint: 'D:\\AProjectScript\\RagSystem\\data', bucket: 'knowledge-base' },
+  queue: { type: '本地任务队列', concurrency: 2 },
+  embedding: { mode: '远程', dim: DIM, gpu_endpoint: 'http://10.0.0.21:8000', model: 'bge-large-zh-v1.5' },
+  ocr: { available: true, engine: 'PaddleOCR', gpu_endpoint: 'http://10.0.0.21:8001', model: 'PP-OCRv4' },
+  gpu_cluster: { embedding: true, ocr: true },
+  llm: { endpoint: 'http://10.0.0.22:11434', model: 'qwen2.5:14b', available: true },
+  local_model: {
+    embedding_mode: 'remote', active: false, total_dim: DIM,
+    bge: { name: 'bge-large-zh-v1.5', loaded: true, dim: DIM },
+    qwen: { name: 'qwen2.5:14b', loaded: false, dim: null },
+    ocr: { available: true, engines: ['PaddleOCR', 'RapidOCR'] },
+    llm: { name: 'qwen2.5:14b', endpoint: 'http://127.0.0.1:11434', available: false, local: true, standby: true, running: false },
+  },
+};
+const AGENT = {
+  watchdog: { running: true, last_heartbeat: new Date().toISOString(), stuck_tasks: 1, restart_count: 2 },
+  circuit_breaker: { state: 'closed', failures: 0, threshold: 5 },
+  stats: { total_tasks: 128, success_rate: 0.96, avg_duration_ms: 4200 },
+  events: AGENT_EVENTS,
+};
+const AGENT_ACTIONS = {
+  scan: '立即巡检', restart_stuck: '重启停滞任务', clear_circuit: '重置熔断器',
+  learn: '触发一次学习', rescan_annotations: '重扫未处理反馈',
+};
+
+/* ---------------- 3. 内存 API（读操作直读，写操作串行） ---------------- */
+let writeChain = Promise.resolve();
+function serializeWrite(task) {
+  const run = writeChain.then(task, task);
+  writeChain = run.catch(() => {});
+  return run;
+}
+function fileById(id) { return FILES.find((f) => f.id === id); }
+function touch(f) { f.updated_at = new Date().toISOString(); }
+const isSessionFile = (f) => Boolean(f.material_id);
+
+const api = {
+  async listFiles({ page = 1, page_size = 10, status, file_type, keyword, session_only, library, sort_by = 'updated_at', order = 'desc' } = {}) {
+    const kw = (keyword || '').trim().toLowerCase();
+    let items = FILES.filter((f) => {
+      if (status && status !== 'all' && f.status !== status) return false;
+      if (file_type && file_type !== 'all' && f.file_type !== file_type) return false;
+      if (session_only && !isSessionFile(f)) return false;
+      if (library && libraryOf(f.directory_path) !== library) return false;
+      if (kw) {
+        const hay = [f.original_name, f.directory_path, f.customer, f.department].join(' ').toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+    items = items.slice().sort((a, b) => {
+      const va = a[sort_by] || '', vb = b[sort_by] || '';
+      const c = va < vb ? -1 : va > vb ? 1 : 0;
+      return order === 'asc' ? c : -c;
+    });
+    const total = items.length;
+    const start = (page - 1) * page_size;
+    return { total, page, page_size, items: items.slice(start, start + page_size) };
+  },
+  async getFileStats() {
+    const by_status = {};
+    STATUS_ORDER.forEach((s) => { by_status[s] = FILES.filter((f) => f.status === s).length; });
+    return {
+      total_files: FILES.length,
+      total_size: FILES.reduce((n, f) => n + f.file_size, 0),
+      total_chunks: FILES.reduce((n, f) => n + f.chunk_count, 0),
+      by_status,
+      by_type: FILES.reduce((m, f) => (m[f.file_type] = (m[f.file_type] || 0) + 1, m), {}),
+    };
+  },
+  async getFileDetail(id) { return fileById(id); },
+  async uploadFile(name, size) {
+    return serializeWrite(async () => {
+      await sleep(320);
+      const f = {
+        id: uid('file'), original_name: name, file_type: fileType(name), file_size: size,
+        status: 'pending', chunk_count: 0, character_count: 0, directory_path: `${registerLibrary(currentLibrary) || '未归档'}/页面内上传`,
+        customer: '集团内部', department: '产品部', nature: '页面内上传', amount_wan: 0,
+        material_id: uid('mat'), source: 'upload',
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        summary: '页面内上传，尚未处理',
+      };
+      FILES.unshift(f);
+      MATERIALS.unshift({ id: f.material_id, name: f.original_name, fileId: f.id, source: 'upload' });
+      return { ok: true, file: f };
+    });
+  },
+  async fileAction(id, action) {
+    return serializeWrite(async () => {
+      await sleep(240);
+      const f = fileById(id);
+      if (!f) throw new Error('资料不存在');
+      if (action === 'delete') {
+        const mat = f.material_id;
+        FILES = FILES.filter((x) => x.id !== id);
+        if (mat) MATERIALS = MATERIALS.filter((m) => m.id !== mat);
+        return { ok: true, deleted: 1 };
+      }
+      if (action === 'parse' || action === 'retry') {
+        f.status = 'processing'; f.progress = 30; f.error_message = undefined; touch(f);
+        await sleep(420);
+        f.status = 'completed'; f.progress = undefined;
+        f.chunk_count = Math.max(4, Math.round(f.file_size / 65536) + 6);
+        f.character_count = f.chunk_count * CHUNK;
+        f.parsed_at = new Date().toISOString();
+        touch(f);
+        AGENT.events.unshift({ time: new Date().toISOString(), type: 'task', message: `「${f.original_name}」处理完成（${f.chunk_count} 段）` });
+        return { ok: true };
+      }
+      return { ok: false };
+    });
+  },
+  async batchDeleteFiles(ids) {
+    return serializeWrite(async () => {
+      await sleep(260);
+      const mats = FILES.filter((f) => ids.includes(f.id)).map((f) => f.material_id).filter(Boolean);
+      const deleted = FILES.filter((f) => ids.includes(f.id)).length;
+      FILES = FILES.filter((f) => !ids.includes(f.id));
+      MATERIALS = MATERIALS.filter((m) => !mats.includes(m.id));
+      return { ok: true, deleted };
+    });
+  },
+  async search({ q = '', mode = 'hybrid', file_type, department, customer, nature, time_start, time_end, amount_min, amount_max, page = 1, page_size = 10 } = {}) {
+    const t0 = Date.now();
+    await sleep(260);
+    const kw = q.trim();
+    const modeKey = mode === 'filename' || mode === 'name' ? 'name' : mode === 'content' ? 'content' : 'all';
+    const hasStructured = Boolean(department || customer || nature || (file_type && file_type !== 'all'));
+    const minScore = kw ? 0.85 : hasStructured ? 0.3 : modeKey === 'content' ? 0.4 : 0.42;
+
+    const results = [];
+    for (const f of FILES) {
+      if (f.status === 'failed' || f.status === 'archived') continue;
+      if (file_type && file_type !== 'all' && f.file_type !== file_type) continue;
+      if (department && f.department !== department) continue;
+      if (customer && f.customer !== customer) continue;
+      if (nature && f.nature !== nature) continue;
+      if (time_start && (f.parsed_at || f.created_at).slice(0, 10) < time_start) continue;
+      if (time_end && (f.parsed_at || f.created_at).slice(0, 10) > time_end) continue;
+      if (amount_min != null && (f.amount_wan || 0) < amount_min) continue;
+      if (amount_max != null && (f.amount_wan || 0) > amount_max) continue;
+
+      const nameHit = kw ? f.original_name.toLowerCase().includes(kw.toLowerCase()) || f.directory_path.toLowerCase().includes(kw.toLowerCase()) : true;
+      const paragraphs = paragraphsOf(f);
+      const bodyHits = kw ? paragraphs.filter((p) => p.includes(kw)) : paragraphs.slice(0, hasStructured || !kw ? 1 : 0);
+      if (kw && modeKey !== 'name' && bodyHits.length === 0 && !nameHit) continue;
+      if (kw && modeKey === 'name' && !nameHit) continue;
+      if (!kw && !hasStructured && modeKey === 'content') { /* 空查询浏览正文模式：列出全部段落首段 */ }
+
+      if (nameHit || bodyHits.length > 0) {
+        results.push({
+          file_id: f.id, file_name: f.original_name, file_type: f.file_type,
+          chunk_text: bodyHits[0] || `${f.original_name}：${f.summary || ''}`,
+          score: nameHit ? 0.99 : Math.min(0.97, 0.72 + bodyHits.length * 0.02),
+          source_page: 1, source_section: f.nature, nature: f.nature, nature_confidence: 0.92,
+          contract_info: f.amount_wan ? { contract_name: f.original_name, customer_name: f.customer, amount: f.amount_wan, department: f.department } : undefined,
+          highlight: kw, from_cache: false, reranked: true,
+          file_time: f.parsed_at || f.created_at,
+        });
+      }
+    }
+    results.sort((a, b) => b.score - a.score);
+    const a = (page - 1) * page_size;
+    return {
+      query: q, mode: modeKey === 'name' ? 'filename' : modeKey, total: results.length, all_total: results.length,
+      took_ms: Date.now() - t0, page, page_size, results: results.slice(a, a + page_size),
+    };
+  },
+  async submitAnnotation({ query, file_id, rating, issues }) {
+    return serializeWrite(async () => {
+      await sleep(200);
+      const f = fileById(file_id);
+      const id = uid('anno');
+      ANNOS.unshift({
+        id, query, file_id, file_name: f ? f.original_name : file_id, rating, issues: issues || '',
+        status: 'pending', result_note: '', created_at: new Date().toISOString(),
+      });
+      AGENT.events.unshift({ time: new Date().toISOString(), type: 'annotation', message: `收到检索反馈（${rating === 'accurate' ? '准确' : '不准确'}）：${query || '未填写检索词'}` });
+      return { ok: true, id };
+    });
+  },
+  async listAnnotations() { return { items: ANNOS.slice(0, 100) }; },
+  async processAnnotation(id, note) {
+    return serializeWrite(async () => {
+      await sleep(200);
+      const a = ANNOS.find((x) => x.id === id);
+      if (a) { a.status = 'done'; a.result_note = note || '已人工复核'; }
+      return { ok: true };
+    });
+  },
+  async runAgentAction(action) {
+    return serializeWrite(async () => {
+      await sleep(360);
+      const label = AGENT_ACTIONS[action] || action;
+      if (action === 'restart_stuck') AGENT.watchdog.restart_count += 1;
+      if (action === 'clear_circuit') AGENT.circuit_breaker.failures = 0;
+      AGENT.events.unshift({ time: new Date().toISOString(), type: 'watchdog', message: `${label}：本地模拟执行完成` });
+      return { ok: true, message: `${label} 已完成（本地模拟）` };
+    });
+  },
+  async testRemoteModel(type) {
+    return serializeWrite(async () => {
+      await sleep(420);
+      const s = SERVERS[type];
+      if (!s) return { ok: false, error: '未知模型类型' };
+      SERVERS[type] = { ...s, latency_ms: 18 + Math.round(Math.random() * 40) };
+      return { ok: true, latency_ms: SERVERS[type].latency_ms };
+    });
+  },
+  async toggleModel(type, mode) {
+    return serializeWrite(async () => {
+      await sleep(260);
+      if (type === 'embedding') CONFIG.embedding.mode = mode === 'local' ? '本地' : '远程';
+      CONFIG.local_model.embedding_mode = mode;
+      return { ok: true };
+    });
+  },
+  async startLocalModel() {
+    return serializeWrite(async () => {
+      await sleep(600);
+      const lm = CONFIG.local_model;
+      lm.active = true; lm.embedding_mode = 'local';
+      lm.bge = { ...lm.bge, loaded: true, dim: lm.total_dim };
+      lm.qwen = { ...lm.qwen, loaded: true };
+      lm.llm = { ...lm.llm, available: true, running: true, standby: false };
+      return { ok: true };
+    });
+  },
+  async indexFolder(path) {
+    return serializeWrite(async () => {
+      await sleep(500);
+      return { ok: true, folder_path: path, count: 3 };
+    });
+  },
+};
+
+/* ---------------- 4. 会话状态 / 资料 ---------------- */
+let MATERIALS = FILES.filter(isSessionFile).map((f) => ({ id: f.material_id, name: f.original_name, fileId: f.id, source: 'session' }));
+let SESSIONS = [{ id: 'sess-demo', title: '演示会话', createdAt: Date.now(), updatedAt: Date.now() }];
+let MESSAGES = {};                    // messageId -> message
+let activeSession = 'sess-demo';
+
+function messagesOf(sid) {
+  return Object.values(MESSAGES).filter((m) => m.sessionId === sid).sort((a, b) => a.seq - b.seq);
+}
+function nextSeq(sid) {
+  const list = messagesOf(sid);
+  return list.length ? list[list.length - 1].seq + 1 : 1;
+}
+function addMessage(msg) { MESSAGES[msg.id] = msg; return msg; }
+function patchMessage(id, patch) {
+  const m = MESSAGES[id];
+  if (m) MESSAGES[id] = { ...m, ...patch };
+}
+
+/* ---------------- 5. 检索回答（会话里的"提问"链路） ---------------- */
+const SENTENCES = [
+  '设备质量保证期为验收合格后 12 个月。',
+  '预付款比例为合同总价的 30%，验收后支付 60%，质保金 10%。',
+  '本项目采用 EPC 总承包模式，工期 180 日历天。',
+  '供应商准入需通过质量体系与财务能力两项审核。',
+  '密封改造范围覆盖 3 号机组高温高压管道法兰。',
+  '年度框架采购合同的有效期为 2026 年 1 月至 12 月。',
+  '现场施工安全交底由项目经理与安全员共同签发。',
+  '产品需求文档 v3.2 明确知识库需支持 2048 维向量检索。',
+  '接口设计说明约定了目录层级优先的召回策略。',
+  '版本发布记录显示 2026 年共发布 12 个版本。',
+  '结算清单以工程量确认单为计价依据。',
+  '技术规格书要求焊缝一次探伤合格率不低于 98%。',
+];
+function paragraphsOf(f) {
+  const base = [
+    `${f.original_name}（${SOURCE_TEXT[f.source] || '资料'}）`,
+    `归属：${f.customer || '集团内部'} · ${f.department || '—'} · ${f.nature || '—'}`,
+    ...SENTENCES,
+  ];
+  return base.filter((p) => !f.nature || p.includes(f.nature) || true).slice(0, 6);
+}
+function buildAnswer(kind, q) {
+  const hits = FILES.filter((f) => f.status === 'completed').slice(0, 3);
+  if (kind === 'summary') {
+    return `当前资料库里共 ${FILES.length} 份资料，其中已完成 ${FILES.filter((f) => f.status === 'completed').length} 份。\n\n`
+      + `重点内容：\n` + hits.map((f, i) => `${i + 1}. ${f.original_name} —— ${f.summary || f.nature}`).join('\n');
+  }
+  if (kind === 'list') {
+    return `资料库里共有 ${FILES.length} 份资料：\n` + FILES.slice(0, 8).map((f) => `· ${f.original_name}（${STATUS_TEXT[f.status]}）`).join('\n')
+      + (FILES.length > 8 ? `\n… 还有 ${FILES.length - 8} 份，可以去「文件管理」看完整列表。` : '');
+  }
+  if (kind === 'cite') {
+    return `我找到 ${hits.length} 条相关依据：\n` + hits.map((f, i) => `\n[${i + 1}] ${f.original_name}\n    ${SENTENCES[i % SENTENCES.length]}`).join('\n');
+  }
+  return `没有在资料库里找到和「${q}」直接相关的内容。可以换个说法，或者先去「文件管理」把相关资料添加处理。`;
+}
+
+/* ---------------- 6. 操作指令解析（一句话做事） ---------------- */
+const has = (text, ...words) => words.some((w) => text.includes(w));
+function quotedNames(text) {
+  const out = [];
+  const re = /[「“"'《]([^」”"'》]+)[」”"'》]/g;
+  let m;
+  while ((m = re.exec(text))) out.push(m[1]);
+  return out;
+}
+function statusWords(text) {
+  if (has(text, '失败', '报错')) return 'failed';
+  if (has(text, '待处理', '等待处理', '还没处理')) return 'pending';
+  if (has(text, '处理中', '正在处理')) return 'processing';
+  if (has(text, '已完成', '完成了', '处理完成')) return 'completed';
+  if (has(text, '归档')) return 'archived';
+  return null;
+}
+function matchFiles(text, files) {
+  const named = quotedNames(text);
+  const hits = new Map();
+  for (const f of files) {
+    const blob = text.toLowerCase();
+    const full = f.original_name.toLowerCase();
+    const stem = full.replace(/\.[a-z0-9]+$/, '');
+    if (named.some((n) => full.includes(n.toLowerCase()) || n.toLowerCase().includes(stem))) hits.set(f.id, f);
+    else if (stem.length >= 4 && blob.includes(stem)) hits.set(f.id, f);
+  }
+  return [...hits.values()];
+}
+function cluster(status, count) {
+  return { status, count };
+}
+function parseOperation(text, files, ctx) {
+  const t = text.trim();
+  if (!t) return null;
+
+  // 帮助
+  if (has(t, '你能做什么', '会做什么', '怎么用', '帮助', '使用说明', '能帮我做什么', '支持哪些')) {
+    return {
+      kind: 'help', area: 'kb', title: '我能帮你做的事', confirm: 'none', params: {},
+      details: [
+        '文件：列出资料、看某份资料详情、上传、解析/重试、删除、按目录索引',
+        '搜索：按关键词、部门、客户、金额、性质筛选，翻页；也可以提交「准确 / 不准确」反馈',
+        '运维：看运行状态、立即巡检、重启停滞任务、重置熔断器、触发学习、重扫反馈',
+        '配置：看模型状态、测试向量/OCR/大模型连通、启动本地模型、切换远程/本地',
+        '不可撤销的动作（删除、切换模型）会先出一张卡，你点「确认执行」才会真的动。',
+      ],
+    };
+  }
+
+  // 纯疑问句交给提问链路（带明确动作的例外）
+  if (/^(怎么|如何|为什么|什么|是否|能否|能不能|可以吗)/.test(t) || /[？?]$/.test(t)) {
+    if (!has(t, '帮我删', '删掉', '删除', '执行', '跑一下', '做一下', '搜索', '检索', '查找', '找一下', '帮我找', '找找', '搜一下')) return null;
+  }
+
+  /* —— 文件 —— */
+  const selected = ctx.selectedFileIds || [];
+  if (has(t, '预览', '打开看一下', '打开看看', '看一眼')) {
+    const target = matchFiles(t, files)[0] || files.find((f) => selected.includes(f.id));
+    if (target) return { kind: 'open_preview', area: 'file', title: `预览 ${target.original_name}`, confirm: 'none', details: [target.directory_path], params: { fileId: target.id, name: target.original_name } };
+  }
+  if (has(t, '上传', '添加文件', '导入文件')) {
+    return { kind: 'upload_files', area: 'file', title: '上传资料', confirm: 'none', params: { pick: 'file' },
+      details: ['浏览器里必须由你亲自选中文件，我不能凭空造出一份资料。', '页面右上角的「上传资料」按钮就是入口。'] };
+  }
+  if (has(t, '索引', '扫描目录', '扫目录')) {
+    const folder = quotedNames(t)[0] || '项目信息库';
+    return { kind: 'index_folder', area: 'file', title: `索引目录「${folder}」`, confirm: 'card', params: { folderPath: folder, recursive: !has(t, '不递归', '只第一层') },
+      details: [`目录：${folder}`, has(t, '不递归', '只第一层') ? '范围：只第一层' : '范围：含子目录', '索引只新增目录里还没有的资料。'],
+      warning: '索引会往资料库里写入新记录，先确认目录没选错。' };
+  }
+  if (has(t, '重试', '重新解析')) {
+    const failed = files.filter((f) => f.status === 'failed');
+    const targets = matchFiles(t, files);
+    const list = targets.length ? targets : (failed.length ? failed : files.filter((f) => selected.includes(f.id)));
+    if (list.length) return { kind: 'retry_files', area: 'file', title: `重新处理 ${list.length} 份资料`, confirm: 'none', params: { fileIds: list.map((f) => f.id) }, details: list.slice(0, 6).map((f) => f.original_name) };
+  }
+  if (has(t, '解析', '处理一下', '开始处理')) {
+    const targets = matchFiles(t, files);
+    const list = targets.length ? targets : files.filter((f) => f.status === 'pending' || selected.includes(f.id));
+    if (list.length) return { kind: 'parse_files', area: 'file', title: `处理 ${list.length} 份资料`, confirm: 'none', params: { fileIds: list.map((f) => f.id) }, details: list.slice(0, 6).map((f) => f.original_name) };
+  }
+  if (has(t, '删除', '删掉', '清掉')) {
+    const targets = matchFiles(t, files);
+    let list = targets;
+    if (!list.length) list = files.filter((f) => selected.includes(f.id));
+    if (!list.length && has(t, '失败')) list = files.filter((f) => f.status === 'failed');
+    if (!list.length) {
+      return { kind: 'list_files', area: 'file', title: '不知道要删除哪些资料', confirm: 'none', params: {},
+        details: ['请带上文件名，例如「删除 质量管理体系文件.pdf」；也可以先在文件管理里勾选，再说「删除选中的资料」。'] };
+    }
+    return { kind: 'delete_files', area: 'file', title: `删除 ${list.length} 份资料`, confirm: 'card', params: { fileIds: list.map((f) => f.id) },
+      details: list.slice(0, 8).map((f) => `${f.original_name}（${f.directory_path}）`),
+      warning: '删除后它们会同时从检索范围里消失，并且不可撤销。' };
+  }
+  if (has(t, '详情', '看一下信息', '资料信息')) {
+    const target = matchFiles(t, files)[0];
+    if (target) return { kind: 'file_detail', area: 'file', title: `查看 ${target.original_name}`, confirm: 'none', params: { fileId: target.id }, details: [target.directory_path] };
+  }
+  if (has(t, '列出', '有哪些', '都有什么', '清单', '列表', '看看资料', '列一下')) {
+    const status = statusWords(t);
+    const sessionOnly = has(t, '会话', '示例资料', 'AI');
+    return { kind: 'list_files', area: 'file', title: status ? `列出「${STATUS_TEXT[status]}」的资料` : sessionOnly ? '列出会话里的资料' : '列出资料库里的资料',
+      confirm: 'none', params: { status, sessionOnly }, details: [status ? `状态：${STATUS_TEXT[status]}` : '范围：全部资料', sessionOnly ? '只看 AI 会话加进来的那批' : ''] .filter(Boolean) };
+  }
+
+  /* —— 运维 —— */
+  if (has(t, '运维', '看门狗', '巡检', '健康', 'agent', '停滞', '熔断', '运行状态', '运行情况')) {
+    const map = [['巡检', 'scan'], ['重启', 'restart_stuck'], ['停滞', 'restart_stuck'], ['熔断', 'clear_circuit'], ['学习', 'learn'], ['反馈', 'rescan_annotations'], ['重扫', 'rescan_annotations']];
+    const hit = map.find(([k]) => t.includes(k));
+    const isAction = hit && has(t, '执行', '跑一下', '做一下', '现在', '帮我', '一下', '重启', '重置', '触发', '重扫') && !has(t, '看看', '查看', '怎么样', '状态');
+    if (isAction) {
+      return { kind: 'agent_action', area: 'agent', title: AGENT_ACTIONS[hit[1]], confirm: 'none', params: { action: hit[1] },
+        details: ['在本地模拟环境里执行，不会真的重启服务。'] };
+    }
+    return { kind: 'agent_status', area: 'agent', title: '看运行状态', confirm: 'none', params: {}, details: ['看门狗心跳、熔断器、最近事件'] };
+  }
+
+  /* —— 配置 —— */
+  if (has(t, '模型', '向量服务', '向量', '模式', '维度', 'ocr', 'embedding', 'bge', 'qwen', '大模型', '连通', '配置')) {
+    const type = has(t, 'ocr') ? 'ocr' : has(t, '大模型', 'llm', 'qwen') ? 'llm' : 'embedding';
+    const isSwitch = has(t, '切换', '改成', '换成', '切到', '关掉', '停用', '关闭', '换成远程');
+    if (has(t, '测试', '连通', '通不通', '能不能连')) {
+      return { kind: 'test_model', area: 'settings', title: `测试 ${type} 服务连通`, confirm: 'none', params: { type }, details: ['向配置里的端点做一次（模拟）连通测试，只读不改。'] };
+    }
+    // 「切换成本地推理」是切换语义，不能被「本地」两个字抢成"启动本地模型"
+    if (isSwitch) {
+      const mode = has(t, '关掉', '停用', '关闭', '不启动', '别启动') ? 'off' : has(t, '本地') ? 'local' : 'remote';
+      return { kind: 'toggle_model', area: 'settings', title: `把向量模式切换为${mode === 'local' ? '本地推理' : mode === 'off' ? '停用' : '远程接口'}`,
+        confirm: 'card', params: { type: 'embedding', mode }, details: ['影响后续新增资料的向量生成方式。'], warning: '切换会改变入库方式，先确认当前没有正在解析的资料。' };
+    }
+    if (has(t, '启动本地', '本地模型')) {
+      return { kind: 'start_local_model', area: 'settings', title: '启动本地模型', confirm: 'none', params: {}, details: [`本地向量 ${CONFIG.local_model.bge.name}（${DIM} 维）`, '仅切换内存里的模拟状态，不真的加载权重。'] };
+    }
+    return { kind: 'model_status', area: 'settings', title: '看模型配置', confirm: 'none', params: {}, details: ['远程三行服务 + 本地模型 + 基础设施'] };
+  }
+
+  /* —— 搜索 / 反馈 —— */
+  if (has(t, '反馈', '批注') || (has(t, '不准确', '准确') && has(t, '标记', '反馈', '这条'))) {
+    const rating = has(t, '不准确', '不对', '错') ? 'inaccurate' : 'accurate';
+    return { kind: 'annotate', area: 'search', title: `提交一条「${rating === 'accurate' ? '准确' : '不准确'}」反馈`, confirm: 'card', params: { query: quotedNames(t)[0] || '', rating },
+      details: ['反馈会写进 Agent 控制台的批注列表，供人工复核。'], warning: '提交后这条反馈会进入重扫队列。' };
+  }
+  const hasFilter = has(t, '筛选', '过滤', '只看', '按部门', '按客户', '金额', '大于', '小于', '日期', '最近');
+  const searchVerb = has(t, '搜索', '检索', '查找', '找一下', '帮我找', '找找', '搜一下');
+  if (hasFilter && (searchVerb || has(t, '只看'))) {
+    const amount = /(\d+(?:\.\d+)?)\s*(?:万|万元)/.exec(t);
+    const dept = /部门[「“"']?([^」”"'，。；、\s]{2,20})/.exec(t);
+    const cust = /(?:客户|甲方)[「“"']?([^」”"'，。；、\s]{2,30})/.exec(t);
+    const less = has(t, '小于', '不超过', '低于');
+    return { kind: 'search', area: 'search', title: '按条件筛选资料', confirm: 'none',
+      params: { q: quotedNames(t)[0] || '', department: dept ? dept[1] : '', customer: cust ? cust[1] : '', amountMin: amount && !less ? Number(amount[1]) : undefined, amountMax: amount && less ? Number(amount[1]) : undefined, mode: 'hybrid' },
+      details: [quotedNames(t)[0] ? `关键词：${quotedNames(t)[0]}` : '关键词：无（按条件浏览）', dept ? `归属部门：${dept[1]}` : '', cust ? `客户：${cust[1]}` : '', amount ? `合同金额：${less ? '不超过' : '不少于'} ${amount[1]} 万元` : ''].filter(Boolean) };
+  }
+  if (searchVerb) {
+    const q = quotedNames(t)[0] || (/(?:搜索|检索|查找|找一下|帮我找|找找|搜一下|搜搜)\s*(.*)$/.exec(t) || [, ''])[1]
+      .replace(/^(一下|下|看看|看|关于|有关)\s*/, '').replace(/[？?。！!，,；;：:]+$/g, '')
+      .replace(/\s*的?\s*(资料|文件|内容|记录)\s*$/g, '').replace(/^(资料|文件|内容)\s*/, '').trim();
+    if (q) return { kind: 'search', area: 'search', title: `在资料库里找「${q}」`, confirm: 'none',
+      params: { q, mode: has(t, '文件名', '.pdf', '.docx', '.xlsx', '.md') ? 'filename' : 'hybrid' },
+      details: [`关键词：${q}`, '范围：文件名 + 正文内容', '只读检索，不会改动任何资料。'] };
+  }
+  return null;
+}
+
+/* ---------------- 7. 操作执行器 ---------------- */
+function dedupeByFile(results, limit = 6) {
+  const m = new Map();
+  for (const r of results) {
+    const hit = m.get(r.file_name);
+    if (hit) { hit.hits += 1; hit.score = Math.max(hit.score, r.score); }
+    else m.set(r.file_name, { file_name: r.file_name, score: r.score, hits: 1 });
+  }
+  return [...m.values()].slice(0, limit);
+}
+async function runOperation(intent) {
+  const p = intent.params || {};
+  switch (intent.kind) {
+    case 'help':
+      return { summary: '这些就是我能在会话里直接帮你做的事。', output: intent.details };
+    case 'list_files': {
+      const res = await api.listFiles({ page: 1, page_size: 100, status: p.status, session_only: p.sessionOnly });
+      const st = await api.getFileStats();
+      if (res.total === 0) return { summary: '没有符合条件的资料。', link: { label: '去文件管理看看', href: '#/files' } };
+      return {
+        summary: `当前有 ${res.total} 份符合条件的资料（文件库共 ${st.total_files} 份）。`,
+        output: res.items.slice(0, 12).map((f) => `${f.original_name}（${fmtSize(f.file_size)} · ${STATUS_TEXT[f.status]} · ${f.customer || '集团内部'} · ${f.department || '—'}）`),
+        stats: [{ label: '符合条件', value: MONO(res.total) }, { label: '文件库总数', value: MONO(st.total_files) }, { label: '处理失败', value: MONO(st.by_status.failed || 0) }],
+        link: { label: '去文件管理看全部', href: '#/files' },
+      };
+    }
+    case 'file_detail': {
+      const f = fileById(p.fileId);
+      if (!f) return { summary: '这份资料已经不在库里了。' };
+      return {
+        summary: `「${f.original_name}」的当前状态：${STATUS_TEXT[f.status]}。`,
+        output: [
+          `目录：${f.directory_path}`, `大小：${fmtSize(f.file_size)}`, `类型：${f.file_type}`,
+          `归属：${f.customer || '集团内部'} · ${f.department || '—'} · ${f.nature || '—'}`,
+          `段落：${f.chunk_count} 段 · 字符：${MONO(f.character_count)}`,
+          `来源：${SOURCE_TEXT[f.source] || '—'}`, `最近更新：${fmtTime(f.updated_at)}`,
+          f.error_message ? `失败原因：${f.error_message}` : `摘要：${f.summary || '—'}`,
+        ],
+        link: { label: '去文件管理查看', href: '#/files' },
+      };
+    }
+    case 'parse_files':
+    case 'retry_files': {
+      const list = (p.fileIds || []).slice();
+      for (const id of list) await api.fileAction(id, intent.kind === 'retry_files' ? 'retry' : 'parse');
+      return { summary: `${intent.kind === 'retry_files' ? '重新处理' : '处理'}了 ${list.length} 份资料，已全部完成。`,
+        output: list.map((id) => fileById(id) ? `${fileById(id).original_name}（${fileById(id).chunk_count} 段）` : id),
+        link: { label: '去文件管理看进度', href: '#/files' } };
+    }
+    case 'delete_files': {
+      const ids = p.fileIds || [];
+      const names = ids.map((id) => (fileById(id) ? fileById(id).original_name : id));
+      const res = await api.batchDeleteFiles(ids);
+      return { summary: `已删除 ${res.deleted} 份资料，检索里也不会再出现它们。`, output: names,
+        stats: [{ label: '删除', value: MONO(res.deleted) }, { label: '剩余', value: MONO(FILES.length) }], link: { label: '去文件管理', href: '#/files' } };
+    }
+    case 'index_folder': {
+      const res = await api.indexFolder(p.folderPath);
+      const lib = registerLibrary(libraryOf(res.folder_path));
+      const lines = ['扫描目录 → 切分内容 → 生成向量 → 写入索引'];
+      if (lib) lines.push(`已登记信息库：${lib}（文件管理下拉里会出现）`);
+      return { summary: `目录「${res.folder_path}」扫描完成，新增 ${res.count} 条资料记录（本地模拟）。`,
+        output: lines,
+        output: ['扫描目录 → 切分内容 → 生成向量 → 写入索引'], link: { label: '去文件管理', href: '#/files' } };
+    }
+    case 'upload_files':
+      return { summary: '上传需要你亲自选文件，我不能凭空造一份资料出来。', output: ['点右上角「上传资料」选本地文件即可。'], link: { label: '去文件管理上传', href: '#/files' } };
+    case 'open_preview':
+      return { summary: `已打开「${p.name}」的预览。`, preview: { fileId: p.fileId, name: p.name } };
+    case 'search': {
+      const res = await api.search({ q: p.q || '', mode: p.mode || 'hybrid', department: p.department || undefined, customer: p.customer || undefined, amount_min: p.amountMin, amount_max: p.amountMax, page: 1 });
+      const qs = new URLSearchParams();
+      if (p.q) qs.set('q', p.q);
+      if (p.department) qs.set('department', p.department);
+      if (p.mode) qs.set('mode', p.mode);
+      if (p.amountMin != null) qs.set('amount_min', String(p.amountMin));
+      if (p.amountMax != null) qs.set('amount_max', String(p.amountMax));
+      return {
+        summary: res.total === 0 ? '按这些条件没有找到资料，可以放宽条件再试。' : `找到 ${res.total} 份相关资料，用时 ${res.took_ms} ms。`,
+        output: dedupeByFile(res.results).map((r) => `${r.file_name}（匹配 ${r.hits} 处，最高匹配度 ${(r.score * 100).toFixed(1)}%）`),
+        stats: [{ label: '命中', value: MONO(res.total) }, { label: '本页', value: MONO(res.results.length) }, { label: '用时', value: res.took_ms + ' ms' }],
+        link: { label: '去搜索页继续筛选', href: '#/search?' + qs.toString() },
+      };
+    }
+    case 'annotate': {
+      const target = FILES.slice().sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))[0];
+      if (!target) return { summary: '文件库里还没有资料，没法提交反馈。' };
+      const res = await api.submitAnnotation({ query: p.query || '（未填写检索词）', file_id: target.id, rating: p.rating, issues: p.rating === 'inaccurate' ? '检索结果与问题不匹配' : '结果符合预期' });
+      return { summary: `反馈已提交（编号 ${res.id}），可以在 Agent 控制台的批注列表里看到。`,
+        output: [`关联资料：${target.original_name}`, `标记为：${p.rating === 'accurate' ? '准确' : '不准确'}`], link: { label: '去 Agent 控制台看批注', href: '#/agent' } };
+    }
+    case 'agent_status': {
+      const w = AGENT.watchdog, cb = AGENT.circuit_breaker;
+      return { summary: `看门狗${w.running ? '运行中' : '已停止'}，熔断器 ${cb.state}，最近 ${AGENT.events.length} 条事件。`,
+        output: AGENT.events.slice(0, 5).map((e) => `${fmtTime(e.time)} · ${e.message}`),
+        stats: [{ label: '停滞任务', value: MONO(w.stuck_tasks) }, { label: '重启次数', value: MONO(w.restart_count) }, { label: '失败数', value: MONO(cb.failures) }],
+        link: { label: '去 Agent 控制台', href: '#/agent' } };
+    }
+    case 'agent_action': {
+      const res = await api.runAgentAction(p.action);
+      return { summary: res.message, output: AGENT.events.slice(0, 4).map((e) => `${fmtTime(e.time)} · ${e.message}`), link: { label: '去 Agent 控制台', href: '#/agent' } };
+    }
+    case 'model_status': {
+      const lm = CONFIG.local_model;
+      return { summary: `共 ${Object.keys(SERVERS).length} 个远程服务，向量维度 ${lm.total_dim}，推理位置为${lm.embedding_mode === 'local' ? '本地' : '远程'}。`,
+        output: Object.values(SERVERS).map((s) => `${s.name}：${s.alive ? '在线' : '离线'} · ${s.endpoint} · ${s.detail}`),
+        stats: [{ label: '向量维度', value: String(lm.total_dim) }, { label: '本地模型', value: lm.active ? '已启动' : '待命' }],
+        link: { label: '去系统配置', href: '#/settings' } };
+    }
+    case 'test_model': {
+      const res = await api.testRemoteModel(p.type);
+      return res.ok
+        ? { summary: `${p.type === 'ocr' ? 'OCR' : p.type === 'llm' ? '大模型' : '向量'}服务连通正常，延迟约 ${res.latency_ms} ms。`, stats: [{ label: '延迟', value: res.latency_ms + ' ms' }], link: { label: '去系统配置', href: '#/settings' } }
+        : { summary: '连通测试没有通过。', output: [res.error || '未知错误'] };
+    }
+    case 'start_local_model': {
+      await api.startLocalModel();
+      return { summary: '本地模型已启动（本地模拟），向量与问答都切到本地推理。',
+        stats: [{ label: '向量', value: String(CONFIG.local_model.total_dim) }, { label: '模式', value: '本地推理' }], link: { label: '去系统配置', href: '#/settings' } };
+    }
+    case 'toggle_model': {
+      await api.toggleModel(p.type || 'embedding', p.mode);
+      return { summary: `向量模式已切换为${p.mode === 'local' ? '本地推理' : p.mode === 'off' ? '停用' : '远程接口'}（本地模拟）。`, link: { label: '去系统配置', href: '#/settings' } };
+    }
+    default:
+      return { summary: '这个操作还没有实现。' };
+  }
+}
+
+/* ---------------- 8. 发送消息 ---------------- */
+const operationRunning = new Set();
+const OP_ERROR_TEXT = { file: '这次文件操作没有完成，请换个说法再试一次。', search: '这次检索没有完成，请稍后再试。', agent: '这次运维动作没有完成。', settings: '这次配置操作没有完成。', kb: '这个操作没有完成。' };
+
+function sendUserMessage(sessionId, content) {
+  const text = content.trim();
+  if (!text) return;
+  const seq = nextSeq(sessionId);
+  const user = addMessage({ id: uid('msg'), sessionId, role: 'user', content: text, seq, createdAt: Date.now() });
+  const session = SESSIONS.find((s) => s.id === sessionId);
+  if (session) { session.updatedAt = Date.now(); if (seq <= 2 && (!session.titled || session.title === '演示会话')) { session.title = topicOf(text); session.titled = true; } }
+
+  const selected = $$('.file-check:checked').map((c) => c.value);
+  const intent = parseOperation(text, FILES, { selectedFileIds: selected });
+
+  let assistant;
+  if (intent) {
+    const operation = {
+      id: 'op-' + user.id, intent,
+      state: intent.confirm === 'card' ? 'awaiting_confirm' : 'pending',
+      summary: intent.confirm === 'card' ? '等待你确认后才会执行。' : '准备执行…',
+      createdAt: Date.now(),
+    };
+    const assistantText = intent.confirm === 'card'
+      ? ['**这张操作卡还没有执行。**', '', `要做的：${intent.title}`,
+         ...(intent.warning ? ['', `警告：${intent.warning}`] : []), '',
+         '核对无误就点「确认执行」；点「放弃」不会有任何改动。'].join('\n')
+      : intent.kind === 'help' ? '下面这些事你可以直接在这里说一句话完成。' : '好，这就去办，结果马上出来。';
+    assistant = addMessage({ id: uid('msg'), sessionId, role: 'assistant', content: assistantText, seq: seq + 1, createdAt: Date.now(), operation });
+    if (intent.confirm !== 'card') setTimeout(() => runOperationTask(assistant.id), 60);
+  } else {
+    const kind = /总结|概览/.test(text) ? 'summary' : /哪些|列出|清单|列表/.test(text) ? 'list' : /依据|引用|原文/.test(text) ? 'cite' : 'search';
+    const answer = buildAnswer(kind, text) + '\n\n（以上为本地模拟回答，不联网、不调用真实模型。）';
+    assistant = addMessage({ id: uid('msg'), sessionId, role: 'assistant', content: answer, seq: seq + 1, createdAt: Date.now() });
+  }
+  persist();
+  render();
+  return { user, assistant };
+}
+
+async function runOperationTask(messageId) {
+  const msg = MESSAGES[messageId];
+  const op = msg && msg.operation;
+  if (!op) return;
+  if (op.state === 'awaiting_confirm') return;
+  if (op.state === 'running' || op.state === 'done' || operationRunning.has(op.id)) return;
+  operationRunning.add(op.id);
+  patchMessage(messageId, { operation: { ...op, state: 'running', summary: '正在执行…' } });
+  render();
+  try {
+    const out = await runOperation(op.intent);
+    const cur = MESSAGES[messageId];
+    patchMessage(messageId, {
+      operation: {
+        ...cur.operation, state: 'done', summary: out.summary, output: out.output, stats: out.stats,
+        link: out.link, preview: out.preview, finishedAt: Date.now(),
+      },
+    });
+  } catch (e) {
+    const cur = MESSAGES[messageId];
+    patchMessage(messageId, { operation: { ...cur.operation, state: 'failed', summary: OP_ERROR_TEXT[op.intent.area], error: String(e && e.message || e), finishedAt: Date.now() } });
+  } finally {
+    operationRunning.delete(op.id);
+    persist();
+    render();
+  }
+}
+function confirmOperation(messageId) {
+  const msg = MESSAGES[messageId];
+  const op = msg && msg.operation;
+  if (!op || op.state !== 'awaiting_confirm') return;
+  patchMessage(messageId, { operation: { ...op, state: 'pending', summary: '准备执行…' } });
+  runOperationTask(messageId);
+}
+function cancelOperation(messageId) {
+  const msg = MESSAGES[messageId];
+  const op = msg && msg.operation;
+  if (!op || op.state !== 'awaiting_confirm') return;
+  patchMessage(messageId, { operation: { ...op, state: 'cancelled', summary: '已放弃这次操作，没有任何改动。', finishedAt: Date.now() } });
+  persist(); render();
+}
+function topicOf(text) {
+  const t = text.replace(/[。！？!?，,]/g, ' ').trim();
+  return (t.length > 14 ? t.slice(0, 14) + '…' : t) || '新会话';
+}
+
+/* ---------------- 9. 持久化 ---------------- */
+const STORE_KEY = 'kb-single-file-v1';
+function persist() {
+  safeStore.set(STORE_KEY, JSON.stringify({
+    files: FILES, materials: MATERIALS, sessions: SESSIONS, messages: MESSAGES,
+    annos: ANNOS, events: AGENT.events, config: CONFIG, activeSession, libraries: LIBRARIES,
+  }));
+}
+function restore() {
+  const raw = safeStore.get(STORE_KEY);
+  if (!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if (!s.files || !s.files.length) return false;
+    FILES = s.files; MATERIALS = s.materials || []; SESSIONS = s.sessions || SESSIONS;
+    MESSAGES = s.messages || {}; ANNOS = s.annos || ANNOS; AGENT.events = s.events || AGENT.events;
+    Object.assign(CONFIG, s.config || {}); activeSession = s.activeSession || SESSIONS[0].id;
+    LIBRARIES = (s.libraries && s.libraries.length) ? s.libraries : LIBRARIES;
+    return true;
+  } catch (e) { return false; }
+}
+function resetAll() {
+  FILES = buildFiles();
+  MATERIALS = FILES.filter(isSessionFile).map((f) => ({ id: f.material_id, name: f.original_name, fileId: f.id, source: 'session' }));
+  SESSIONS = [{ id: 'sess-demo', title: '演示会话', createdAt: Date.now(), updatedAt: Date.now() }];
+  MESSAGES = {}; activeSession = 'sess-demo'; LIBRARIES = BUILTIN_LIBS.slice();
+  ANNOS = ANNOS.slice(); AGENT.events = AGENT_EVENTS.slice();
+  safeStore.del(STORE_KEY);
+}
+
+/* ---------------- 10. 路由 ---------------- */
+const NAV = [
+  ['#/', '首页', '◆'],
+  ['#/files', '文件管理', '▤'],
+  ['#/search', '搜索', '◎'], ['#/agent', 'Agent 控制台', '◈'], ['#/settings', '系统配置', '⚙︎'],
+  ['#/knowledge', '信息库', '▥'], ['#/tasks', '添加记录', '≡'], ['#/docs', '使用说明', '▫'],
+];
+let currentRoute = { path: '/', query: new URLSearchParams() };
+function parseHash() {
+  const raw = location.hash.replace(/^#/, '') || '/';
+  const [path, query] = raw.split('?');
+  return { path: path || '/', query: new URLSearchParams(query || '') };
+}
+function go(href) { location.hash = href.startsWith('#') ? href : '#' + href; }
+window.addEventListener('hashchange', () => { currentRoute = parseHash(); render(); });
+
+/* ---------------- 11. 渲染 ---------------- */
+function renderSidebar() {
+  const nav = $('#sidebar');
+  nav.innerHTML = NAV.map(([href, label, icon]) => {
+    const on = currentRoute.path === href.slice(1) || (href === '#/' && currentRoute.path === '/');
+    return `<div class="nav-item${on ? ' on' : ''}" data-nav="${href}"><span class="nav-icon">${icon}</span>${label}</div>`;
+  }).join('');
+}
+
+function render() {
+  renderSidebar();
+  const main = $('#main');
+  const path = currentRoute.path;
+  if (path === '/' || path === '/chat') main.innerHTML = viewHome();
+  else if (path === '/files') main.innerHTML = viewFiles();
+  else if (path === '/search') main.innerHTML = viewSearch();
+  else if (path === '/agent') main.innerHTML = viewAgent();
+  else if (path === '/settings') main.innerHTML = viewSettings();
+  else if (path === '/docs') main.innerHTML = viewDocs();
+  else main.innerHTML = viewHome();
+  bindView();
+  if (path === '/' || path === '/chat') scrollChatToEnd();
+}
+
+/* —— 首页 = AI 会话 —— */
+function viewHome() {
+  const msgs = messagesOf(activeSession);
+  const session = SESSIONS.find((s) => s.id === activeSession) || SESSIONS[0];
+  const head = `<div class="chat-head">
+      <h2>${msgs.length ? esc(session.title) : '知识库 AI 会话原型'}</h2>
+      <span class="meta">${msgs.length ? msgs.length + ' 条消息 · 本地模拟' : '首页 · 一句话完成知识库的事'}</span>
+      <span class="grow" style="flex:1"></span>
+      <button class="btn sm" data-act="new-session">新会话</button>
+    </div>`;
+  const body = msgs.length ? msgs.map(renderMessage).join('') : welcomeHtml();
+  return `<div class="chat">${head}
+    <div class="chat-scroll" id="chat-scroll"><div class="chat-inner">${body}</div></div>
+    <div class="chat-foot">${composerHtml()}</div>
+  </div>`;
+}
+
+function welcomeHtml() {
+  const st = {
+    total: FILES.length,
+    done: FILES.filter((f) => f.status === 'completed').length,
+    session: FILES.filter(isSessionFile).length,
+    pending: FILES.filter((f) => f.status === 'pending' || f.status === 'processing').length,
+  };
+  const quick = ['列出资料库里的全部文件', '列出失败的资料', '搜一下「合同」', '看看运行状态', '测试向量服务连通', '你能做什么'];
+  const caps = [
+    ['#/files', '文件管理', '上传、解析、删除，目录索引与预览'],
+    ['#/search', '搜索', '关键词 + 部门 / 客户 / 金额筛选、反馈'],
+    ['#/agent', 'Agent 控制台', '看门狗、事件时间线、批注与其他运维动作'],
+    ['#/settings', '系统配置', '远程模型、本地模型、基础设施'],
+  ];
+  return `<div class="welcome fade-in">
+    <h1>知识库里的事，说一句话就行</h1>
+    <div class="lead">问它、让它找、让它删、让它看运行状态都可以。不可撤销的动作会先出一张卡，你确认了才动。</div>
+    <div class="grid-3">
+      <div class="stat-card" data-nav="#/files"><div class="stat-value">${MONO(st.total)}</div><div class="stat-label">文件库资料</div></div>
+      <div class="stat-card" data-nav="#/files"><div class="stat-value">${MONO(st.done)}</div><div class="stat-label">已处理</div></div>
+      <div class="stat-card" data-nav="#/files"><div class="stat-value">${MONO(st.session)}</div><div class="stat-label">来自 AI 会话</div></div>
+      <div class="stat-card" data-nav="#/files"><div class="stat-value">${MONO(st.pending)}</div><div class="stat-label">待处理</div></div>
+    </div>
+    <div style="margin:18px 0 6px" class="card-title">试试这样说</div>
+    <div class="quick">${quick.map((q) => `<button class="quick-chip" data-say="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <div class="card-title">或者直接进细节页</div>
+    <div class="grid-2">
+      ${caps.map(([href, t, d]) => `<div class="card cap" data-nav="${href}"><div class="card-title">${t} →</div><div class="muted tiny">${d}</div></div>`).join('')}
+    </div>
+    <div class="notice" style="margin-top:16px">
+      全部数据与执行都是<b>本地模拟</b>：不联网、不调用真实模型、不会删除你磁盘上的任何文件。
+      <a class="op-link" href="#/files">去文件管理 →</a>
+    </div>
+  </div>`;
+}
+
+function renderBold(text) {
+  return esc(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+function renderMessage(m) {
+  const mine = m.role === 'user';
+  return `<div class="msg ${mine ? 'user' : 'assistant'} fade-in">
+    <div class="who">${mine ? '我' : 'AI'}</div>
+    <div class="body">
+      <div class="bubble">${renderBold(m.content)}</div>
+      ${m.operation ? renderOperation(m) : ''}
+    </div>
+  </div>`;
+}
+function renderOperation(m) {
+  const op = m.operation;
+  const areaText = { file: '文件管理', search: '搜索', agent: 'Agent 控制台', settings: '系统配置', kb: '信息库' };
+  const stateText = { pending: '准备执行', awaiting_confirm: '等待确认', running: '执行中', done: '已完成', failed: '未完成', cancelled: '已放弃' };
+  const settled = ['done', 'failed', 'cancelled'].includes(op.state);
+  return `<div class="op-card state-${op.state}">
+    <div class="op-head">
+      <span class="op-area">${areaText[op.intent.area] || ''}</span>
+      <span class="op-title">${esc(op.intent.title)}</span>
+      <span class="op-state">${(op.state === 'running' || op.state === 'pending') ? '<span class="spinner"></span> ' : ''}${stateText[op.state]}</span>
+    </div>
+    <div class="op-body">
+      ${op.intent.details && op.intent.details.length ? `<ul class="op-details">${op.intent.details.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}
+      ${op.state === 'awaiting_confirm' && op.intent.warning ? `<div class="op-warning"><span class="ic-warn">!</span> 警告：${esc(op.intent.warning)}</div>` : ''}
+      ${op.state === 'awaiting_confirm' ? `<div class="op-actions">
+          <button class="btn primary sm" data-confirm="${m.id}">确认执行</button>
+          <button class="btn sm" data-cancel="${m.id}">放弃</button>
+          <span class="hint">在你确认之前，不会有任何改动。</span></div>` : ''}
+      ${(op.state === 'running' || op.state === 'pending') ? `<div class="op-running"><span class="spinner"></span><span>${esc(op.summary || '')}</span></div>` : ''}
+      ${settled ? `<div class="op-result">
+          <div class="op-summary">${esc(op.summary || '')}</div>
+          ${op.output && op.output.length ? `<ul class="op-output">${op.output.map((o) => `<li>${esc(o)}</li>`).join('')}</ul>` : ''}
+          ${op.stats && op.stats.length ? `<div class="op-stats">${op.stats.map((s) => `<span class="op-stat"><b>${esc(s.value)}</b><i>${esc(s.label)}</i></span>`).join('')}</div>` : ''}
+          ${op.error ? `<div class="err-text">原因：${esc(op.error)}</div>` : ''}
+          ${op.preview ? `<button class="btn sm" data-preview="${op.preview.fileId}" data-preview-name="${esc(op.preview.name)}">打开预览</button>` : ''}
+          ${op.link ? `<a class="op-link" href="${op.link.href}">${esc(op.link.label)} →</a>` : ''}
+        </div>` : ''}
+    </div>
+  </div>`;
+}
+function composerHtml() {
+  return `<div class="composer">
+    <textarea id="composer" rows="1" placeholder="说一句话就行，例如：列出失败的资料 / 搜一下「质保期」/ 看看运行状态"></textarea>
+    <div class="composer-bar">
+      <button class="btn sm" data-upload>上传资料</button>
+      <span class="hint">回车发送 · Shift+回车换行</span>
+      <span class="grow"></span>
+      <button class="btn primary sm" data-send>发送</button>
+    </div>
+  </div>`;
+}
+
+
+/* —— 文件管理 —— */
+function viewFiles() {
+  const page = Number(currentRoute.query.get('page') || 1);
+  const status = currentRoute.query.get('status') || 'all';
+  const sessionOnly = currentRoute.query.get('session') === '1';
+  const SIZE = 10;
+  let items = FILES.filter((f) => (status === 'all' || f.status === status) && (!sessionOnly || isSessionFile(f)));
+  const total = items.length;
+  const shown = items.slice((page - 1) * SIZE, page * SIZE);
+  const counts = STATUS_ORDER.reduce((m, s) => (m[s] = FILES.filter((f) => f.status === s).length, m), {});
+  const pills = [['all', '全部', FILES.length], ...STATUS_ORDER.map((s) => [s, STATUS_TEXT[s], counts[s]])];
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>文件管理</h2><div class="page-sub">资料库里的每一份资料：来源、目录、状态与操作。</div></div>
+    <div class="row" style="margin-bottom:12px">
+      ${pills.map(([k, label, n]) => `<button class="btn sm${status === k && !sessionOnly ? ' primary' : ''}" data-files-status="${k}">${label} ${n}</button>`).join('')}
+      <button class="btn sm${sessionOnly ? ' primary' : ''}" data-files-session>来自 AI 会话 ${FILES.filter(isSessionFile).length}</button>
+      <span class="grow" style="flex:1"></span>
+      <button class="btn sm" data-upload>上传资料</button>
+      <label class="btn sm" style="display:inline-flex;align-items:center">选择文件<input type="file" id="file-input" multiple hidden></label>
+    </div>
+    ${sessionOnly ? '<div class="notice" style="margin-bottom:10px">正在看 AI 会话加进来的资料（与首页资料区是同一批记录）。</div>' : ''}
+    <div class="card" style="padding:0">
+      <table class="table">
+        <thead><tr><th style="width:18px"></th><th>文件名</th><th>目录</th><th>归属</th><th>性质</th><th>大小</th><th>状态</th><th>段落</th><th style="width:190px">操作</th></tr></thead>
+        <tbody>${shown.length ? shown.map((f) => `<tr>
+          <td><input type="checkbox" class="file-check" value="${f.id}"></td>
+          <td><span class="ic-file t-${esc(f.file_type)}">${TYPE_ICON[f.file_type] || '▫'}</span> ${esc(f.original_name)}${isSessionFile(f) ? ' <span class="tag">会话</span>' : ''}</td>
+          <td class="muted tiny">${esc(f.directory_path)}</td>
+          <td class="tiny">${esc(f.customer || '集团内部')}<br><span class="muted">${esc(f.department || '—')}</span></td>
+          <td class="tiny">${esc(f.nature || '—')}</td>
+          <td class="tiny mono">${fmtSize(f.file_size)}</td>
+          <td><span class="status-dot ${f.status}"></span>${STATUS_TEXT[f.status]}${f.status === 'processing' ? ` ${f.progress || 0}%` : ''}</td>
+          <td class="tiny mono">${MONO(f.chunk_count)}</td>
+          <td>
+            <button class="btn sm" data-preview="${f.id}">预览</button>
+            ${f.status === 'failed' ? `<button class="btn sm" data-retry="${f.id}">重试</button>` : `<button class="btn sm" data-parse="${f.id}">解析</button>`}
+            <button class="btn sm" data-del="${f.id}">删除</button>
+          </td></tr>`).join('') : `<tr><td colspan="9" class="empty">这里还没有资料。</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <span class="muted tiny">共 ${total} 份 · 第 ${page} / ${Math.max(1, Math.ceil(total / SIZE))} 页</span>
+      <button class="btn sm" data-files-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>上一页</button>
+      <button class="btn sm" data-files-page="${page + 1}" ${page * SIZE >= total ? 'disabled' : ''}>下一页</button>
+    </div>
+  </div>`;
+}
+
+/* —— 搜索 —— */
+function viewSearch() {
+  const q = currentRoute.query.get('q') || currentRoute.query.get('keyword') || '';
+  const department = currentRoute.query.get('department') || '';
+  const customer = currentRoute.query.get('customer') || '';
+  const nature = currentRoute.query.get('nature') || '';
+  const amountMin = currentRoute.query.get('amount_min') || '';
+  const mode = currentRoute.query.get('mode') || 'hybrid';
+  const page = Number(currentRoute.query.get('page') || 1);
+
+  const all = FILES.filter((f) => {
+    if (f.status === 'failed' || f.status === 'archived') return false;
+    if (department && f.department !== department) return false;
+    if (customer && f.customer !== customer) return false;
+    if (nature && f.nature !== nature) return false;
+    if (amountMin && (f.amount_wan || 0) < Number(amountMin)) return false;
+    if (!q) return Boolean(department || customer || nature || amountMin);
+    const kw = q.toLowerCase();
+    const inName = f.original_name.toLowerCase().includes(kw) || f.directory_path.toLowerCase().includes(kw);
+    const inBody = paragraphsOf(f).some((p) => p.includes(q));
+    if (mode === 'filename') return inName;
+    if (mode === 'content') return inBody;
+    return inName || inBody;
+  });
+  const depts = [...new Set(FILES.map((f) => f.department).filter(Boolean))];
+  const natures = [...new Set(FILES.map((f) => f.nature).filter(Boolean))];
+  const SIZE = 10;
+  const rows = all.slice((page - 1) * SIZE, page * SIZE);
+  const hist = (safeStore.get('kb-history') || '').split('|').filter(Boolean);
+
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>搜索</h2><div class="page-sub">关键词 + 部门 / 客户 / 资料性质 / 金额一起用，筛选在本页真实生效。</div></div>
+    <div class="card">
+      <div class="search-box">
+        <input id="q" value="${esc(q)}" placeholder="搜文件名或正文内容，例如：质保期 / 合同">
+        <button class="btn primary" data-search>搜索</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="field">模式<select id="mode">
+          <option value="hybrid"${mode === 'hybrid' ? ' selected' : ''}>文件名 + 内容</option>
+          <option value="filename"${mode === 'filename' ? ' selected' : ''}>只搜文件名</option>
+          <option value="content"${mode === 'content' ? ' selected' : ''}>只搜正文</option></select></label>
+        <label class="field">归属部门<select id="department"><option value="">不限</option>${depts.map((d) => `<option${d === department ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+        <label class="field">资料性质<select id="nature"><option value="">不限</option>${natures.map((d) => `<option${d === nature ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+        <label class="field">金额下限（万元）<input id="amount_min" type="number" value="${esc(amountMin)}" placeholder="不限" style="min-width:110px"></label>
+        <button class="btn sm" data-search-apply>应用筛选</button>
+        <button class="btn sm" data-search-reset>清空</button>
+      </div>
+      ${hist.length ? `<div class="row" style="margin-top:10px"><span class="muted tiny">最近搜索：</span>${hist.slice(0, 6).map((h) => `<button class="quick-chip" data-say-search="${esc(h)}">${esc(h)}</button>`).join('')}</div>` : ''}
+      <div class="row" style="margin-top:10px"><span class="muted tiny">热词：</span>${['合同', '质保期', '验收', '结算', '采购', '方案'].map((h) => `<button class="quick-chip" data-say-search="${h}">${h}</button>`).join('')}</div>
+    </div>
+    <div style="margin:16px 0 10px" class="row">
+      <span class="card-title" style="margin:0">${q || department || nature || amountMin ? `找到 ${all.length} 条` : '输入关键词或选一个筛选条件'}</span>
+      ${department ? `<span class="tag info">部门：${esc(department)}</span>` : ''}
+      ${customer ? `<span class="tag info">客户：${esc(customer)}</span>` : ''}
+      ${nature ? `<span class="tag info">性质：${esc(nature)}</span>` : ''}
+      ${amountMin ? `<span class="tag info">金额 ≥ ${esc(amountMin)} 万</span>` : ''}
+    </div>
+    ${rows.map((f) => `<div class="result">
+      <div class="name"><span class="ic-file t-${esc(f.file_type)}">${TYPE_ICON[f.file_type] || '▫'}</span> ${esc(f.original_name)}</div>
+      <div class="chunk">${highlightText(paragraphsOf(f)[0] || f.summary || '', q)}</div>
+      <div class="meta">
+        <span>${esc(f.directory_path)}</span><span>${esc(f.customer || '集团内部')} · ${esc(f.department || '—')}</span>
+        <span>${esc(f.nature || '—')}</span>${f.amount_wan ? `<span>${f.amount_wan.toFixed(1)} 万元</span>` : ''}
+        <span>匹配度 ${(0.86 + (f.original_name.length % 10) / 100).toFixed(2)}</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm" data-preview="${f.id}">预览</button>
+        <button class="btn sm" data-anno="${f.id}" data-anno-query="${esc(q || '未填写检索词')}">准确</button>
+        <button class="btn sm" data-anno="${f.id}" data-anno-query="${esc(q || '未填写检索词')}" data-anno-rating="inaccurate">不准确</button>
+      </div>
+    </div>`).join('')}
+    ${(q || department || nature || amountMin) && all.length === 0 ? '<div class="empty">没有命中，试试放宽条件或换个词。</div>' : ''}
+    ${all.length ? `<div class="pager">
+      <span class="muted tiny">共 ${all.length} 条 · 第 ${page} / ${Math.ceil(all.length / SIZE)} 页</span>
+      <button class="btn sm" data-search-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>上一页</button>
+      <button class="btn sm" data-search-page="${page + 1}" ${page * SIZE >= all.length ? 'disabled' : ''}>下一页</button>
+    </div>` : ''}
+  </div>`;
+}
+function highlightText(text, q) {
+  if (!q) return esc(text);
+  const safe = esc(text);
+  const needle = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp(needle, 'g'), (m) => `<em>${m}</em>`);
+}
+
+/* —— Agent 控制台 —— */
+function viewAgent() {
+  const w = AGENT.watchdog, cb = AGENT.circuit_breaker;
+  const dogs = [
+    ['解析看门狗', w.running], ['索引队列', w.running], ['资源调控', true],
+    ['API 熔断器', cb.state === 'closed'], ['双阶段补扫', w.running], ['结果校验', true],
+  ];
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>Agent 控制台</h2><div class="page-sub">看门狗与熔断器状态、事件时间线、检索反馈、运维动作（全部本地模拟，不发真实请求）。</div></div>
+    <div class="grid-3">
+      ${dogs.map(([name, ok]) => `<div class="stat-card"><div class="card-title"><span class="status-dot ${ok ? 'completed' : 'failed'}"></span>${name}</div><div class="muted tiny">${ok ? '运行正常' : '已触发保护'}</div></div>`).join('')}
+    </div>
+    <div class="grid-3" style="margin-top:14px">
+      <div class="stat-card"><div class="stat-value">${MONO(w.stuck_tasks)}</div><div class="stat-label">停滞任务</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(w.restart_count)}</div><div class="stat-label">重启次数</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(cb.failures)}</div><div class="stat-label">熔断失败数（阈值 ${cb.threshold}）</div></div>
+      <div class="stat-card"><div class="stat-value">${(AGENT.stats.success_rate * 100).toFixed(0)}%</div><div class="stat-label">任务成功率（${AGENT.stats.total_tasks} 次）</div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-title">运维动作</div>
+      <div class="row">${Object.entries(AGENT_ACTIONS).map(([k, label]) => `<button class="btn sm" data-agent="${k}">${label}</button>`).join('')}</div>
+      <div class="hint" style="margin-top:8px">最近心跳：${fmtTime(w.last_heartbeat)}</div>
+    </div>
+    <div class="grid-2" style="margin-top:14px">
+      <div class="card"><div class="card-title">事件时间线</div>
+        <div class="timeline">${AGENT.events.slice(0, 8).map((e) => `<div class="ev"><time>${fmtTime(e.time)}</time><span class="tag">${e.type}</span> ${esc(e.message)}</div>`).join('')}</div>
+      </div>
+      <div class="card"><div class="card-title">检索反馈（批注）</div>
+        <table class="table"><thead><tr><th>文件</th><th>问题</th><th>状态</th><th>处理结果</th><th></th></tr></thead>
+        <tbody>${ANNOS.slice(0, 8).map((a) => `<tr>
+          <td class="tiny">${esc(a.file_name)}</td>
+          <td class="tiny">${esc(a.query)}（${a.rating === 'accurate' ? '准确' : '不准确'}）</td>
+          <td><span class="tag ${a.status === 'done' ? 'ok' : 'warn'}">${a.status === 'done' ? '已处理' : '待处理'}</span></td>
+          <td class="tiny muted">${esc(a.result_note || '—')}</td>
+          <td><button class="btn sm" data-anno-done="${a.id}">标记已处理</button></td>
+        </tr>`).join('')}</tbody></table>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* —— 系统配置 —— */
+function viewSettings() {
+  const lm = CONFIG.local_model;
+  const rows = Object.entries(SERVERS).map(([type, s]) => `<tr>
+    <td><span class="status-dot ${s.alive ? 'completed' : 'failed'}"></span>${esc(s.name)}</td>
+    <td class="mono tiny">${esc(s.detail)}</td>
+    <td class="mono tiny">${esc(s.endpoint)}</td>
+    <td><span class="tag ${s.alive ? 'ok' : 'err'}">${s.alive ? '在线' : '离线'}</span></td>
+    <td class="mono tiny">${s.latency_ms} ms</td>
+    <td><button class="btn sm" data-test="${type}">测试连通</button></td>
+  </tr>`).join('');
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>系统配置</h2><div class="page-sub">管理页保留专业监控用词；所有状态都是本地模拟。</div></div>
+    <div class="card"><div class="card-title">远程模型服务</div>
+      <table class="table"><thead><tr><th>服务</th><th>模型</th><th>端点</th><th>状态</th><th>延迟</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="grid-2" style="margin-top:14px">
+      <div class="card"><div class="card-title">本地模型</div>
+        <div class="kvs">
+          <span class="k">推理位置</span><span>${lm.embedding_mode === 'local' ? '<span class="tag ok">本地推理</span>' : '<span class="tag info">远程接口</span>'} ${lm.active ? '<span class="tag ok">已启动</span>' : '<span class="tag">待命</span>'}</span>
+          <span class="k">向量维度</span><span class="mono">${lm.total_dim}</span>
+          <span class="k">向量模型</span><span class="mono">${esc(lm.bge.name)}${lm.bge.loaded ? `（已加载 ${lm.bge.dim} 维）` : '（未加载）'}</span>
+          <span class="k">大模型</span><span class="mono">${esc(lm.qwen.name)}${lm.qwen.loaded ? '（已加载）' : '（待命）'}</span>
+          <span class="k">OCR 引擎</span><span class="mono">${lm.ocr.engines.join(' / ')}</span>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary sm" data-start-local>启动本地模型</button>
+          <button class="btn sm" data-toggle="local">切换为本地推理</button>
+          <button class="btn sm" data-toggle="remote">切换为远程接口</button>
+        </div>
+      </div>
+      <div class="card"><div class="card-title">基础设施配置</div>
+        <div class="kvs">
+          <span class="k">数据库</span><span class="mono">${esc(CONFIG.database.type)} · ${esc(CONFIG.database.url)}</span>
+          <span class="k">向量索引</span><span class="mono">${esc(CONFIG.database.vector)}</span>
+          <span class="k">存储</span><span class="mono tiny">${esc(CONFIG.storage.endpoint)}</span>
+          <span class="k">任务队列</span><span class="mono">${esc(CONFIG.queue.type)} · 并发 ${CONFIG.queue.concurrency}</span>
+          <span class="k">向量服务</span><span class="mono">${esc(CONFIG.embedding.mode)} · ${esc(CONFIG.embedding.gpu_endpoint)}</span>
+          <span class="k">GPU 集群</span><span class="mono">向量 ${CONFIG.gpu_cluster.embedding ? '启用' : '关闭'} · OCR ${CONFIG.gpu_cluster.ocr ? '启用' : '关闭'}</span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* —— 使用说明 —— */
+function viewDocs() {
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>使用说明</h2><div class="page-sub">这份单文件原型怎么用，以及它与完整 React 版的关系。</div></div>
+    <div class="card paper">
+      <h3>它是什么</h3>
+      <p>把知识库原型的<b>数据层 + 五个页面 + AI 会话操作通道</b>压缩进一个 HTML 文件：双击就能在浏览器里跑，不需要 Node、不需要后端、不联网。数据和 React 版（<code>src/</code>）是同一套口径：24 份演示资料、信息库（可增长）、默认向量维度 ${DIM}。</p>
+      <h3>能用一句话做什么</h3>
+      <ul>
+        <li>找资料：<code>搜一下「质保期」</code>、<code>按部门 项目部 筛选</code>、<code>金额大于 1000 万的资料</code></li>
+        <li>看资料：<code>列出失败的资料</code>、<code>列出会话里的资料</code>、<code>看看华东石化检维修服务合同.pdf 的详情</code>、<code>预览 供应商名录 2026.xlsx</code></li>
+        <li>改资料：<code>解析待处理的资料</code>、<code>重试失败的资料</code>、<code>删除 质量管理体系文件.pdf</code>（会先出确认卡）</li>
+        <li>运维：<code>看看运行状态</code>、<code>帮我巡检一下</code>、<code>重启停滞任务</code>、<code>重置熔断器</code></li>
+        <li>配置：<code>测试向量服务连通</code>、<code>启动本地模型</code>、<code>把向量模式切换成本地推理</code>（会先出确认卡）</li>
+        <li>反馈：<code>把这条检索标记为不准确</code> → 出现在 Agent 控制台的批注列表</li>
+      </ul>
+      <h3>安全边界</h3>
+      <ul>
+        <li>删除、切换模型这类不可撤销动作<b>先出确认卡</b>，点了「确认执行」才会动；点「放弃」没有任何改动。</li>
+        <li>上传需要你亲自选本地文件，原型不会凭空造资料，也不会往磁盘写任何文件。</li>
+        <li>所有「服务连通」「重启服务」「熔断」都是内存里的状态切换，不会真的发起对外请求。</li>
+        <li>AI 会话侧只说日常话；文件管理与系统配置这类管理页保留专业监控用词（看门狗、熔断器、向量维度）。</li>
+      </ul>
+      <h3>刷新与重置</h3>
+      <p>数据存在浏览器 localStorage（<code>file://</code> 下若被限制则退化为内存态，刷新即复位）。右上角「重置演示数据」恢复初始 24 份资料与空白会话。</p>
+      <h3>与完整版的差异</h3>
+      <ul>
+        <li>检索是关键词 + 规则打分，没有真实向量；嵌入维度只作为配置项展示。</li>
+        <li>预览是排版模拟（文档段落 / 表格 / 幻灯片 / 图片占位），不解析真实文件字节。</li>
+        <li>完整 React 版在 <code>src/</code>：同样的业务口径 + antd 组件 + 逐页验收；这份单文件版用于离线演示与分发。</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+/* ---------------- 11. 渲染 ---------------- */
+function renderSidebar() {
+  const box = $('#sidebar');
+  const nav = NAV.map(([href, label, icon]) => {
+    const on = currentRoute.path === href.slice(1) || (href === '#/' && currentRoute.path === '/');
+    return `<div class="nav-item${on ? ' on' : ''}" data-nav="${href}">
+      <span class="nav-icon">${icon}</span><span class="nav-label">${esc(label)}</span></div>`;
+  }).join('');
+  const sessions = SESSIONS.map((s) => {
+    const on = s.id === activeSession;
+    const n = messagesOf(s.id).length;
+    return `<div class="session-item${on ? ' active' : ''}" data-session="${s.id}">
+      <div class="session-item-title">${esc(s.title)}</div>
+      <div class="session-item-meta">${n} 条消息</div></div>`;
+  }).join('');
+  box.innerHTML = `
+    <ul class="sidebar-menu">${nav}</ul>
+    <div class="session-block">
+      <div class="session-block-head">
+        <span class="session-block-title">会话 · ${SESSIONS.length}</span>
+        <button class="btn ghost sm" data-act="new-session" title="新建会话">＋</button>
+      </div>
+      <div class="session-list">${sessions || '<div class="tiny muted" style="padding:10px 16px">还没有会话</div>'}</div>
+    </div>
+    <div class="sidebar-foot">
+      <span>会话只保存在本地</span>
+      <button class="btn ghost sm" data-nav="#/docs" title="使用说明">≡</button>
+    </div>`;
+}
+
+function pageShell(inner) {
+  return `<div class="fade-in">${inner}</div>`;
+}
+
+function render() {
+  renderSidebar();
+  const main = $('#main');
+  const path = currentRoute.path;
+  if (path === '/files') main.innerHTML = viewFiles();
+  else if (path === '/search') main.innerHTML = viewSearch();
+  else if (path === '/agent') main.innerHTML = viewAgent();
+  else if (path === '/settings') main.innerHTML = viewSettings();
+  else if (path === '/knowledge') main.innerHTML = viewKnowledge();
+  else if (path === '/tasks') main.innerHTML = viewTasks();
+  else if (path === '/docs') main.innerHTML = viewDocs();
+  else main.innerHTML = viewHome();
+  bindView();
+  bindComposer();
+  if (path === '/' || path === '/chat') scrollChatToEnd();
+}
+
+function render() {
+  renderSidebar();
+  const main = $('#main');
+  const path = currentRoute.path;
+  if (path === '/files') main.innerHTML = viewFiles();
+  else if (path === '/search') main.innerHTML = viewSearch();
+  else if (path === '/agent') main.innerHTML = viewAgent();
+  else if (path === '/settings') main.innerHTML = viewSettings();
+  else if (path === '/knowledge') main.innerHTML = viewKnowledge();
+  else if (path === '/tasks') main.innerHTML = viewTasks();
+  else if (path === '/docs') main.innerHTML = viewDocs();
+  else main.innerHTML = viewHome();
+  bindView();
+  bindComposer();
+  if (path === '/' || path === '/chat') scrollChatToEnd();
+}
+
+
+/* —— 首页 = AI 会话 —— */
+function viewHome() {
+  const msgs = messagesOf(activeSession);
+  const session = SESSIONS.find((s) => s.id === activeSession) || SESSIONS[0];
+  const head = `<header class="chat-header">
+      <span class="chat-title">${msgs.length ? esc(session.title) : '知识库 AI 会话原型'}</span>
+      <div class="chat-header-meta">${msgs.length ? msgs.length + ' 条消息 · ' : ''}${msgs.length ? '本地模拟会话' : '首页 · 一句话完成知识库的事'}</div>
+      <span class="grow"></span>
+      <button class="btn sm" data-act="new-session">＋ 新会话</button>
+      <button class="btn sm" data-toggle-tools>工具栏 ▾</button>
+    </header>`;
+  const body = msgs.length ? msgs.map(renderMessage).join('') : welcomeHtml();
+  return `<section class="chat-main">${head}
+    <div class="chat-scroll${msgs.length ? '' : ' home-scroll'}" id="chat-scroll"><div class="chat-inner">${body}</div></div>
+    ${composerHtml()}
+  </section>`;
+}
+
+function welcomeHtml() {
+  const st = {
+    total: FILES.length,
+    done: FILES.filter((f) => f.status === 'completed').length,
+    session: FILES.filter(isSessionFile).length,
+    pending: FILES.filter((f) => f.status === 'pending' || f.status === 'processing').length,
+    kbs: knownLibraries().length,
+  };
+  const quick = ['列出资料库里的全部文件', '列出失败的资料', '搜一下「合同」', '看看运行状态', '测试向量服务连通', '你能做什么'];
+  const caps = [
+    ['#/files', '文件管理', '上传、解析、删除、目录索引与预览，都在文件管理里完成'],
+    ['#/search', '搜索', '按关键词、部门、金额或性质过滤，结果可预览可反馈'],
+    ['#/agent', 'Agent 控制台', '看门狗运行状态、事件时间线，以及各条检索反馈的处理'],
+    ['#/settings', '系统配置', '远程模型服务、本地模型与基础设施配置'],
+  ];
+  const stat = (n, label, href) => `<button class="home-stat" data-nav="${href}"><b>${MONO(n)}</b><i>${label}</i></button>`;
+  return `<div class="home-wrap">
+    <header class="home-head">
+      <div class="home-hello">${greeting()}</div>
+      <h1 class="home-title">知识库里的事，说一句话就行</h1>
+      <p class="home-sub">知识库 AI 会话原型的每个动作都能在这里用日常说法完成：上传、搜索、目录收录、看运行状态、切模型服务。不可撤销的动作（比如删除资料）会先出一张卡，等你确认才动。</p>
+    </header>
+    <section class="home-stats">
+      ${stat(st.total, '文件库资料', '#/files')}
+      ${stat(st.done, '已处理', '#/files')}
+      ${stat(st.session, '会话资料', '#/files?session=1')}
+      ${stat(st.kbs, '信息库', '#/knowledge')}
+      ${stat(st.pending, '待处理', '#/files?status=pending')}
+    </section>
+    <section class="home-block">
+      <div class="home-block-head"><span class="ic-spark">◆</span> 一开口就能做 <em>点一下 = 把这句话发给我</em></div>
+      <div class="home-ops">
+        ${quick.map((q) => `<button class="home-op" data-say="${esc(q)}">${esc(q)}</button>`).join('')}
+      </div>
+      <div class="home-op-note">也可以直接打字，例如「删除失败的那个 xxx.pdf」「看看产品部都有哪些资料」。</div>
+    </section>
+    <section class="home-block">
+      <div class="home-block-head"><span class="ic-spark">◆</span> 要去页面里细看的事 <em>都是真实页面，没有死链接</em></div>
+      <div class="home-cards">
+        ${caps.map(([href, t, d]) => `<button class="home-card" data-nav="${href}">
+          <span class="home-card-icon">▪</span>
+          <span class="home-card-body"><b>${t}</b><i>${d}</i></span></button>`).join('')}
+      </div>
+    </section>
+    <section class="home-block">
+      <div class="home-block-head"><span class="ic-lib">▤</span> 当前资料库</div>
+      <div class="home-tags">
+        <span class="tag">共 ${st.total} 份</span>
+        <span class="tag warn">待处理 ${st.pending}</span>
+        <span class="tag ok">已处理 ${st.done}</span>
+        <span class="tag">会话来源 ${st.session}</span>
+      </div>
+      <div class="home-links">
+        <button class="btn sm" data-nav="#/files">文件管理</button>
+        <button class="btn sm" data-nav="#/search">搜索</button>
+        <button class="btn sm" data-nav="#/agent">Agent 控制台</button>
+        <button class="btn sm" data-nav="#/settings">系统配置</button>
+        <button class="btn sm" data-nav="#/docs">使用说明</button>
+      </div>
+    </section>
+    <div class="home-foot">
+      全部数据与执行都是<b>本地模拟</b>：不联网、不调用真实模型、不会删除你磁盘上的任何文件。
+      <a href="#/files">去文件管理 →</a>
+    </div>
+  </div>`;
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return '这么晚还在整理资料';
+  if (h < 11) return '早上好';
+  if (h < 13) return '中午好';
+  if (h < 18) return '下午好';
+  return '晚上好';
+}
+
+function renderBold(text) {
+  return esc(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+function renderMessage(m) {
+  const mine = m.role === 'user';
+  return `<div class="msg-row ${mine ? 'role-user' : 'role-assistant'} fade-in">
+    <div class="msg-avatar">${mine ? '我' : 'AI'}</div>
+    <div class="msg-body">
+      <div class="msg-bubble">${renderBold(m.content)}</div>
+      ${m.operation ? renderOperation(m) : ''}
+      <div class="msg-meta">${fmtTime(new Date(m.createdAt).toISOString())}${mine ? '' : ' · 本地模拟'}</div>
+    </div>
+  </div>`;
+}
+
+function renderOperation(m) {
+  const op = m.operation;
+  const areaText = { file: '文件管理', search: '搜索', agent: 'Agent 控制台', settings: '系统配置', kb: '信息库' };
+  const stateText = { pending: '准备执行', awaiting_confirm: '等待确认', running: '执行中', done: '已完成', failed: '未完成', cancelled: '已放弃' };
+  const settled = ['done', 'failed', 'cancelled'].includes(op.state);
+  const running = op.state === 'running' || op.state === 'pending';
+  return `<div class="op-card state-${op.state}">
+    <div class="op-head">
+      <span class="op-area">${areaText[op.intent.area] || ''}</span>
+      <span class="op-title">${esc(op.intent.title)}</span>
+      <span class="op-state">${running ? '<span class="spinner"></span> ' : ''}${stateText[op.state]}</span>
+    </div>
+    <div class="op-body">
+      ${op.intent.details && op.intent.details.length ? `<ul class="op-details">${op.intent.details.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>` : ''}
+      ${op.state === 'awaiting_confirm' && op.intent.warning ? `<div class="op-warning"><span class="ic-warn">!</span> 警告：${esc(op.intent.warning)}</div>` : ''}
+      ${op.state === 'awaiting_confirm' ? `<div class="op-actions">
+          <button class="btn primary sm" data-confirm="${m.id}">确认执行</button>
+          <button class="btn sm" data-cancel="${m.id}">放弃</button>
+          <span class="hint">在你确认之前，不会有任何改动。</span></div>` : ''}
+      ${running ? `<div class="op-running"><span class="spinner"></span><span>${esc(op.summary || '')}</span></div>` : ''}
+      ${settled ? `<div class="op-result">
+          <div class="op-summary">${esc(op.summary || '')}</div>
+          ${op.output && op.output.length ? `<ul class="op-output">${op.output.map((o) => `<li>${esc(o)}</li>`).join('')}</ul>` : ''}
+          ${op.stats && op.stats.length ? `<div class="op-stats">${op.stats.map((s) => `<span class="op-stat"><b>${esc(s.value)}</b><i>${esc(s.label)}</i></span>`).join('')}</div>` : ''}
+          ${op.error ? `<div class="err-text">原因：${esc(op.error)}</div>` : ''}
+          ${op.preview ? `<div><button class="btn sm" data-preview="${op.preview.fileId}" data-preview-name="${esc(op.preview.name)}">打开预览</button></div>` : ''}
+          ${op.link ? `<div><a class="op-link" href="${op.link.href}">${esc(op.link.label)} →</a></div>` : ''}
+        </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function composerHtml() {
+  return `<div class="composer">
+    <div class="composer-inner">
+      <div class="composer-hint">
+        <span class="composer-hint-main">普通提问不会把资料加进信息库；只有「把…添加到…信息库」这类明确的说法才会生成一张待确认卡</span>
+        <span class="composer-hint-keys">Enter 发送 · Shift+Enter 换行</span>
+      </div>
+      <div class="composer-box" id="composer-box">
+        <textarea class="composer-input" id="composer" rows="2" placeholder="说一句话就行，例如：列出失败的资料 / 搜一下「质保期」/ 看看运行状态"></textarea>
+        <div class="composer-actions">
+          <div class="composer-left">
+            <input type="file" id="file-input" multiple hidden>
+            <button class="btn sm" data-upload title="选择本地文件上传"><span class="ic-file">▤</span> 文件</button>
+            <span class="muted tiny">回车发送，Shift+回车换行</span>
+          </div>
+          <div class="composer-right">
+            <button class="btn primary sm" data-send>发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+
+
+/* —— 分组工具（搜索/文件管理共用） —— */
+function groupsBy(key) {
+  const map = new Map();
+  for (const f of FILES) {
+    const k = f[key] || '—';
+    const g = map.get(k) || { name: k, files: [], amount: 0 };
+    g.files.push(f);
+    g.amount += f.amount_wan || 0;
+    map.set(k, g);
+  }
+  return [...map.values()].sort((a, b) => b.files.length - a.files.length);
+}
+
+/* —— 文件管理 —— */
+function viewFiles() {
+  const page = Number(currentRoute.query.get('page') || 1);
+  const status = currentRoute.query.get('status') || 'all';
+  const sessionOnly = currentRoute.query.get('session') === '1';
+  const kw = currentRoute.query.get('q') || '';
+  const lib = currentRoute.query.get('lib') || 'all';
+  if (lib !== 'all') currentLibrary = lib;
+  const libCounts = libraryCounts();
+  const libNames = knownLibraries();
+  const SIZE = 10;
+  const items = FILES.filter((f) => {
+    if (status !== 'all' && f.status !== status) return false;
+    if (sessionOnly && !isSessionFile(f)) return false;
+    if (lib !== 'all' && libraryOf(f.directory_path) !== lib) return false;
+    if (kw && !f.original_name.toLowerCase().includes(kw.toLowerCase())) return false;
+    return true;
+  });
+  const total = items.length;
+  const pages = Math.max(1, Math.ceil(total / SIZE));
+  const cur = Math.min(Math.max(1, page), pages);
+  const shown = items.slice((cur - 1) * SIZE, cur * SIZE);
+  const counts = STATUS_ORDER.reduce((m, s) => (m[s] = FILES.filter((f) => f.status === s).length, m), {});
+  const pills = [['all', '全部', FILES.length], ...STATUS_ORDER.map((s) => [s, STATUS_TEXT[s], counts[s]])];
+  const types = [...new Set(FILES.map((f) => f.file_type))];
+  const typeIcon = (f) => TYPE_ICON[f.file_type] || '▫';
+  const action = (label, attr, id, extra) => `<button ${attr}="${id}"${extra || ''}>${label}</button>`;
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>文件管理</h2><p>管理资料来源：上传、解析、归档与检索预处理</p></div>
+    <div class="grid-3">
+      <div class="stat-card"><div class="stat-value">${MONO(FILES.length)}</div><div class="stat-label">全部资料</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(counts.completed || 0)}</div><div class="stat-label">已完成</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(counts.processing || 0)}</div><div class="stat-label">处理中</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(counts.pending || 0)}</div><div class="stat-label">待处理</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(counts.failed || 0)}</div><div class="stat-label">失败</div></div>
+    </div>
+    <div class="card" style="padding:0;margin-top:14px">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--color-divider)" class="row">
+        <span class="hint">资料列表</span>
+        <input id="files-kw" class="tiny" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px;width:190px" placeholder="按文件名搜索" value="${esc(kw)}">
+        <select id="files-lib" title="按信息库筛选" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px;max-width:190px">
+          <option value="all">全部信息库 (${libNames.length})</option>${libNames.map((n) => `<option value="${esc(n)}"${lib === n ? ' selected' : ''}>${esc(n)} (${libCounts[n] || 0})</option>`).join('')}
+        </select>
+        <select id="files-type" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px">
+          <option value="all">文件类型</option>${types.map((t) => `<option value="${t}">${t}</option>`).join('')}
+        </select>
+        <select id="files-status" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px">
+          <option value="all">处理状态</option>${STATUS_ORDER.map((s) => `<option value="${s}"${status === s ? ' selected' : ''}>${STATUS_TEXT[s]}</option>`).join('')}
+        </select>
+        <button class="btn sm${sessionOnly ? ' primary' : ''}" data-files-session>来自 AI 会话 (${FILES.filter(isSessionFile).length})</button>
+        <span class="grow"></span>
+        <button class="btn sm" data-upload>上传资料</button>
+        <label class="btn sm" style="display:inline-flex;align-items:center">扫描目录<input type="file" id="file-input" multiple hidden></label>
+        <button class="btn sm" data-parse-all>全部解析</button>
+        <button class="btn sm danger" data-reset-db>重置数据库</button>
+      </div>
+      <table class="table">
+        <thead><tr>
+          <th style="width:30px"><input type="checkbox" id="check-all"></th>
+          <th>文件名</th><th>信息库</th><th>归属</th><th>性质</th><th>大小</th><th>状态</th><th>段落</th><th>更新时间</th><th style="width:150px">操作</th>
+        </tr></thead>
+        <tbody>${shown.length ? shown.map((f) => `<tr class="${isSessionFile(f) ? 'row-on' : ''}">
+          <td><input type="checkbox" class="file-check" value="${f.id}"></td>
+          <td><div class="name"><span class="ic-file t-${esc(f.file_type)}">${typeIcon(f)}</span><b title="${esc(f.original_name)}">${esc(f.original_name)}</b>${isSessionFile(f) ? '<span class="tag">会话</span>' : ''}</div></td>
+          <td class="tiny"><span class="lib-chip">${esc(libraryOf(f.directory_path))}</span><br><span class="muted">${esc((f.directory_path || '').split('/').slice(1).join('/') || '—')}</span></td>
+          <td class="tiny">${esc(f.customer || '集团内部')}<br><span class="muted">${esc(f.department || '—')}</span></td>
+          <td class="tiny">${esc(f.nature || '—')}</td>
+          <td class="tiny mono">${fmtSize(f.file_size)}</td>
+          <td style="min-width:88px"><span class="status-dot ${f.status}"></span>${STATUS_TEXT[f.status]}${f.status === 'processing' ? `<div class="progress"><i style="width:${f.progress || 42}%"></i></div>` : ''}</td>
+          <td class="tiny mono">${MONO(f.chunk_count || 0)}</td>
+          <td class="tiny mono">${fmtTime(f.updated_at).slice(5, 16)}</td>
+          <td><div class="table-actions">
+            <button data-detail="${f.id}">详情</button>
+            <button data-preview="${f.id}" data-preview-name="${esc(f.original_name)}">预览</button>
+            ${f.status === 'failed' ? action('重新解析', 'data-retry', f.id) : action('解析', 'data-parse', f.id)}
+            <button class="danger" data-del="${f.id}">删除</button>
+          </div></td>
+        </tr>`).join('') : `<tr><td colspan="10"><div class="empty-state" style="text-align:center;padding:26px 0"><p class="muted">${sessionOnly ? '还没有来自 AI 会话的资料。' : '没有符合筛选条件的资料。'}</p></div></td></tr>`}
+        </tbody>
+      </table>
+      <div style="padding:12px 14px" class="row">
+        <span class="hint">共 ${total} 份 · 第 ${cur} / ${pages} 页</span>
+        <span class="grow"></span>
+        <button class="btn sm" data-files-page="${cur - 1}" ${cur <= 1 ? 'disabled' : ''}>上一页</button>
+        <button class="btn sm" data-files-page="${cur + 1}" ${cur >= pages ? 'disabled' : ''}>下一页</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* —— 搜索 —— */
+function viewSearch() {
+  const q = currentRoute.query.get('q') || currentRoute.query.get('keyword') || '';
+  const department = currentRoute.query.get('department') || '';
+  const customer = currentRoute.query.get('customer') || '';
+  const nature = currentRoute.query.get('nature') || '';
+  const amountMin = currentRoute.query.get('amount_min') || '';
+  const mode = currentRoute.query.get('mode') || 'hybrid';
+  const page = Number(currentRoute.query.get('page') || 1);
+
+  const all = FILES.filter((f) => {
+    if (f.status === 'failed' || f.status === 'archived') return false;
+    if (department && f.department !== department) return false;
+    if (customer && f.customer !== customer) return false;
+    if (nature && f.nature !== nature) return false;
+    if (amountMin && (f.amount_wan || 0) < Number(amountMin)) return false;
+    if (!q) return Boolean(department || customer || nature || amountMin);
+    const k = q.toLowerCase();
+    const inName = f.original_name.toLowerCase().includes(k) || f.directory_path.toLowerCase().includes(k);
+    const inBody = paragraphsOf(f).some((p) => p.includes(q));
+    if (mode === 'filename') return inName;
+    if (mode === 'content') return inBody;
+    return inName || inBody;
+  });
+  const depts = [...new Set(FILES.map((f) => f.department).filter(Boolean))];
+  const natures = [...new Set(FILES.map((f) => f.nature).filter(Boolean))];
+  const SIZE = 10;
+  const pages = Math.max(1, Math.ceil(all.length / SIZE));
+  const cur = Math.min(Math.max(1, page), pages);
+  const rows = all.slice((cur - 1) * SIZE, cur * SIZE);
+  const hist = (safeStore.get('kb-history') || '').split('|').filter(Boolean);
+  const active = Boolean(q || department || customer || nature || amountMin);
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>搜索</h2><p>关键词 + 部门 / 客户 / 资料性质 / 金额一起用，筛选在本页真实生效。</p></div>
+    <div class="card">
+      <div class="search-box">
+        <input id="q" value="${esc(q)}" placeholder="搜文件名或正文内容，例如：质保期 / 合同">
+        <button class="btn primary" data-search>搜索</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="field">模式
+          <select id="mode">
+            <option value="hybrid"${mode === 'hybrid' ? ' selected' : ''}>文件名 + 内容</option>
+            <option value="filename"${mode === 'filename' ? ' selected' : ''}>只搜文件名</option>
+            <option value="content"${mode === 'content' ? ' selected' : ''}>只搜正文</option>
+          </select></label>
+        <label class="field">归属部门
+          <select id="department"><option value="">不限</option>${depts.map((d) => `<option${d === department ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+        <label class="field">资料性质
+          <select id="nature"><option value="">不限</option>${natures.map((d) => `<option${d === nature ? ' selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+        <label class="field">金额下限（万元）
+          <input id="amount_min" type="number" value="${esc(amountMin)}" placeholder="不限" style="min-width:110px"></label>
+        <button class="btn sm" data-search-apply>应用筛选</button>
+        <button class="btn sm" data-search-reset>清空</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span class="hint">${hist.length ? '最近搜索：' : '热词：'}</span>
+        ${(hist.length ? hist.slice(0, 6) : ['合同', '质保期', '验收', '结算', '采购', '方案']).map((h) => `<button class="quick-chip" data-say-search="${esc(h)}">${esc(h)}</button>`).join('')}
+      </div>
+    </div>
+    <div class="row" style="margin:16px 0 10px">
+      <span class="card-title" style="margin:0">${active ? `找到 ${all.length} 条` : '输入关键词或选一个筛选条件'}</span>
+      ${department ? `<span class="tag info">部门：${esc(department)}</span>` : ''}
+      ${customer ? `<span class="tag info">客户：${esc(customer)}</span>` : ''}
+      ${nature ? `<span class="tag info">性质：${esc(nature)}</span>` : ''}
+      ${amountMin ? `<span class="tag info">金额 ≥ ${esc(amountMin)} 万</span>` : ''}
+    </div>
+    ${rows.map((f) => `<div class="result">
+      <div class="name"><span class="ic-file t-${esc(f.file_type)}">${TYPE_ICON[f.file_type] || '▫'}</span> <b>${esc(f.original_name)}</b></div>
+      <div class="chunk">${highlightText(paragraphsOf(f)[0] || f.summary || '', q)}</div>
+      <div class="meta">
+        <span>${esc(f.directory_path)}</span><span>${esc(f.customer || '集团内部')} · ${esc(f.department || '—')}</span>
+        <span>${esc(f.nature || '—')}</span>${f.amount_wan ? `<span>${f.amount_wan.toFixed(1)} 万元</span>` : ''}
+        <span>匹配度 ${(0.86 + (f.original_name.length % 10) / 100).toFixed(2)}</span>
+        <span class="grow"></span>
+        <button class="quick-chip" data-preview="${f.id}" data-preview-name="${esc(f.original_name)}">预览</button>
+        <button class="quick-chip" data-anno="${f.id}" data-anno-query="${esc(q || '未填写检索词')}">准确</button>
+        <button class="quick-chip" data-anno="${f.id}" data-anno-query="${esc(q || '未填写检索词')}" data-anno-rating="inaccurate">不准确</button>
+      </div>
+    </div>`).join('')}
+    ${active && all.length === 0 ? '<div class="empty-state" style="text-align:center;padding:30px 0"><p class="muted">没有命中，试试放宽条件或换个词。</p></div>' : ''}
+    ${all.length ? `<div class="row pager" style="justify-content:flex-end">
+      <span class="hint">共 ${all.length} 条 · 第 ${cur} / ${pages} 页</span>
+      <button class="btn sm" data-search-page="${cur - 1}" ${cur <= 1 ? 'disabled' : ''}>上一页</button>
+      <button class="btn sm" data-search-page="${cur + 1}" ${cur >= pages ? 'disabled' : ''}>下一页</button>
+    </div>` : ''}
+  </div>`;
+}
+function highlightText(text, q) {
+  if (!q) return esc(text);
+  const needle = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return esc(text).replace(new RegExp(needle, 'g'), (m) => `<em>${m}</em>`);
+}
+
+/* —— Agent 控制台 —— */
+function viewAgent() {
+  const w = AGENT.watchdog, cb = AGENT.circuit_breaker;
+  const dogs = [
+    ['解析看门狗', w.running], ['索引队列', w.running], ['资源调控', true],
+    ['API 熔断器', cb.state === 'closed'], ['双阶段补扫', w.running], ['结果校验', true],
+  ];
+  const pending = ANNOS.filter((a) => a.status !== 'done').length;
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>Agent 控制台</h2><p>看门狗与熔断器状态、事件时间线、检索反馈、运维动作（全部本地模拟，不发真实请求）。</p></div>
+    <div class="grid-3">
+      ${dogs.map(([name, ok]) => `<div class="stat-card"><div class="card-title"><span class="status-dot ${ok ? 'completed' : 'failed'}"></span>${name}</div><div class="hint">${ok ? '运行正常' : '已触发保护'}</div></div>`).join('')}
+    </div>
+    <div class="grid-3" style="margin-top:14px">
+      <div class="stat-card"><div class="stat-value">${MONO(w.stuck_tasks)}</div><div class="stat-label">停滞任务</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(w.restart_count)}</div><div class="stat-label">重启次数</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(cb.failures)}</div><div class="stat-label">熔断失败数（阈值 ${cb.threshold}）</div></div>
+      <div class="stat-card"><div class="stat-value">${(AGENT.stats.success_rate * 100).toFixed(0)}%</div><div class="stat-label">任务成功率（${AGENT.stats.total_tasks} 次）</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(pending)}</div><div class="stat-label">待处理反馈</div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-title">运维动作</div>
+      <div class="row">${Object.entries(AGENT_ACTIONS).map(([k, label]) => `<button class="btn sm" data-agent-action="${k}">${label}</button>`).join('')}</div>
+      <div class="hint" style="margin-top:8px">最近心跳：${fmtTime(w.last_heartbeat)} · 熔断器状态 ${cb.state}</div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="card-title">事件时间线</div>
+        <div class="timeline">${AGENT.events.slice(0, 8).map((e) => `<div class="ev"><div class="kvs"><span class="mono">${fmtTime(e.time)}</span><span class="tag">${e.type}</span></div><div>${esc(e.message)}</div></div>`).join('')}</div>
+      </div>
+      <div class="card"><div class="card-title">检索反馈（批注）</div>
+        <table class="table"><thead><tr><th>资料</th><th>问题</th><th>状态</th><th>处理结果</th><th></th></tr></thead>
+        <tbody>${ANNOS.slice(0, 8).map((a) => `<tr>
+          <td class="tiny">${esc(a.file_name)}</td>
+          <td class="tiny">${esc(a.query)}（${a.rating === 'accurate' ? '准确' : '不准确'}）</td>
+          <td><span class="tag ${a.status === 'done' ? 'ok' : 'warn'}">${a.status === 'done' ? '已处理' : '待处理'}</span></td>
+          <td class="tiny muted">${esc(a.result_note || '—')}</td>
+          <td><div class="table-actions"><button data-anno-done="${a.id}">标记已处理</button></div></td>
+        </tr>`).join('') || '<tr><td colspan="5"><div class="empty-state" style="text-align:center;padding:20px 0"><p class="muted">还没有反馈</p></div></td></tr>'}</tbody></table>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* —— 系统配置 —— */
+function viewSettings() {
+  const lm = CONFIG.local_model;
+  const rows = Object.entries(SERVERS).map(([type, s]) => `<tr>
+    <td><span class="status-dot ${s.alive ? 'completed' : 'failed'}"></span>${esc(s.name)}</td>
+    <td class="mono tiny">${esc(s.detail)}</td>
+    <td class="mono tiny">${esc(s.endpoint)}</td>
+    <td><span class="tag ${s.alive ? 'ok' : 'bad'}">${s.alive ? '在线' : '离线'}</span></td>
+    <td class="mono tiny">${s.latency_ms} ms</td>
+    <td><div class="table-actions"><button data-test-model="${type}">测试连通</button></div></td>
+  </tr>`).join('');
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>系统配置</h2><p>管理页保留专业监控用词；所有状态都是本地模拟。</p></div>
+    <div class="notice-bar" style="margin-bottom:12px">下面的端点、延迟、模型状态都来自内存中的模拟配置：不会真的发起对外请求，也不会加载真实权重。</div>
+    <div class="card" style="padding:0">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--color-divider)" class="row">
+        <span class="card-title" style="margin:0">远程模型服务</span>
+        <span class="grow"></span>
+        <button class="btn sm" data-to-remote>全部切换为远程</button>
+      </div>
+      <table class="table"><thead><tr><th>服务</th><th>模型</th><th>端点</th><th>状态</th><th>延迟</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="grid-2" style="margin-top:14px">
+      <div class="card"><div class="card-title">本地模型</div>
+        <div class="kvs" style="flex-direction:column;gap:6px">
+          <div class="row"><span class="hint" style="width:96px">推理位置</span><span>${lm.embedding_mode === 'local' ? '<span class="tag ok">本地推理</span>' : '<span class="tag info">远程接口</span>'} ${lm.active ? '<span class="tag ok">已启动</span>' : '<span class="tag">待命</span>'}</span></div>
+          <div class="row"><span class="hint" style="width:96px">向量维度</span><span class="mono">${lm.total_dim}</span></div>
+          <div class="row"><span class="hint" style="width:96px">向量模型</span><span class="mono">${esc(lm.bge.name)}${lm.bge.loaded ? `（已加载 ${lm.bge.dim} 维）` : '（未加载）'}</span></div>
+          <div class="row"><span class="hint" style="width:96px">大模型</span><span class="mono">${esc(lm.qwen.name)}${lm.qwen.loaded ? '（已加载）' : '（待命）'}</span></div>
+          <div class="row"><span class="hint" style="width:96px">OCR 引擎</span><span class="mono">${lm.ocr.engines.join(' / ')}</span></div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary sm" data-start-local>启动本地模型</button>
+          <button class="btn sm" data-to-local>切换为本地推理</button>
+          <button class="btn sm" data-to-remote>切换为远程接口</button>
+        </div>
+      </div>
+      <div class="card"><div class="card-title">基础设施配置</div>
+        <div class="kvs" style="flex-direction:column;gap:6px">
+          <div class="row"><span class="hint" style="width:96px">数据库</span><span class="mono">${esc(CONFIG.database.type)} · ${esc(CONFIG.database.url)}</span></div>
+          <div class="row"><span class="hint" style="width:96px">向量索引</span><span class="mono">${esc(CONFIG.database.vector)}</span></div>
+          <div class="row"><span class="hint" style="width:96px">存储</span><span class="mono tiny">${esc(CONFIG.storage.endpoint)}</span></div>
+          <div class="row"><span class="hint" style="width:96px">任务队列</span><span class="mono">${esc(CONFIG.queue.type)} · 并发 ${CONFIG.queue.concurrency}</span></div>
+          <div class="row"><span class="hint" style="width:96px">向量服务</span><span class="mono">${esc(CONFIG.embedding.mode)} · ${esc(CONFIG.embedding.gpu_endpoint)}</span></div>
+          <div class="row"><span class="hint" style="width:96px">GPU 集群</span><span class="mono">向量 ${CONFIG.gpu_cluster.embedding ? '启用' : '关闭'} · OCR ${CONFIG.gpu_cluster.ocr ? '启用' : '关闭'}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* —— 信息库 —— */
+function viewKnowledge() {
+  const libNames = knownLibraries();
+  const byKb = libNames.map((name) => ({ name, files: FILES.filter((f) => libraryOf(f.directory_path) === name) }));
+  const rows = byKb.map((k) => `<div class="card">
+      <div class="card-title"><span class="ic-lib">▤</span> ${esc(k.name)} <span class="tag">${k.files.length} 份资料</span></div>
+      <ul class="op-output">${k.files.slice(0, 6).map((f) => `<li>${esc(f.original_name)} <span class="muted tiny">· ${esc(f.department || '—')} · ${STATUS_TEXT[f.status]}</span></li>`).join('') || '<li class="muted tiny">还没有资料</li>'}</ul>
+      <button class="btn sm" data-lib-link="${esc(k.name)}">去文件管理看全部 →</button>
+    </div>`).join('');
+  const pending = MATERIALS.filter((m) => !FILES.some((f) => f.material_id === m.id && f.status === 'completed'));
+  return pageShell(`<div class="content">
+    <div class="page-header"><h2>信息库</h2><p>内置 ${BUILTIN_LIBS.length} 个信息库：${BUILTIN_LIBS.join(' / ')}。索引到新的目录会自动登记成新库，这里和文件管理的下拉都会跟着长。</p></div>
+    <div class="grid-3">
+      <div class="stat-card"><div class="stat-value">${MONO(libNames.length)}</div><div class="stat-label">信息库</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(MATERIALS.length)}</div><div class="stat-label">会话资料</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(FILES.filter((f) => f.status === 'completed').length)}</div><div class="stat-label">已处理</div></div>
+      <div class="stat-card"><div class="stat-value">${MONO(pending.length)}</div><div class="stat-label">待确认</div></div>
+    </div>
+    <div style="margin-top:14px">${rows}</div>
+  </div>`);
+}
+
+/* —— 添加记录 —— */
+function viewTasks() {
+  const sessionFiles = FILES.filter(isSessionFile);
+  const rows = sessionFiles.map((f) => `<tr>
+      <td><div class="name"><span class="ic-file t-${esc(f.file_type)}">${TYPE_ICON[f.file_type] || '▫'}</span><b>${esc(f.original_name)}</b></div></td>
+      <td class="tiny">${esc(f.directory_path)}</td>
+      <td class="tiny">${esc(f.nature || '—')}</td>
+      <td>${STATUS_TEXT[f.status]}</td>
+      <td class="tiny mono">${MONO(f.chunk_count || 0)}</td>
+      <td class="tiny mono">${fmtTime(f.created_at)}</td>
+      <td><div class="table-actions"><button data-preview="${f.id}" data-preview-name="${esc(f.original_name)}">预览</button></div></td>
+    </tr>`).join('');
+  return pageShell(`<div class="content">
+    <div class="page-header"><h2>添加记录</h2><p>会话里加进来的资料都会留一条记录：来源、目标信息库、处理结果。</p></div>
+    <div class="notice-bar" style="margin-bottom:12px">这里只记录<b>已经确认添加</b>的资料；普通提问不会产生记录。</div>
+    <div class="card" style="padding:0">
+      <table class="table">
+        <thead><tr><th>资料</th><th>目标信息库</th><th>性质</th><th>状态</th><th>段落</th><th>添加时间</th><th>操作</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7"><div class="empty-state" style="text-align:center;padding:24px 0"><p class="muted">还没有添加记录</p></div></td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`);
+}
+
+function viewDocs() {
+  return `<div class="content fade-in">
+    <div class="page-header"><h2>使用说明</h2><div class="page-sub">这份单文件原型怎么用，以及它与完整 React 版的关系。</div></div>
+    <div class="card paper">
+      <h3>它是什么</h3>
+      <p>把知识库原型的<b>数据层 + 五个页面 + AI 会话操作通道</b>压缩进一个 HTML 文件：双击就能在浏览器里跑，不需要 Node、不需要后端、不联网。数据和 React 版（<code>src/</code>）是同一套口径：24 份演示资料、信息库（可增长）、默认向量维度 ${DIM}。</p>
+      <h3>能用一句话做什么</h3>
+      <ul>
+        <li>找资料：<code>搜一下「质保期」</code>、<code>按部门 项目部 筛选</code>、<code>金额大于 1000 万的资料</code></li>
+        <li>看资料：<code>列出失败的资料</code>、<code>列出会话里的资料</code>、<code>看看华东石化检维修服务合同.pdf 的详情</code>、<code>预览 供应商名录 2026.xlsx</code></li>
+        <li>改资料：<code>解析待处理的资料</code>、<code>重试失败的资料</code>、<code>删除 质量管理体系文件.pdf</code>（会先出确认卡）</li>
+        <li>运维：<code>看看运行状态</code>、<code>帮我巡检一下</code>、<code>重启停滞任务</code>、<code>重置熔断器</code></li>
+        <li>配置：<code>测试向量服务连通</code>、<code>启动本地模型</code>、<code>把向量模式切换成本地推理</code>（会先出确认卡）</li>
+        <li>反馈：<code>把这条检索标记为不准确</code> → 出现在 Agent 控制台的批注列表</li>
+      </ul>
+      <h3>安全边界</h3>
+      <ul>
+        <li>删除、切换模型这类不可撤销动作<b>先出确认卡</b>，点了「确认执行」才会动；点「放弃」没有任何改动。</li>
+        <li>上传需要你亲自选本地文件，原型不会凭空造资料，也不会往磁盘写任何文件。</li>
+        <li>所有「服务连通」「重启服务」「熔断」都是内存里的状态切换，不会真的发起对外请求。</li>
+        <li>AI 会话侧只说日常话；文件管理与系统配置这类管理页保留专业监控用词（看门狗、熔断器、向量维度）。</li>
+      </ul>
+      <h3>刷新与重置</h3>
+      <p>数据存在浏览器 localStorage（<code>file://</code> 下若被限制则退化为内存态，刷新即复位）。右上角「重置演示数据」恢复初始 24 份资料与空白会话。</p>
+      <h3>与完整版的差异</h3>
+      <ul>
+        <li>检索是关键词 + 规则打分，没有真实向量；嵌入维度只作为配置项展示。</li>
+        <li>预览是排版模拟（文档段落 / 表格 / 幻灯片 / 图片占位），不解析真实文件字节。</li>
+        <li>完整 React 版在 <code>src/</code>：同样的业务口径 + antd 组件 + 逐页验收；这份单文件版用于离线演示与分发。</li>
+      </ul>
+    </div>
+  </div>`;
+}
+
+/* ---------------- 12. 交互绑定 ---------------- */
+function scrollChatToEnd() {
+  const el = $('#chat-scroll');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+
+function modal(html, width) {
+  const mask = document.createElement('div');
+  mask.className = 'mask';
+  mask.innerHTML = `<div class="modal"${width ? ` style="width:${width}"` : ''}>${html}</div>`;
+  mask.addEventListener('click', (e) => {
+    if (e.target === mask || e.target.closest('[data-close]')) mask.remove();
+  });
+  document.body.appendChild(mask);
+  return mask;
+}
+
+function openPreview(fileId, name) {
+  const f = fileById(fileId);
+  if (!f) return;
+  const paras = paragraphsOf(f);
+  const table = f.file_type === 'xlsx' ? `<table><tr><th>项目</th><th>金额（万元）</th><th>状态</th></tr>
+      <tr><td>合同总价</td><td>${(f.amount_wan || 0).toFixed(1)}</td><td>已确认</td></tr>
+      <tr><td>预付款 30%</td><td>${((f.amount_wan || 0) * 0.3).toFixed(1)}</td><td>已支付</td></tr>
+      <tr><td>质保金 10%</td><td>${((f.amount_wan || 0) * 0.1).toFixed(1)}</td><td>待支付</td></tr></table>` : '';
+  modal(`<div class="modal-head"><b>${esc(name || f.original_name)}</b><span class="grow"></span>
+      <span class="tag">${STATUS_TEXT[f.status]}</span><span class="tag">${fmtSize(f.file_size)}</span></div>
+    <div class="modal-body paper">
+      <div class="muted tiny" style="margin-bottom:8px">${esc(f.directory_path)} · ${esc(f.customer || '集团内部')} · ${esc(f.department || '—')} · ${esc(f.nature || '—')}</div>
+      ${table}
+      ${paras.map((p, i) => `<h3>第 ${i + 1} 节</h3><p>${esc(p)}</p>`).join('')}
+      <p class="muted tiny">（排版模拟预览，未解析真实文件内容）</p>
+    </div>
+    <div class="modal-foot"><button class="btn sm" data-close>关闭</button></div>`);
+}
+
+function openDetail(fileId) {
+  const f = fileById(fileId);
+  if (!f) return;
+  const kv = (k, v) => `<tr><th style="width:120px">${k}</th><td>${esc(String(v ?? '—'))}</td></tr>`;
+  modal(`<div class="modal-head"><b>资料详情</b><span class="grow"></span><span class="tag">${STATUS_TEXT[f.status]}</span></div>
+    <div class="modal-body">
+      <table class="paper" style="width:100%;border-collapse:collapse">${[
+        kv('文件名', f.original_name), kv('目录', f.directory_path), kv('来源', f.source === 'session' ? 'AI 会话' : f.source === 'upload' ? '页面内上传' : '目录索引'),
+        kv('归属客户', f.customer || '集团内部'), kv('所属部门', f.department || '—'), kv('资料性质', f.nature || '—'),
+        kv('合同金额', f.amount_wan ? `${f.amount_wan} 万元` : '—'), kv('文件大小', fmtSize(f.file_size)),
+        kv('段落数', f.chunk_count || 0), kv('字符数', MONO(f.character_count || 0)), kv('处理耗时', (f.processing_time_ms || 0) + ' ms'),
+        kv('创建时间', fmtTime(f.created_at)), kv('更新时间', fmtTime(f.updated_at)),
+        kv('摘要', f.summary || '—'), kv('错误信息', f.error_message || '—'),
+      ].join('')}</table>
+    </div>
+    <div class="modal-foot"><button class="btn sm" data-preview="${f.id}" data-preview-name="${esc(f.original_name)}">预览</button>
+      <button class="btn sm" data-close>关闭</button></div>`);
+}
+
+function openReset() {
+  modal(`<div class="modal-head"><b>重置演示数据</b></div>
+    <div class="modal-body">
+      <p class="notice-bar">会把资料库恢复到初始 24 份演示资料，并清空会话、批注与配置改动。这个动作不可撤销。</p>
+      <p class="tiny muted">输入 <b>CONFIRM</b> 后「确认重置」才可用。</p>
+      <input id="reset-input" placeholder="输入 CONFIRM" style="border:1px solid var(--color-border);padding:6px 8px;font-size:13px;width:220px">
+    </div>
+    <div class="modal-foot"><button class="btn sm" data-close>取消</button>
+      <button class="btn primary sm" id="reset-ok" disabled>确认重置</button></div>`);
+  const input = $('#reset-input'), ok = $('#reset-ok');
+  input.addEventListener('input', () => { ok.disabled = input.value.trim() !== 'CONFIRM'; });
+  ok.addEventListener('click', async () => {
+    await api.resetMockDb();
+    const m = document.querySelector('.mask');
+    if (m) m.remove();
+    persist(); go('#/'); render(); toast('已恢复初始演示数据');
+  });
+}
+
+function openBrowse() {
+  const dirs = [...new Set(FILES.map((f) => f.directory_path))].slice(0, 12);
+  modal(`<div class="modal-head"><b>扫描目录</b><span class="grow"></span><span class="tag">虚拟目录树 · 本地模拟</span></div>
+    <div class="modal-body">
+      <p class="tiny muted">这里列出的是内存资料所在目录。真实系统会把目录里的文件逐份解析后写入索引；原型不读磁盘。</p>
+      <ul class="op-output">${dirs.map((d) => `<li class="mono tiny">${esc(d)}</li>`).join('')}</ul>
+    </div>
+    <div class="modal-foot"><button class="btn primary sm" id="browse-run">开始收录</button><button class="btn sm" data-close>关闭</button></div>`);
+  $('#browse-run').onclick = async () => {
+    const res = await api.indexFolder(dirs[0], true);
+    $('.mask') && $('.mask').remove();
+    toast(`已收录 ${(res && res.count) || 0} 份资料`);
+    persist(); render();
+  };
+}
+
+function dropEmptySessions(exceptId) {
+  SESSIONS = SESSIONS.filter((s) => s.id === exceptId || messagesOf(s.id).length > 0);
+}
+
+function bindView() {
+  $$('[data-nav]').forEach((el) => { el.onclick = () => go(el.getAttribute('data-nav')); });
+  $$('[data-session]').forEach((el) => {
+    el.onclick = () => {
+      // 点当前会话标题（在首页时）不重复进入
+      activeSession = el.getAttribute('data-session');
+      persist(); render();
+      setTimeout(scrollChatToEnd, 30);
+    };
+  });
+  $$('[data-new-session]').forEach((el) => { el.onclick = () => newSession(); });
+  $$('[data-say]').forEach((el) => {
+    el.onclick = () => {
+      let target = activeSession;
+      if (!SESSIONS.some((s) => s.id === activeSession)) target = newSession(true);
+      sendUserMessage(target, el.getAttribute('data-say'));
+      setTimeout(scrollChatToEnd, 30);
+    };
+  });
+  $$('[data-upload]').forEach((el) => { el.onclick = () => { const i = $('#file-input'); if (i) i.click(); else toast('请到文件管理页上传资料'); }; });
+
+  // 首页「尝试这样说」→ 点一下就直接发送（先确保有会话）
+  const ensureSession = () => (SESSIONS.some((s) => s.id === activeSession) ? activeSession : newSession(true));
+
+  // 搜索页
+  $$('[data-search-apply]').forEach((el) => { el.onclick = applySearch; });
+  $$('[data-search]').forEach((el) => { el.onclick = applySearch; });
+  const qInput = $('#q');
+  if (qInput) qInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySearch(); });
+  $$('[data-search-reset]').forEach((el) => { el.onclick = () => go('#/search'); });
+  $$('[data-say-search]').forEach((el) => {
+    el.onclick = () => go('#/search?q=' + encodeURIComponent(el.getAttribute('data-say-search')));
+  });
+  $$('[data-search-page]').forEach((el) => {
+    el.onclick = () => {
+      const qs2 = new URLSearchParams(currentRoute.query);
+      qs2.set('page', el.getAttribute('data-search-page'));
+      go('#/search?' + qs2.toString());
+    };
+  });
+  $$('[data-goto-search]').forEach((el) => {
+    el.onclick = () => {
+      const [k, v] = el.getAttribute('data-goto-search').split('=');
+      go(`#/search?${k}=${v}&mode=hybrid`);
+    };
+  });
+  // 文件管理
+  $$('[data-files-status]').forEach((el) => { el.onclick = () => go('#/files?status=' + el.getAttribute('data-files-status')); });
+  $$('[data-lib-link]').forEach((el) => { el.onclick = () => go('#/files?lib=' + encodeURIComponent(el.getAttribute('data-lib-link'))); });
+  const libSel = $('#files-lib');
+  if (libSel) libSel.onchange = () => {
+    const qs = new URLSearchParams(location.hash.split('?')[1] || '');
+    if (libSel.value === 'all') qs.delete('lib'); else qs.set('lib', libSel.value);
+    qs.delete('page');
+    const tail = qs.toString();
+    go('#/files' + (tail ? '?' + tail : ''));
+  };
+  $$('[data-files-session]').forEach((el) => { el.onclick = () => go('#/files?session=1'); });
+  $$('[data-files-page]').forEach((el) => {
+    if (el.hasAttribute('disabled')) return;
+    el.onclick = () => {
+      const qs2 = new URLSearchParams(currentRoute.query);
+      qs2.set('page', el.getAttribute('data-files-page'));
+      go('#/files?' + qs2.toString());
+    };
+  });
+  $$('[data-preview]').forEach((el) => {
+    el.onclick = () => openPreview(el.getAttribute('data-preview'), el.getAttribute('data-preview-name'));
+  });
+  $$('[data-detail]').forEach((el) => { el.onclick = () => openDetail(el.getAttribute('data-detail')); });
+  $$('[data-retry]').forEach((el) => {
+    el.onclick = async () => {
+      await api.fileAction(el.getAttribute('data-retry'), 'retry');
+      toast('已重新处理'); persist(); render();
+    };
+  });
+  $$('[data-del]').forEach((el) => {
+    el.onclick = async () => {
+      const id = el.getAttribute('data-del');
+      const f = fileById(id);
+      if (!confirm(`删除「${f ? f.original_name : id}」？会同时从检索范围里移除。`)) return;
+      const res = await api.batchDeleteFiles([id]);
+      toast(`已删除 ${(res && res.deleted) || 1} 份资料`);
+      persist(); render();
+    };
+  });
+  // 文件管理：搜索 / 全选 / 批量动作
+  const fkw = $('#files-kw');
+  if (fkw) {
+    fkw.addEventListener('input', () => {
+      const qs3 = new URLSearchParams();
+      if (fkw.value.trim()) qs3.set('q', fkw.value.trim());
+      if (currentRoute.query.get('status')) qs3.set('status', currentRoute.query.get('status'));
+      if (currentRoute.query.get('session')) qs3.set('session', '1');
+      go('#/files' + (qs3.toString() ? '?' + qs3.toString() : ''));
+    });
+  }
+  const fst = $('#files-status');
+  if (fst) {
+    fst.onchange = () => {
+      const qs3 = new URLSearchParams(currentRoute.query);
+      qs3.delete('page');
+      if (fst.value === 'all') qs3.delete('status'); else qs3.set('status', fst.value);
+      go('#/files' + (qs3.toString() ? '?' + qs3.toString() : ''));
+    };
+  }
+  const call = $('#check-all');
+  if (call) {
+    call.onchange = () => { $$('.file-check').forEach((c) => { c.checked = call.checked; }); };
+  }
+  $$('[data-parse-all]').forEach((el) => {
+    el.onclick = async () => {
+      const ids = $$('.file-check').filter((c) => c.checked).map((c) => c.value);
+      const targets = ids.length ? FILES.filter((f) => ids.includes(f.id)) : FILES.filter((f) => f.status === 'pending' || f.status === 'failed');
+      for (const f of targets) await api.fileAction(f.id, 'parse');
+      toast(`已处理 ${targets.length} 份资料`); persist(); render();
+    };
+  });
+  $$('[data-reset-db]').forEach((el) => { el.onclick = () => openReset(); });
+  $$('[data-parse]').forEach((el) => {
+    el.onclick = async () => {
+      await api.fileAction(el.getAttribute('data-parse'), 'parse');
+      toast('处理完成'); persist(); render();
+    };
+  });
+  $$('[data-anno]').forEach((el) => {
+    el.onclick = async () => {
+      const rating = el.getAttribute('data-anno-rating') || 'accurate';
+      await api.submitAnnotation({
+        query: el.getAttribute('data-anno-query'),
+        file_id: el.getAttribute('data-anno'),
+        rating,
+        issues: rating === 'inaccurate' ? '检索结果与问题不匹配' : '结果符合预期',
+      });
+      toast(rating === 'accurate' ? '已标记为准确' : '已标记为不准确，可在 Agent 控制台看到');
+      persist();
+    };
+  });
+  $$('[data-anno-done]').forEach((el) => {
+    el.onclick = async () => {
+      await api.processAnnotation(el.getAttribute('data-anno-done'));
+      toast('已标记为处理完成'); persist(); render();
+    };
+  });
+  // Agent 控制台
+  $$('[data-agent-action]').forEach((el) => {
+    el.onclick = async () => {
+      const action = el.getAttribute('data-agent-action');
+      const res = await api.runAgentAction(action);
+      toast((res && res.message) || '已执行');
+      persist(); render();
+    };
+  });
+  // 系统配置
+  $$('[data-test-model]').forEach((el) => {
+    el.onclick = async () => {
+      const r = await api.testRemoteModel(el.getAttribute('data-test-model'));
+      toast(r && r.ok ? `连通正常，延迟约 ${r.latency_ms} ms` : '服务不可用');
+      persist(); render();
+    };
+  });
+  $$('[data-toggle-model]').forEach((el) => {
+    el.onclick = async () => {
+      const type = el.getAttribute('data-toggle-model');
+      const mode = el.getAttribute('data-mode');
+      await api.toggleModel(type, mode);
+      toast('已切换'); persist(); render();
+    };
+  });
+  $$('[data-to-local]').forEach((el) => {
+    el.onclick = async () => {
+      await api.toggleModel('embedding', 'local');
+      toast('已切换为本地推理'); persist(); render();
+    };
+  });
+  $$('[data-to-remote]').forEach((el) => {
+    el.onclick = async () => {
+      await api.toggleModel('embedding', 'remote');
+      toast('已切换为远程接口'); persist(); render();
+    };
+  });
+  $$('[data-start-local]').forEach((el) => {
+    el.onclick = async () => {
+      await api.startLocalModel();
+      toast('本地模型已启动'); persist(); render();
+    };
+  });
+  // 操作卡
+  $$('[data-confirm]').forEach((el) => { el.onclick = () => confirmOperation(el.getAttribute('data-confirm')); });
+  $$('[data-cancel]').forEach((el) => {
+    el.onclick = () => { cancelOperation(el.getAttribute('data-cancel')); };
+  });
+}
+
+/* 发送框回车发送 */
+document.addEventListener('keydown', (e) => {
+  if (e.target && e.target.id === 'composer' && e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const ta = e.target;
+    const text = ta.value;
+    if (!text.trim()) return;
+    const target = SESSIONS.some((s) => s.id === activeSession) ? activeSession : newSession(true);
+    ta.value = '';
+    sendUserMessage(target, text.trim());
+    setTimeout(scrollChatToEnd, 30);
+  }
+});
+
+/* 文件选择上传（真实读取用户选中的文件名，内容不入库） */
+document.addEventListener('change', async (e) => {
+  if (!e.target || e.target.id !== 'file-input') return;
+  const list = [...(e.target.files || [])];
+  if (!list.length) return;
+  for (const file of list) {
+    await api.uploadFile(file.name, file.size);
+  }
+  if (!SESSIONS.some((s) => s.id === activeSession)) newSession(true);
+  toast(`已加入 ${list.length} 份资料`);
+  persist(); render();
+});
+
+/* 发送按钮 */
+function bindComposer() {
+  $$('[data-send]').forEach((el) => {
+    el.onclick = () => {
+      const ta = $('#composer');
+      if (!ta) return;
+      const text = ta.value.trim();
+      if (!text) return;
+      const target = SESSIONS.some((s) => s.id === activeSession) ? activeSession : newSession(true);
+      ta.value = '';
+      sendUserMessage(target, text);
+      setTimeout(scrollChatToEnd, 30);
+    };
+  });
+}
+
+function applySearch() {
+  const qs = new URLSearchParams();
+  const get = (id) => ($(id) ? $(id).value : '');
+  const q = get('#q').trim();
+  const mode = get('#mode') || 'hybrid';
+  const department = get('#department');
+  const nature = get('#nature');
+  const amount_min = get('#amount_min');
+  if (q) qs.set('q', q);
+  if (mode !== 'hybrid') qs.set('mode', mode);
+  if (department) qs.set('department', department);
+  if (nature) qs.set('nature', nature);
+  if (amount_min) qs.set('amount_min', amount_min);
+  go('#/search' + (qs.toString() ? '?' + qs.toString() : ''));
+  if (q) {
+    const hist = (safeStore.get('kb-history') || '').split('|').filter(Boolean).filter((x) => x !== q);
+    safeStore.set('kb-history', [q, ...hist].slice(0, 8).join('|'));
+  }
+}
+
+/* ---------------- 13. 启动 ---------------- */
+function newSession() {
+  const id = uid('sess');
+  SESSIONS.push({ id, title: '新会话', createdAt: Date.now(), updatedAt: Date.now(), titled: false });
+  dropEmptySessions(id);
+  activeSession = id;
+  persist();
+  return id;
+}
+
+restore();
+if (!location.hash) location.hash = '#/';
+currentRoute = parseHash();
+render();
+$('#btn-reset').onclick = () => openReset();
+
+</script>
+</body>
+</html>

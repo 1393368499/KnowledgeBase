@@ -1,0 +1,336 @@
+/* ============================================================================
+ * 新增样式（**不属于原型**，标注清楚以便对照）
+ *
+ * 原型没有"右侧文档栏"。需求要求它在**首页 AI 会话右边**，且**默认收起**；
+ * 收起时必须与原型布局完全一致。因此这里只做两件事：
+ *   1. 把首页三段（52px 头部 / 滚动区 / 底部 composer）包进 .chat-col，
+ *      让它在列方向上的几何与原型 .chat-main 完全相同；
+ *   2. 展开时把 .chat-main 变成横向排布，右侧挂 .doc-pane。
+ * 不改动原型任何一条既有规则。
+ *
+ * 本文件由 base.html **全站加载**（2026-10-16 起）：除首页外，文件管理页与搜索页的
+ * 「性质」显示（`.nature-label` / `.nature-select`，见文件末尾）也在这里定义 ——
+ * 同一套口径只写一份样式，不再各页复制。
+ * ========================================================================== */
+
+/* 收起状态：.chat-col 撑满，几何与原型 .chat-main 一致 */
+.chat-col{flex:1; min-height:0; display:flex; flex-direction:column}
+
+/* 展开状态：主区横向 = 会话列 + 文档栏 */
+.chat-main.doc-open{flex-direction:row}
+
+.doc-pane{
+  /* 宽度演进（每一轮都是用户要求）：
+       380px（原型）→ 570px（380 × 1.5）→ 855px（570 × 1.5）→ 750px → **700px（2026-10-19 定为最终值）**。
+     700px 在 1920 宽的屏上会话列仍有 ~1000px；为了让 1440/1280 这类较窄的屏
+     不至于把会话列挤成一条、也不让文档栏冲出视口，再用 max-width 兜一层：
+     会话列至少保留 620px（.chat-col 的 min-content 实测约 609px），
+     视口不够时文档栏自动收窄（默认仍是 700px）。
+     收起时是 display:none，所以不影响"收起时几何与原型一致"的前提。
+     窄屏（<=960px）走下面的媒体查询，纵向堆叠，与此值无关。 */
+  display:none; flex:0 0 700px; max-width:calc(100vw - var(--sidebar-width, 220px) - 620px);
+  min-width:0; flex-direction:column;
+  border-left:1px solid var(--color-border); background:var(--color-surface);
+}
+.doc-pane.open{display:flex}
+.doc-pane-head{
+  flex:0 0 auto; height:52px; display:flex; align-items:center; gap:8px;
+  padding:0 14px; border-bottom:1px solid var(--color-border);
+}
+.doc-pane-title{font-size:13.5px; font-weight:600}
+.doc-pane-body{flex:1; min-height:0; overflow:auto; padding:14px}
+.doc-pane-foot{
+  flex:0 0 auto; border-top:1px solid var(--color-border); padding:10px 14px;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.doc-pane .field{display:block; margin-bottom:10px}
+.doc-pane .field label{display:block; font-size:11.5px; color:var(--color-text-secondary); margin-bottom:4px}
+.doc-pane textarea{
+  width:100%; border:1px solid var(--color-border); border-radius:2px; resize:vertical;
+  padding:8px 10px; font-family:inherit; font-size:13px; line-height:1.7; min-height:220px;
+}
+.doc-pane textarea:focus{outline:none; border-color:var(--color-dark)}
+/* 公文模板预览（.paper.is-official）：口径对齐模板原件（01.公文基本规范模板.docx）。
+   标题 = 方正小标宋二号居中；一级标题黑体三号、二级楷体三号加粗、三级仿宋三号加粗；
+   正文仿宋三号、首行缩进两字符、固定 28 磅行距。字号按 pt 折算成 px
+   （三号 16pt≈21.33px、二号 22pt≈29.33px），让预览换行与 Word 里基本一致。
+   非公文模板不加 .is-official，仍是通用 Markdown 排版（.paper 原型样式）。 */
+.paper.is-official{
+  font-family:"仿宋","FangSong","仿宋_GB2312",serif;
+  font-size:21.33px; line-height:28pt; color:#000;
+}
+.paper.is-official h1, .paper.is-official .gb-title{
+  font-family:"方正小标宋简体","方正小标宋_GBK","宋体",serif;
+  font-size:29.33px; font-weight:400; line-height:28pt;
+  text-align:center; text-indent:0; margin:0 0 28pt;
+}
+/* Markdown 里的 `#` 会被渲染成 h2（页面已有 h2 语义），所以首行标题用 .gb-title 认领 */
+.paper.is-official h2{
+  font-family:"黑体","SimHei",sans-serif;
+  font-size:21.33px; font-weight:400; text-indent:0; margin:16px 0 6px;
+}
+.paper.is-official h3{
+  font-family:"楷体","KaiTi","楷体_GB2312",serif;
+  font-size:21.33px; font-weight:700; text-indent:0; margin:14px 0 6px;
+}
+.paper.is-official h4{
+  font-family:"仿宋","FangSong",serif;
+  font-size:21.33px; font-weight:700; text-indent:0; margin:12px 0 6px;
+}
+/* 公文的层级靠「一、」「（一）」标出，不是 Markdown 标题：
+   renderPreview() 会给这些行加类，这里按同一套口径排印（与 Word 导出一致）。 */
+.paper.is-official .gb-h1{
+  font-family:"黑体","SimHei",sans-serif;
+  font-size:21.33px; font-weight:400; text-indent:2em; margin:0;
+}
+.paper.is-official .gb-h2{
+  font-family:"楷体","KaiTi","楷体_GB2312",serif;
+  font-size:21.33px; font-weight:700; text-indent:2em; margin:0;
+}
+.paper.is-official .gb-h3{
+  font-family:"仿宋","FangSong",serif;
+  font-size:21.33px; font-weight:700; text-indent:2em; margin:0;
+}
+/* 落款单位与成文日期居右、不缩进 */
+.paper.is-official .gb-signature{text-align:right; text-indent:0}
+.paper.is-official p{margin:0; text-indent:2em}
+.paper.is-official ul,.paper.is-official ol{margin:0; padding-left:2em; text-indent:0}
+.paper.is-official table{font-size:18px; border-collapse:collapse; margin:8px 0}
+.paper.is-official th,.paper.is-official td{border:1px solid #333; padding:2px 6px; text-indent:0}
+.doc-pane .doc-list-item{
+  display:block; width:100%; text-align:left; appearance:none; border:1px solid var(--color-border);
+  background:#fff; border-radius:2px; padding:7px 9px; font-size:12.5px; cursor:pointer; margin-bottom:6px;
+}
+.doc-pane .doc-list-item:hover{border-color:var(--color-dark)}
+.doc-pane .doc-list-item.on{border-color:var(--color-dark); background:#f7f7f7}
+/* 列表一行 = 「打开」+ 行内「删除」。行内删除是新增入口：原来只能删"当前打开的
+   那一份"，列表里没法就地删，用户会以为草稿删不掉（实测反馈）。 */
+.doc-pane .doc-list-row{display:flex; align-items:stretch; gap:6px; margin-bottom:6px}
+.doc-pane .doc-list-row .doc-list-item{
+  flex:1 1 auto; min-width:0; margin-bottom:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.doc-pane .doc-del{
+  flex:0 0 auto; width:30px; padding:0; cursor:pointer;
+  border:1px solid var(--color-border); background:#fff; border-radius:2px;
+  color:var(--color-text-secondary); font-size:12px; line-height:1;
+}
+.doc-pane .doc-del:hover{border-color:#c0392b; color:#c0392b}
+/* 状态条容器：**固定在滚动区之外**（头部与滚动体之间），永远可见 */
+.doc-pane .doc-pane-status{
+  flex:0 0 auto; padding:8px 14px 0;
+}
+/* 保存状态条：保存中 / 已保存 / 有未保存的改动 / 保存失败。 */
+.doc-pane .doc-status{
+  font-size:12px; line-height:1.6; padding:6px 8px;
+  border:1px solid var(--color-border); border-radius:2px; background:#fafafa;
+  color:var(--color-text-secondary);
+}
+.doc-pane .doc-status.saving{color:#8a6d3b; background:#fcf8e3; border-color:#f0e0a8}
+.doc-pane .doc-status.dirty{color:#8a6d3b; background:#fcf8e3; border-color:#f0e0a8}
+.doc-pane .doc-status.saved{color:#2d6a2d; background:#f0f8f0; border-color:#bfe0bf}
+.doc-pane .doc-status.error{color:#a33; background:#fdf0f0; border-color:#e6b8b8}
+
+/* `hidden` 必须真的隐藏：`.doc-pane .field{display:block}` 这类作者样式会盖掉
+   浏览器 UA 的 `[hidden]{display:none}`，于是"隐藏的预览面板还显示着"（实测踩到）。
+   这条只作用于文档面板内部，不影响原型样式表。 */
+.doc-pane [hidden]{display:none !important}
+
+/* 「编辑 / 预览」互斥视图 */
+.doc-pane .doc-tabs{display:flex; gap:6px; margin:2px 0 8px}
+.doc-pane .doc-tab{
+  appearance:none; border:1px solid var(--color-border); background:#fff; border-radius:2px;
+  padding:5px 12px; font-size:12.5px; cursor:pointer; color:var(--color-text-secondary);
+}
+.doc-pane .doc-tab:hover{border-color:var(--color-dark)}
+.doc-pane .doc-tab.on{
+  border-color:var(--color-dark); color:var(--color-text); font-weight:600; background:#f7f7f7;
+}
+
+/* 底栏说明行：**每个禁用按钮的理由**写在这里（title 只能悬停看到，不够） */
+.doc-pane .doc-hint{
+  flex:1 1 100%; font-size:11.5px; line-height:1.6; color:var(--color-text-secondary);
+  margin-top:6px;
+}
+.doc-pane .doc-hint.warn{color:#8a6d3b}
+
+.src-results{max-height:190px; overflow:auto; border:1px solid var(--color-divider); border-radius:2px; padding:6px}
+.src-item{display:flex; align-items:flex-start; gap:6px; padding:3px 0; font-size:12px; cursor:pointer}
+/* 通用 input 样式会把这个复选框拉满宽，导致文字被挤到很右边。
+   这里只针对文档栏里的复选框收紧：不伸缩、按自身宽度。 */
+.doc-pane .src-item input[type="checkbox"]{
+  width:auto; flex:0 0 auto; min-width:0; margin:2px 0 0; padding:0;
+}
+
+@media (max-width:960px){
+  .chat-main.doc-open{flex-direction:column}
+  .doc-pane.open{flex:0 0 auto; max-height:50vh; border-left:0; border-top:1px solid var(--color-border)}
+}
+
+/* ============================================================================
+ * 资料「性质」的显示样式（文件管理页 + 搜索页共用）
+ *
+ * 性质由后端按正文内容自动识别（五项固定词表），也可能人工指定；空值表示
+ * **还没识别出来**，界面显示「待识别」。依据/失败原因与来源放在 `title` 里
+ * （`KB.natureTooltip`），这里只负责让取值本身与"行内人工纠正"同格可读。
+ * ========================================================================== */
+.nature-label{
+  /* 「涉密文档」四个汉字（11.5px）约 52px：给到 84px 保证**不被裁字**
+     （曾经用 104px 的盒子把它和下拉挤在一格，结果 chip 文字被截断）。 */
+  display:inline-block; max-width:84px; overflow:hidden; text-overflow:ellipsis;
+  margin-right:6px; padding:0 5px; border-radius:2px;
+  border:1px solid var(--color-border); border-bottom-style:dashed; background:#fafafa;
+  color:var(--color-text); white-space:nowrap; vertical-align:middle;
+}
+/* 行内人工纠正下拉：表格格子里要窄一些，否则会把"操作"列挤出去。
+   选项文案保持短（长解释放在 title 上），所以不设 min-width（原型给内部 select
+   的 150px 在这里会把「性质」列撑爆）。 */
+.nature-select{
+  max-width:104px; min-width:0; padding:2px 4px; font-size:11.5px; font-family:inherit;
+  border:1px solid var(--color-border); border-radius:2px; background:#fff;
+  color:var(--color-text); vertical-align:middle;
+}
+.nature-select:focus{outline:none; border-color:var(--color-dark)}
+
+/* ============================================================================
+ * 提示（toast）的**语义色**（处置清单 OP-18）
+ *
+ * 原型 `.toast` 只有一种深色底：成功、警告、失败长得完全一样。`KB.toast`
+ * 的第二参数 `kind` 过去被静默丢掉，于是"解析未受理""反馈没有记录成功"这类
+ * 失败在一闪而过的提示里读不出来。这里只加三条**新增类**（原型 CSS 是只读的，
+ * 所以写在 kb-home.css —— 它在 kb-proto.css 之后加载）。
+ * 不带 kind 的旧调用点行为完全不变（还是原型那一种样式）。
+ * ========================================================================== */
+.toast.toast-ok{background:#2f6b34}
+.toast.toast-warn{background:#8a6d3b}
+.toast.toast-err{background:#a3342f}
+
+/* 行内动作的**权限原因**提示：置灰的按钮旁边一行可见说明（不靠悬停 title） */
+.perm-note{font-size:11.5px; line-height:1.6; color:#8a6d3b; margin:6px 0}
+.table-actions button[data-perm-denied="1"]{opacity:.55; cursor:not-allowed}
+
+/* ------------------------------------------------ 知识库调用选择（输入框） ----
+ *
+ * 回显条只在用户真的限定了检索范围时出现（HTML 上默认 hidden）。
+ * 放在 composer-box 内、textarea 之下：它描述的是"这一问的检索范围"，
+ * 与发送按钮同属一个整体，贴在外面会被读成页面级的全局设置。
+ */
+.composer-scope{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  padding:5px 9px; border-top:1px dashed var(--color-divider); background:#fbfbfa;
+}
+.composer-scope .kb-scope-chips{display:flex; align-items:center; gap:4px; flex-wrap:wrap}
+/* 单个已选库的"胶囊"：**必须显示 code**，同名库靠它区分（界面上不猜） */
+.kb-scope-chip{
+  font-size:11px; line-height:1.5; padding:1px 6px; border-radius:10px;
+  border:1px solid var(--color-border); background:#fff; color:#404040;
+}
+/* 选择弹窗里的勾选列表 */
+.kb-scope-list{display:flex; flex-direction:column; gap:2px; max-height:320px; overflow:auto; margin-top:8px}
+.kb-scope-item{display:flex; align-items:flex-start; gap:7px; font-size:12.5px; padding:5px 6px; border-radius:2px; cursor:pointer}
+.kb-scope-item:hover{background:#f7f7f7}
+
+/* ------------------------------------------------------------ 公文模板 ----
+ *
+ * 用原生 details 折叠：收起时只占一行，不把下面的草稿列表挤出可视区。
+ */
+.doc-pane .doc-block{
+  border:1px solid var(--color-divider); border-radius:2px; padding:8px 9px;
+  margin-bottom:10px; background:#fcfcfb;
+}
+.doc-pane .doc-block > summary{
+  list-style:none; display:flex; align-items:center; gap:6px; cursor:pointer;
+  font-size:11.5px; color:var(--color-text-secondary);
+}
+.doc-pane .doc-block > summary::-webkit-details-marker{display:none}
+.doc-pane .doc-block > summary::before{content:"▸"; font-size:10px; color:var(--color-text-secondary)}
+.doc-pane .doc-block[open] > summary::before{content:"▾"}
+.doc-pane .tpl-list{margin-top:6px}
+.doc-pane .tpl-row{display:flex; align-items:stretch; gap:6px; margin-bottom:6px}
+.doc-pane .tpl-item{
+  flex:1; min-width:0; text-align:left; appearance:none; border:1px solid var(--color-border);
+  background:#fff; border-radius:2px; padding:6px 8px; font-size:12px; cursor:pointer;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.doc-pane .tpl-item:hover{border-color:var(--color-dark)}
+.doc-pane .tpl-meta{font-size:10.5px; color:var(--color-text-secondary)}
+/* 底栏的「撰写模板」下拉：必须占满一整行，否则会和按钮挤在同一行看不清 */
+.doc-pane-foot .doc-foot-row{
+  flex-basis:100%; display:flex; align-items:center; gap:6px; margin-bottom:2px;
+}
+.doc-pane-foot .doc-foot-row select{
+  flex:1; min-width:0; font-size:12px; padding:4px 6px;
+  border:1px solid var(--color-border); border-radius:2px; background:#fff;
+}
+
+/* 待确认卡上的「公文模板」选择行 */
+.op-template{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  border:1px solid var(--color-divider); background:#fcfcfb; border-radius:2px;
+  padding:7px 9px; margin-bottom:8px;
+}
+.op-template label{font-size:12px; color:#404040}
+.op-template select{
+  flex:1; min-width:160px; font-size:12px; padding:4px 6px;
+  border:1px solid var(--color-border); border-radius:2px; background:#fff;
+}
+.op-template .tiny{flex-basis:100%}
+/* 「编写新文档」待确认卡：参考文件多选，至少一份。 */
+.op-sources{
+  border:1px solid var(--color-divider); background:#fcfcfb; border-radius:2px;
+  padding:7px 9px; margin-bottom:8px;
+}
+.op-sources-head{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:4px}
+.op-sources-head label{font-size:12px; color:#404040}
+.op-source-search{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0}
+.op-source-search input{flex:1 1 180px; min-width:0; max-width:360px; border:1px solid var(--color-border); border-radius:2px; padding:5px 8px; font-size:12px}
+.op-source-item[hidden]{display:none}
+.op-source-list{max-height:168px; overflow:auto; border-top:1px solid var(--color-divider); padding-top:4px}
+.op-source-item{display:flex; align-items:center; gap:6px; font-size:12px; padding:2px 0; cursor:pointer}
+.op-source-item input{margin:0}
+.op-source-name{overflow-wrap:anywhere}
+/* 模板管理与按文档归组的存储详情。 */
+.template-upload-form { display:flex; flex-wrap:wrap; align-items:end; gap:14px; margin:14px 0; }
+.template-upload-form label { display:grid; gap:6px; flex:1 1 180px; font-size:13px; }
+.template-upload-form .template-description { flex:2 1 250px; }
+.template-upload-form .template-file { flex:1 1 300px; }
+.template-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; }
+.template-card { border:1px solid var(--border,#e2e2e2); padding:18px; min-width:0; }
+.template-card b, .template-card .tiny { overflow-wrap:anywhere; }
+.library-detail-body { max-height:76vh; overflow:auto; }
+.stored-document { border:1px solid #e2e2e2; padding:14px; margin:12px 0; }
+.stored-document summary { cursor:pointer; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.stored-document summary b { overflow-wrap:anywhere; }
+.stored-metadata { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin:18px 0; }
+.stored-metadata dt { font-size:12px; color:#777; }
+.stored-metadata dd { margin:4px 0 0; font-size:13px; overflow-wrap:anywhere; }
+.stored-chunk { padding:14px; margin:12px 0; background:#fafafa; border:1px solid #eee; }
+.stored-text { white-space:pre-wrap; overflow-wrap:anywhere; font-family:inherit; font-size:13px; line-height:1.8; max-height:400px; overflow:auto; }
+.modal { max-width:96vw; }
+@media(max-width:600px) { .template-grid { grid-template-columns:1fr; } .stored-metadata { grid-template-columns:1fr; } }
+.doc-format-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:10px 0; }
+.doc-format-grid label { display:grid; gap:5px; font-size:12px; }
+.doc-format-grid select { width:100%; padding:5px; border:1px solid #ddd; background:white; }
+#doc-render.has-body_font { font-family:var(--doc-body_font); }
+#doc-render.has-body_font p, #doc-render.has-body_font li, #doc-render.has-body_font td { font-family:var(--doc-body_font); }
+#doc-render.has-title_font .doc-format-title { font-family:var(--doc-title_font); }
+#doc-render.has-heading_font h3 { font-family:var(--doc-heading_font); }
+#doc-render.has-subheading_font h4, #doc-render.has-subheading_font h5 { font-family:var(--doc-subheading_font); }
+#doc-render.has-text_color, #doc-render.has-text_color * { color:var(--doc-text_color) !important; }
+#doc-render.has-title_color .doc-format-title, #doc-render.has-title_color .doc-format-title * { color:var(--doc-title_color) !important; }
+/* 进度条使用真实阶段工作量；没有总量时由原生 progress 显示不定进度。 */
+.work-progress { min-width:140px; padding:7px 0; font-size:12px; }
+.work-progress-heading,.work-progress-detail { display:flex; justify-content:space-between; gap:12px; }
+.work-progress-heading { color:var(--color-text,#222); }
+.work-progress-detail { color:var(--color-muted,#777); font-size:11px; min-height:12px; }
+.work-progress progress { display:block; width:100%; height:7px; margin:5px 0; accent-color:#2864b4; }
+.work-progress.state-done progress { accent-color:#2c7b46; }
+.work-progress.state-failed progress { accent-color:#b3261e; }
+.work-progress.state-failed .work-progress-heading { color:#b3261e; }
+.modal-request-progress { padding:0 18px; flex-shrink:0; }
+.modal-request-progress:empty { display:none; }
+#chat-action-progress { padding:0 20px; max-height:145px; overflow:auto; flex-shrink:0; }
+#doc-action-progress { padding:0 12px; }
+.file-processing-progress { min-width:210px; }
+.file-processing-progress .work-progress-heading { flex-wrap:wrap; gap:2px 10px; }
+.work-progress-heading > span:last-child { white-space:nowrap; flex-shrink:0; }

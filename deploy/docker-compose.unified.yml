@@ -1,0 +1,324 @@
+# 知识库系统 · 统一 Compose（web / worker / scheduler + 现有 PostgreSQL / Redis / Qdrant）
+#
+# 目标：把全栈放到**一套 Compose** 里跑，服务间用**服务名**寻址。
+#
+# 硬约束（与既有基线一致，不得违反）：
+#   * 向量数据：**已获用户明确授权改用 Docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015`
+#     （原因是 bind mount 在 Qdrant 重启后 payload 读取失败，重建新代次仍 7/7 复现）。
+#     旧 `vector_data/qdrant` **原样保留**（不删除、不拷贝已坏数据）；新卷从空开始、按原件重建。
+#     **实际存储位置已由用户授权改由 Docker 管理，不再强制落在项目根。**
+#   * 既有 PG/Redis 命名卷原样复用（卷名显式写死，external，绝不能被改成别的名字）；
+#   * **不消费/不清空 Redis DB0**（业务队列 193 条历史消息）；
+#   * 原件 `media/raw`：**web 可写（内容寻址新增）／worker 只读**；
+#   * 不启停/不修改 AS711 其他服务，仅通过既有模型接口访问。
+#
+# 端口：宿主 **8800** → 容器 8000。
+#   容器内固定 8000；宿主端口用 KB_WEB_HOST_PORT 覆盖，绑定地址用 KB_WEB_BIND 覆盖。
+#   ⚠️ Windows 上不要用 8000：WinNAT/Hyper-V 会**动态预留**大段 TCP 端口，落在预留段里的端口
+#   宿主根本 bind 不了（docker 报 `ports are not available ... forbidden by its access permissions`
+#   = WinError 10013）。实测 8000 曾被 7984–8083 吃掉，且 127.0.0.1/0.0.0.0/::1 全部被拒。
+#   诊断：`netsh int ipv4 show excludedportrange protocol=tcp`。
+#
+# 用法（**优先从仓库根**：这样根的 .env 才会参与 ${} 插值）：
+#   docker compose up -d --build                       # 根 docker-compose.yml 已 include 本文件
+#   docker compose -f deploy/docker-compose.unified.yml --env-file .env up -d --build
+#   docker compose ps
+#   docker compose logs -f web
+# ⚠️ 用 `-f deploy/...` 而**不加 `--env-file .env`** 时：项目目录变成 deploy/，根的 .env
+#   不参与 `${}` 插值（KB_PG_PASSWORD 等会静默退回默认值，postgres 与应用口令不一致）。
+# ⚠️ 换机器/首次部署：先建镜像（两选一），再 up -d：
+#   bash deploy/build-app.sh             # Linux/macOS（等价于 Windows 的 build-app.ps1 -Standard）
+#   powershell -File deploy/build-app.ps1
+#   若你的基座 tag 不是默认值，用 KB_BASE_IMAGE=<tag> 覆盖 web/worker/scheduler 的 build args。
+# ⚠️ external 卷必须**先存在**（见文件末尾 volumes 注释），否则 up 会直接中止。
+# 不要执行 `docker compose config`（会把 env 文件里的口令打印出来）。
+
+name: knowledgebase
+
+#: 应用容器共用环境（web / worker / scheduler / migrate 完全一致，避免多方配置漂移）
+x-common-env: &common-env
+  # 项目 .env 用 override=True 加载；容器里必须跳过，否则地址被覆盖回 127.0.0.1
+  KB_SKIP_DOTENV: "1"
+  DJANGO_SETTINGS_MODULE: "config.settings"
+  # **钉死数据库引擎**：.env.example 历史上写的是 sqlite，照抄示例会让容器退化到 SQLite
+  # （web 可写 / worker 只读 / beat 锁冲突，postgres 白跑），且 DEBUG 一旦为假会被
+  # config/settings.py 的守卫拒绝启动。这里用插值 + 生产安全默认值兜住。
+  DB_ENGINE: "${KB_DB_ENGINE:-postgres}"
+  # **钉死 DEBUG**：默认 0（生产口径）。开发者要开调试页时在根 .env 设 KB_DJANGO_DEBUG=1。
+  DJANGO_DEBUG: "${KB_DJANGO_DEBUG:-0}"
+  # 容器内一律走**服务名**，不写 127.0.0.1
+  KB_PG_HOST: postgres
+  KB_PG_PORT: "5432"
+  KB_REDIS_URL: redis://redis:6379/1
+  # Celery 走**专用 Redis DB**（DB14 经查空闲；DB0=业务 74 键、DB13/DB15 已被占用 → 不盲用 15）
+  KB_CELERY_BROKER_URL: redis://redis:6379/14
+  KB_CELERY_RESULT_BACKEND: redis://redis:6379/14
+  # 必须**同时覆盖无前缀变量**：.env 里存在 CELERY_BROKER_URL=redis://127.0.0.1:56379/0，
+  # 而 Celery 对环境变量优先于 config_from_object —— 只设 KB_ 前缀会被它盖掉：
+  # worker 会去连宿主 127.0.0.1（拒连），web 生产者更会把任务投进业务 DB0。
+  # 三方（web/worker/scheduler）必须同一套 broker/backend/队列。
+  CELERY_BROKER_URL: redis://redis:6379/14
+  CELERY_RESULT_BACKEND: redis://redis:6379/14
+  KB_CELERY_QUEUE: kb_worker_v2
+  KB_QDRANT_URL: http://qdrant:6333
+  KB_QDRANT_MODE: server
+  RAW_STORE_DIR: /app/media/raw
+  # **可插值**：写死在 environment 里会覆盖 env_file —— 用 IP/域名访问就会 HTTP 400
+  # DisallowedHost，而容器内 curl localhost 仍然 200（假绿灯）。部署时设 KB_ALLOWED_HOSTS。
+  DJANGO_ALLOWED_HOSTS: "${KB_ALLOWED_HOSTS:-127.0.0.1,localhost,web,testserver}"
+
+#: 基础设施就绪依赖（应用服务与 migrate 复用）
+x-infra-depends: &infra-depends
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  qdrant:
+    condition: service_healthy
+
+#: 应用服务公共段（不含 depends_on —— 各服务需要按需合并 migrate 依赖）
+x-app-env: &app-env
+  env_file:
+    - ../.env
+  environment:
+    <<: *common-env
+  restart: unless-stopped
+  # 日志上限：默认 json-file 不封顶，长期运行会把宿主磁盘写满
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+#: 应用镜像的构建参数（web/worker/scheduler 共用同一份镜像）
+#: ⚠️ 默认值是**本机交付基座**；换机器请先跑 deploy/build-app.sh（产出 kb-worker:local-build），
+#:    并设 KB_BASE_IMAGE=kb-worker:local-build，否则 build 会因找不到基座而失败。
+x-app-build: &app-build
+  context: ..
+  dockerfile: deploy/app/Dockerfile
+  args:
+    BASE_IMAGE: "${KB_BASE_IMAGE:-kb-worker:phase2-review-20261015}"
+
+services:
+  # ---------------- 基础设施（与根 docker-compose.yml 一致，勿改） ----------------
+  postgres:
+    image: postgres:17.6-alpine3.22
+    container_name: knowledgebase-postgres
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    environment:
+      POSTGRES_DB: ${KB_PG_DB:-kb}
+      POSTGRES_USER: ${KB_PG_USER:-kb}
+      POSTGRES_PASSWORD: ${KB_PG_PASSWORD:-kb_local_dev_only}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "127.0.0.1:${KB_PG_HOST_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KB_PG_USER:-kb} -d ${KB_PG_DB:-kb}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - log_min_duration_statement=200
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: knowledgebase-redis
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${KB_REDIS_HOST_PORT:-56379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - ""
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    container_name: knowledgebase-qdrant
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    ports:
+      - "127.0.0.1:${KB_QDRANT_HTTP_PORT:-56333}:6333"
+      - "127.0.0.1:${KB_QDRANT_GRPC_PORT:-56334}:6334"
+    volumes:
+      # **已获用户明确授权改用 Docker 命名卷**（2026-10-15）：
+      #   * 原 `../vector_data/qdrant` 的 bind mount 在 Qdrant 重启后会出现
+      #     payload 读取失败（`OutputTooSmall`），实测重建新代次后重启仍然 7/7 复现；
+      #   * 因此改用 Docker 管理的命名卷（位于 Docker Desktop VM 的 ext4）。
+      #   * **旧目录原样保留**（不删除、不拷贝已坏数据）；新卷从空开始，
+      #     由 kbrebuild 从**原件**重建。
+      #   * 不启用独立 WSL 环境；不迁移。
+      - qdrantdata:/qdrant/storage
+    healthcheck:
+      # **真连通性**：旧写法 `["CMD","/qdrant/qdrant","--version"]` 打印版本号就退出 0，
+      # 容器刚起（存储还没加载完）就报 healthy，等于假绿灯。该镜像**没有 curl/wget**，
+      # 但有 bash → 用 bash 的 /dev/tcp 真连一次 HTTP 端口（连不上非 0）。
+      test: ["CMD", "bash", "-c", ":> /dev/tcp/127.0.0.1/6333"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # ---------------- 应用层 ----------------
+  # 一次性迁移 + 数据库层不可篡改触发器补建（两者都幂等）。
+  # **为什么必须有**：三个镜像都没有 ENTRYPOINT，Compose 原先没有任何服务跑 migrate，
+  # 而 ready 探针过去只 `SELECT 1` —— 空库也能报 healthy（假绿灯）。
+  # 应用服务通过 depends_on: service_completed_successfully 等它成功退出。
+  migrate:
+    image: kb-app:delivery
+    build: *app-build
+    env_file:
+      - ../.env
+    environment:
+      <<: *common-env
+    depends_on: *infra-depends
+    container_name: knowledgebase-migrate
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py guards --ensure"]
+
+  web:
+    # 统一使用**当前源码构建**的交付镜像 kb-app:delivery
+    # （固定基础镜像 + 仅增装 whitenoise + COPY 当前 config/apps/governance/manage.py）
+    build: *app-build
+    image: kb-app:delivery
+    <<: *app-env
+    container_name: knowledgebase-web
+    # **单行 + 数组形式**：必须避免 YAML 折叠块（`>`）把命令折成多行。
+    # 实测阻断：折叠后 Config.Cmd 里 gunicorn 与 --bind 之间保留换行，
+    # sh 会先启动一个**无参数的 gunicorn**（只听 127.0.0.1:8000、1 个 sync worker），
+    # 而容器内 health 仍 200 → 假可用。用 exec 让 gunicorn 直接成为 PID 1。
+    command: ["sh", "-c", "fc-cache -f /usr/local/share/fonts/kb && python manage.py collectstatic --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 300 --graceful-timeout 300 --access-logfile - --error-logfile -"]
+    depends_on:
+      <<: *infra-depends
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      # 宿主端口默认 **8800**：绑定地址与端口都可插值（见文件头端口说明）。
+      # KB_WEB_BIND 用来决定"只给本机"（默认 127.0.0.1）还是"给内网"（0.0.0.0）。
+      - "${KB_WEB_BIND:-127.0.0.1}:${KB_WEB_HOST_PORT:-8800}:8000"
+    volumes:
+      # 原件：**web 必须可写**（上传要新增原件）；只允许内容寻址新增 + 原子创建，
+      # 既有 blob 由 storage.py 的 os.replace/复用语义保证不被覆写。
+      # 相对路径以本文件所在目录（deploy/）为基准 → 必须写 `../media/raw`。
+      - ../media/raw:/app/media/raw
+      # 模板原件必须持久化且由 web 可写；不能落在容器临时层。
+      # Linux 首次部署先创建：install -d -o 10001 -g 10001 media/templates（项目根执行）。
+      - ../media/templates:/app/media/templates
+      - ../media/fonts:/usr/local/share/fonts/kb:ro
+    healthcheck:
+      # 覆盖镜像里 worker 的 celery 健康检查（对 web 恒不健康）
+      test: ["CMD-SHELL", "python -c \"import httpx,sys; sys.exit(0 if httpx.get('http://127.0.0.1:8000/api/v1/health/ready/', timeout=8).status_code==200 else 1)\""]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+
+  worker:
+    build: *app-build
+    image: kb-app:delivery
+    <<: *app-env
+    container_name: knowledgebase-worker
+    command: >
+      celery -A config worker
+      -Q ${KB_CELERY_QUEUE:-kb_worker_v2}
+      --concurrency=${KB_CELERY_CONCURRENCY:-2}
+      --loglevel=INFO
+    depends_on:
+      <<: *infra-depends
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      # 原件：worker **只读**（解析需要，但不允许改原件）
+      # 相对路径以本文件所在目录（deploy/）为基准 → 必须写 `../media/raw`
+      - ../media/raw:/app/media/raw:ro
+      - ../media/templates:/app/media/templates:ro
+      - ../media/fonts:/usr/local/share/fonts/kb:ro
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout=10 || exit 1"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 45s
+
+  scheduler:
+    build: *app-build
+    image: kb-app:delivery
+    <<: *app-env
+    container_name: knowledgebase-scheduler
+    command: >
+      celery -A config beat
+      --loglevel=INFO
+      --schedule=/var/lib/kb/celerybeat-schedule
+    depends_on:
+      <<: *infra-depends
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      # 绑定到宿主目录：Docker Desktop 下 uid 10001 可写（命名卷会不可写）
+      # Linux 上必须先把宿主目录交给容器用户：install -d -o 10001 -g 10001 deploy/worker/beat-state
+      - ./worker/beat-state:/var/lib/kb
+    healthcheck:
+      # **真实推进判据**：调度文件族里**最新**的那个 mtime 在 10 分钟内更新过。
+      # ⚠️ 旧写法只看主文件 `celerybeat-schedule`：beat 用 SQLite **WAL**，运行期几乎只写
+      # `-wal`/`-shm`（主文件 mtime 可以长时间不动）→ 容器启动约 10 分钟后**必然**转 unhealthy
+      # （实测 Up 31 minutes (unhealthy)，主文件 mtime 19:06 / -wal 19:36）。
+      # beat 每 5 分钟有一次 sweep（KB_CELERY_BEAT_SWEEP_SECONDS=300），故 10 分钟窗口不会误报。
+      test: ["CMD-SHELL", "f=$$(ls -t /var/lib/kb/celerybeat-schedule* 2>/dev/null | head -1); [ -n \"$$f\" ] && [ $$(( $$(date +%s) - $$(stat -c %Y \"$$f\") )) -lt 600 ]"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  # 向量数据卷：名称写死，便于备份/检查；由 Docker 管理（不在项目根）
+  qdrantdata:
+    name: knowledgebase-qdrantdata-delivery-20261015
+  # 显式 external：与既有卷一一对应；绝不能被改成别的名字（那等于丢数据）
+  # ⚠️ 换机器时必须**先建出来**，否则 `up` 直接中止：
+  #     docker volume create knowledgebase-pgdata knowledgebase-redisdata
+  #     docker volume inspect knowledgebase-qdrantdata-delivery-20261015 || \
+  #       docker volume create knowledgebase-qdrantdata-delivery-20261015
+  #   全新机器上这两个卷是空的 → 必须先 `migrate` 再建用户（compose 的 migrate 服务已自动跑前者，
+  #   管理员账号仍需 `docker compose exec web python manage.py kbcreateuser` 手动创建）。
+  pgdata:
+    name: knowledgebase-pgdata
+    external: true
+  redisdata:
+    name: knowledgebase-redisdata
+    external: true

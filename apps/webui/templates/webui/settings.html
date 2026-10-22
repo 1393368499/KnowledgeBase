@@ -1,0 +1,7 @@
+{% extends "webui/base.html" %}
+{% load static %}
+{% block title %}系统配置 · 智库{% endblock %}
+{% block scripts %}
+<script src="{% static 'webui/kb-pages.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+<script>KB.pages.loadSettings();</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% load static %}
+<div class="navbar">
+  <button class="sidebar-toggle" id="sidebar-toggle" type="button"
+          aria-controls="kb-sidebar" aria-expanded="false" title="展开导航">☰</button>
+  <div class="brand"><b>智库</b><span class="badge">文件与检索</span></div>
+  <div class="grow"></div>
+  <span class="small muted">{{ request.user.username }}</span>
+  <form method="post" action="{% url 'webui:logout' %}" style="margin:0">
+    {% csrf_token %}
+    <button type="submit">退出</button>
+  </form>
+</div>

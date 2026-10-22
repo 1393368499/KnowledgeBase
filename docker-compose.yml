@@ -1,0 +1,31 @@
+# 知识库系统 · **统一部署唯一入口**
+#
+# 本文件**只做一件事**：用 Compose 官方 `include` 引用真正的统一编排定义。
+# 真正的服务定义在 `deploy/docker-compose.unified.yml`（web / worker / scheduler
+# + 现有 PostgreSQL / Redis / Qdrant）。
+#
+# 为什么必须这样改（历史教训，勿回退）：
+#   本文件**曾经**自己定义 postgres/redis/qdrant 三件套，并把 Qdrant 的存储写成
+#   `./vector_data/qdrant` 的 **Windows bind mount**。那条路径在 Qdrant **重启后**
+#   会导致 payload 读取失败（`OutputTooSmall`）—— 对 id 9–15 共 7 个库重建新代次、
+#   逐库验证通过后，仅重启 Qdrant 仍 **7/7 复现**。
+#   如果保留旧的根 Compose 作为默认入口，任何人执行 `docker compose up -d`
+#   都会把已经修好的 Qdrant **切回坏目录**。所以这里不再保留任何服务定义，
+#   避免"两套互相冲突的配置"。
+#
+# 唯一启动方式：
+#   docker compose up -d                     # 在项目根执行即可（本文件即入口）
+#   docker compose -f deploy/docker-compose.unified.yml up -d   # 等价写法
+#
+# 说明：`include` 中的相对路径按**被包含文件所在的目录**解析，
+# 因此 `deploy/docker-compose.unified.yml` 里的 `../media/raw`、`../.env`
+# 仍然正确指向项目根，无需改写。
+#
+# 向量数据位置（2026-10-15 用户明确授权变更）：
+#   实际存储在 **Docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015`（由 Docker 管理，不在项目根）。
+#   旧目录 `vector_data/qdrant` 原样保留可回溯，但**不再被挂载**。
+
+name: knowledgebase
+
+include:
+  - deploy/docker-compose.unified.yml

@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Django
+*.log
+local_settings.py
+
+# 运行时数据（不得入库）
+db/*.sqlite3
+db/*.sqlite3-journal
+media/
+vector_data/
+staticfiles/
+
+# 密钥：任何情况下不得提交
+*.env
+.env
+.env.*
+!/.env.example
+secrets/
+*.pem
+*.key
+# 用户本地资料（含服务器连接资料）不得提交
+文档/
+*.密钥*
+*密钥*.txt
+
+# 临时与工具产物
+.tmp/
+_tmp/
+*.tmp
+_shot-*.png
+.tmp-*.py
+# 审计/审查证据包（可复现生成，单次体积 200MB+，不进版本库）
+artifacts/
+
+# Linux worker 的地址/口令文件：**绝不入库**
+deploy/worker/*.env
+!deploy/worker/worker.env.example
+
+# 阶段 2：WSL 独立发行版的 ext4.vhdx（数十 GB，绝不入库）
+vector_data/wsl-runtime/
+*.vhdx
+
+# 迁移前的只读快照（体积大，且可用脚本重建）
+vector_data/qdrant.snapshot/
+
+# Python 工具缓存
+.ruff_cache/
+
+# Celery beat 运行态（容器内生成，含 SQLite 的 -wal/-shm，绝不入库）
+deploy/worker/beat-state/celerybeat-schedule
+
+# Qdrant 初始化标记与本地快照目录
+.qdrant-initialized
+snapshots/

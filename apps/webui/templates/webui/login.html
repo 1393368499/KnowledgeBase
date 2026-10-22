@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · 智库</title>
+{# 登录页**不套应用外壳**（没有导航栏与左侧导航），只复用原型设计系统 #}
+<link rel="stylesheet" href="{% static 'webui/kb-proto.css' %}?v={{ KB_ASSET_VERSION }}">
+<style>
+  .login-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px}
+  .login-card{background:var(--color-surface); border:1px solid var(--color-border); border-radius:2px;
+    padding:26px 28px; width:min(380px,96vw)}
+  .login-card h1{margin:0 0 4px; font-size:18px; font-weight:700}
+  .login-card p.sub{margin:0 0 18px; font-size:12px; color:var(--color-text-secondary)}
+  .login-card .field{display:block; margin-bottom:12px}
+  .login-card label{display:block; font-size:12px; color:var(--color-text-secondary); margin-bottom:4px}
+  .login-card input{width:100%}
+  .login-card button{width:100%; margin-top:6px}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <form class="login-card" method="post" action="{% url 'webui:login' %}">
+    {% csrf_token %}
+    <h1>智库</h1>
+    <p class="sub">请用你的账号登录（服务端会话认证，浏览器不保存口令）；没有账号请联系管理员开通。</p>
+    {% if form.errors %}
+      <div class="notice-bar" style="margin-bottom:12px">账号或口令不正确，请重试。</div>
+    {% endif %}
+    <div class="field">
+      <label for="id_username">账号</label>
+      <input type="text" name="username" id="id_username" autocomplete="username" autofocus required>
+    </div>
+    <div class="field">
+      <label for="id_password">口令</label>
+      <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+    </div>
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <button class="btn primary" type="submit">登录</button>
+  </form>
+</div>
+</body>
+</html>

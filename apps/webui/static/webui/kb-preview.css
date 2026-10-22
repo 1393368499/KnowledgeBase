@@ -1,0 +1,131 @@
+/* 原件预览的样式（**独立文件**，不改原型 kb-proto.css 的布局）
+ *
+ * 只服务于"预览弹窗内部"的新元素：工具栏、可滚动画布、原图、等宽文本。
+ * 弹窗外框（.mask/.modal/.modal-head/.modal-body.paper/.modal-foot）仍用原型样式，
+ * 因此原型外观不变。
+ */
+
+/* PDF/图片的滚动画布：两个方向都可滚（放大后**横向滚动**才是真实尺寸变化） */
+.preview-scroll {
+  max-height: 62vh;
+  overflow: auto;
+  background: #f3f4f6;
+  border: 1px solid var(--color-divider, #e5e5e5);
+  border-radius: 2px;
+  padding: 8px;
+  text-align: center;
+}
+
+/* 原页/原图：**不设 max-width** —— 显示尺寸由 JS 按缩放设置 width 百分比。
+ * （旧写法 `max-width:100%` 会把放大后的页面又压回同一宽度，
+ *  导致"放大"只提高像素密度、看起来没变大。） */
+.preview-img {
+  display: block;
+  margin: 0 auto;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* 加载中 / 加载失败（不静默破图） */
+.preview-loading,
+.preview-error {
+  padding: 18px 8px;
+  color: var(--color-muted, #6b7280);
+  font-size: 12.5px;
+}
+.preview-error {
+  color: var(--color-danger, #b91c1c);
+}
+
+/* 翻页/缩放工具栏 */
+.preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 文本预览：**保留换行与空格**（原样文本，不做任何重排） */
+.preview-text {
+  margin: 0;
+  max-height: 62vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+/* 结构化提取（DOCX/XLSX）：段落与单元格都**保留换行**，长内容可横向滚动 */
+.preview-blocks {
+  max-height: 62vh;
+  overflow: auto;
+}
+.preview-blocks p,
+.preview-blocks td,
+.preview-blocks th {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.preview-blocks table {
+  table-layout: auto;
+}
+
+/* ===== 会话删除入口（侧栏会话行）=====
+   kb-proto.css 是原型样式**只读**，新增样式一律写在这里。
+   按钮默认隐藏，hover/focus 才出现，保持侧栏视觉不变。 */
+.session-item{position:relative}
+.session-del{position:absolute;right:6px;top:6px;border:0;background:transparent;
+  color:var(--color-muted,#8a8a8a);cursor:pointer;font-size:15px;line-height:1;
+  padding:2px 5px;border-radius:2px;opacity:0;transition:opacity .12s}
+.session-item:hover .session-del,.session-del:focus{opacity:1}
+.session-del:hover{background:rgba(0,0,0,.08);color:#c0392b}
+.session-del:disabled{opacity:.4;cursor:default}
+
+/* ===== 已放弃的待办卡 =====
+   kb-proto.css 只给了 .state-failed 的边框色，没有 .state-rejected。
+   这里补一条"已放弃"的视觉（灰化），让用户一眼看出它不再等待操作。 */
+.op-card.state-rejected{opacity:.72;border-color:var(--color-divider,#e0e0e0)}
+.op-card.state-rejected .op-state{color:var(--color-muted,#8a8a8a)}
+
+/* ===== 窄屏导航抽屉（≤960px）=====
+   kb-proto.css 是原型样式，**不改**；它的 @media 里 .sidebar{display:none} 会让
+   窄屏彻底没有导航入口，所以在这里补 ☰ 按钮 + 抽屉 + 遮罩的三件套。
+   桌面端 .sidebar-toggle 是 display:none，一切与原来完全一致。 */
+.sidebar-toggle{
+  display:none; align-items:center; justify-content:center;
+  width:30px; height:28px; padding:0; margin-right:2px;
+  font-size:15px; line-height:1; color:var(--color-text);
+  background:#fcfcfc; border:1px solid var(--color-border); border-radius:2px; cursor:pointer;
+}
+.sidebar-toggle:hover{background:#f2f2f2}
+.sidebar-mask{display:none}
+@media (max-width:960px){
+  .sidebar-toggle{display:inline-flex}
+  /* 抽屉：覆盖在内容之上，宽度取窄屏的 78%（最宽 260px） */
+  .sidebar.open{
+    display:flex; width:min(78vw,260px);
+    box-shadow:0 10px 30px rgba(0,0,0,.18);
+  }
+  .sidebar-mask.on{
+    display:block; position:fixed;
+    top:var(--navbar-height); right:0; bottom:0; left:0;
+    background:rgba(0,0,0,.28); z-index:880;
+  }
+}
+
+/* ===== 提示条配色 =====
+   kb-proto.css 的 .notice-bar 只有一种暖色（原型样式，不改），而本项目会用它
+   表达两类不同意思：**如实报错**（危险色）与一般说明。这里只加配色变体，
+   不改结构；另外给 kb-files.js 上传结果提示区（KB.notice 的目标）补上基础样式，
+   否则「部分失败」的说明会以无边框的裸文本出现在页面上。 */
+.notice-bar.danger{border-color:#e6c3c3; background:#fdf5f5; color:#8a3b3b}
+.notice-bar.ok{border-color:#c9dfc9; background:#f4faf4; color:#2f6b34}
+#files-upload-note .notice{
+  border:1px solid var(--color-border); background:var(--color-surface);
+  font-size:12px; line-height:1.7; padding:8px 12px; border-radius:2px; margin:10px 0;
+}
+#files-upload-note .notice.danger{border-color:#e6c3c3; background:#fdf5f5; color:#8a3b3b}
+#files-upload-note .notice.warn{border-color:#ece0c6; background:#fdfaf2; color:#6b5424}

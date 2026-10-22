@@ -1,0 +1,27 @@
+<nav class="sidebar" id="kb-sidebar" aria-label="主导航">
+  <ul class="sidebar-menu">
+    <li>
+      <a class="nav-item {% if page == 'assistant' %}on{% endif %}" href="{% url 'webui:assistant' %}">
+        <span class="nav-icon">✦</span><span>助手首页</span>
+      </a>
+    </li>
+    <li>
+      <a class="nav-item {% if page == 'files' %}on{% endif %}" href="{% url 'webui:files' %}">
+        <span class="nav-icon">▦</span><span>文件管理</span>
+      </a>
+    </li>
+    <li>
+      <a class="nav-item {% if page == 'search' %}on{% endif %}" href="{% url 'webui:search' %}">
+        <span class="nav-icon">◎</span><span>检索</span>
+      </a>
+    </li>
+    {% if request.user.is_staff %}
+    <li class="nav-group"><span>管理员</span></li>
+    <li>
+      <a class="nav-item" href="/admin/" target="_blank" rel="noopener">
+        <span class="nav-icon">⚙︎</span><span>系统管理</span>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>

@@ -1,0 +1,7 @@
+{% extends "webui/base.html" %}
+{% load static %}
+{% block title %}添加记录 · 智库{% endblock %}
+{% block scripts %}
+<script src="{% static 'webui/kb-pages.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+<script>KB.pages.loadTasks();</script>
+{% endblock %}

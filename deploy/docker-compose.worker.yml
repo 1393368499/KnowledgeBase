@@ -1,0 +1,94 @@
+# ⚠️⚠️ 已废弃（DEPRECATED）—— 不要用于部署 ⚠️⚠️
+#
+# 本文件是**早期"只有 worker+beat"** 的临时栈，已被
+# `deploy/docker-compose.unified.yml`（web / worker / scheduler + PG / Redis / Qdrant 一套起）
+# 完全取代。保留只为历史可追溯（docs/linux-worker-design.md、docs/docker-only-proposal-2026-10-15.md
+# 仍引用它）。**直接跑它会失败**，原因都是结构性的：
+#   * `env_file: worker/worker.env` —— 该文件按设计不入库（且从未创建），compose 会报 not found；
+#   * `image: kb-worker:local` —— 与 `deploy/web/Dockerfile` 的 `FROM kb-worker:local`
+#     抢同一个 tag（自我覆盖/循环漂移），现行交付 tag 是 `kb-app:delivery`；
+#   * beat 健康判据是 `test -f`（只要文件在就算健康），已被统一 compose 的
+#     "调度文件族 mtime 10 分钟内推进过"取代。
+# 部署请一律用：`bash deploy/preflight.sh` → `bash deploy/build-app.sh` → `docker compose up -d`
+# （从仓库根，根 docker-compose.yml 已 include 统一 compose）。
+#
+# ---------------------------------------------------------------------------
+# Linux Celery worker + beat（专用队列，与业务 Redis 隔离）
+#
+# 隔离设计（部署审查逐条落实）：
+#   1. 队列名 kb_worker_v2，worker 的 -Q 只认它；settings 已支持 KB_CELERY_BROKER_URL
+#      /KB_CELERY_RESULT_BACKEND（原先只读无前缀的变量，容器里根本不生效）；
+#   2. broker 指向**独立 Redis DB**（示例 /15），业务 DB0 的历史消息永不被消费/清空；
+#   3. KB_SKIP_DOTENV=1：项目 .env 用 override=True 加载，容器里必须跳过，
+#      否则地址会被覆盖回 127.0.0.1；
+#   4. worker 需要读**原件**（RAW_STORE_DIR = <项目根>/media/raw）才能解析，
+#      这里以**只读**方式挂载；不挂媒体目录时 worker 拿不到 raw_path；
+#   5. beat 的 schedule 文件放在**宿主绑定目录**（Docker Desktop 下 uid 10001
+#      对该目录可写），避免命名卷权限不可写导致 beat 起不来；
+#   6. beat 有**真实调度**：knowledge.sweep_pending（每 5 分钟扫待处理/失败资料）。
+#
+# 用法（密钥不落盘、不回显）：
+#   cp deploy/worker/worker.env.example deploy/worker/worker.env   # 填真实值
+#   docker compose -f deploy/docker-compose.worker.yml up -d --build
+#   docker compose -f deploy/docker-compose.worker.yml logs -f worker
+#   docker compose -f deploy/docker-compose.worker.yml down
+# 不要执行 `docker compose config`（会把 env 文件里的口令打印出来）。
+
+name: kb-worker
+
+x-common-env: &common-env
+  KB_SKIP_DOTENV: "1"
+  DJANGO_SETTINGS_MODULE: "config.settings"
+  KB_MODEL_CALLS_DISABLED: "${KB_MODEL_CALLS_DISABLED:-0}"
+  KB_CELERY_QUEUE: "${KB_CELERY_QUEUE:-kb_worker_v2}"
+
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/worker/Dockerfile
+    image: kb-worker:local
+    env_file:
+      - worker/worker.env
+    environment:
+      <<: *common-env
+      KB_CELERY_CONCURRENCY: "${KB_CELERY_CONCURRENCY:-4}"
+    command: >
+      celery -A config worker
+      -Q ${KB_CELERY_QUEUE:-kb_worker_v2}
+      --concurrency=${KB_CELERY_CONCURRENCY:-4}
+      --loglevel=INFO
+    volumes:
+      # 原件只读：worker 解析需要它，但**不允许**改原件
+      - ../media/raw:/app/media/raw:ro
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  beat:
+    image: kb-worker:local
+    # 镜像里带的是 **worker** 的 HEALTHCHECK（celery inspect ping）。
+    # beat 不注册 worker 节点，继承它会导致 beat **恒 unhealthy** ——
+    # 所以服务级 healthcheck 覆盖之，并改用"调度文件是否在推进"作为判据。
+    depends_on:
+      - worker
+    env_file:
+      - worker/worker.env
+    environment:
+      <<: *common-env
+    command: >
+      celery -A config beat
+      --loglevel=INFO
+      --schedule=/var/lib/kb/celerybeat-schedule
+    volumes:
+      # 绑定到宿主目录：Docker Desktop 下 uid 10001 可写（命名卷会不可写）
+      - ./worker/beat-state:/var/lib/kb
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /var/lib/kb/celerybeat-schedule"]
+      interval: 60s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

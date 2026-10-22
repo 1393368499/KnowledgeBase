@@ -1,0 +1,8 @@
+{% extends "webui/base.html" %}
+{% load static %}
+{% block title %}信息库 · 智库{% endblock %}
+{% block scripts %}
+<script src="{% static 'webui/kb-library-details.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+<script src="{% static 'webui/kb-pages.js' %}?v={{ KB_ASSET_VERSION }}"></script>
+<script>KB.pages.loadKnowledge();</script>
+{% endblock %}
