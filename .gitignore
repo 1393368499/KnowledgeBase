@@ -54,7 +54,7 @@ vector_data/qdrant.snapshot/
 .ruff_cache/
 
 # Celery beat 运行态（容器内生成，含 SQLite 的 -wal/-shm，绝不入库）
-deploy/worker/beat-state/celerybeat-schedule
+deploy/worker/beat-state/celerybeat-schedule*
 
 # Qdrant 初始化标记与本地快照目录
 .qdrant-initialized
