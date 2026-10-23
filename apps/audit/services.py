@@ -98,25 +98,34 @@ def verify_chain(*, limit: int | None = None) -> dict[str, Any]:
         queryset = queryset[:limit]
     checked = 0
     prev = GENESIS_HASH
+    broken_at = None
+    first_reason = ""
+    mismatches = []
+    mismatch_count = hash_mismatch_count = link_mismatch_count = 0
     for event in queryset.iterator(chunk_size=500):
         checked += 1
+        reasons = []
         if event.prev_hash != prev:
-            return {
-                "ok": False,
-                "checked": checked,
-                "broken_at": event.pk,
-                "reason": "prev_hash 与前一条的 entry_hash 不一致",
-            }
+            reasons.append("prev_hash 与前一条的 entry_hash 不一致")
+            link_mismatch_count += 1
         recomputed = event.compute_entry_hash()
         if recomputed != event.entry_hash:
-            return {
-                "ok": False,
-                "checked": checked,
-                "broken_at": event.pk,
-                "reason": "entry_hash 与重算结果不一致",
-            }
+            reasons.append("entry_hash 与重算结果不一致")
+            hash_mismatch_count += 1
+        if reasons:
+            mismatch_count += 1
+            if broken_at is None:
+                broken_at, first_reason = event.pk, reasons[0]
+            if len(mismatches) < 50:
+                mismatches.append({"id": event.pk, "reasons": reasons})
         prev = event.entry_hash
-    return {"ok": True, "checked": checked, "broken_at": None, "reason": ""}
+    return {
+        "ok": mismatch_count == 0, "checked": checked, "broken_at": broken_at,
+        "reason": first_reason, "mismatch_count": mismatch_count,
+        "hash_mismatch_count": hash_mismatch_count, "link_mismatch_count": link_mismatch_count,
+        "mismatches": mismatches, "details_truncated": mismatch_count > len(mismatches),
+        "scope": "prefix" if limit is not None else "full",
+    }
 
 
 def emit(**kwargs: Any) -> AuditEvent:

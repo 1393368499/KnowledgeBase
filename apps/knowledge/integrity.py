@@ -167,6 +167,7 @@ def record_patrol_run(
         counts=counts,
         findings=_trim_findings(dict(result.get("findings") or {})),
         duration_ms=max(0, int(duration_ms or 0)),
+        coverage=dict(result.get("coverage") or {}),
     )
     if keep > 0:
         stale_ids = list(
@@ -201,9 +202,16 @@ def patrol_snapshot() -> dict[str, Any]:
             "note": "还没有巡检记录：等待周期任务（knowledge.patrol）或手动执行 "
             "`manage.py kbpatrol`",
         }
+    from .models import PatrolRun
+
+    heartbeat = PatrolRun.objects.filter(source="beat").order_by("-created_at", "-id").first()
     age = max(0, int((timezone.now() - run.created_at).total_seconds()))
-    overdue = age > WATCHDOG_STALE_MINUTES * 60
-    minutes = age // 60
+    heartbeat_age = (
+        max(0, int((timezone.now() - heartbeat.created_at).total_seconds()))
+        if heartbeat else None
+    )
+    overdue = heartbeat_age > WATCHDOG_STALE_MINUTES * 60 if heartbeat_age is not None else None
+    minutes = heartbeat_age // 60 if heartbeat_age is not None else None
     return {
         "available": True,
         "implemented": True,
@@ -211,20 +219,25 @@ def patrol_snapshot() -> dict[str, Any]:
         "at": run.created_at.isoformat(),
         "age_seconds": age,
         "overdue": overdue,
+        "heartbeat_available": heartbeat is not None,
+        "heartbeat_at": heartbeat.created_at.isoformat() if heartbeat else None,
+        "heartbeat_age_seconds": heartbeat_age,
         "source": run.source,
         "checked": run.checked,
         "issues": run.issues,
         "status": run.status,
         "counts": run.counts,
         "duration_ms": run.duration_ms,
+        "coverage": run.coverage,
         "stale_after_minutes": WATCHDOG_STALE_MINUTES,
         "verdict": (
-            f"心跳过期：最近一次巡检是 {minutes} 分钟前（阈值 "
+            f"周期心跳过期：最近一次周期巡检是 {minutes} 分钟前（阈值 "
             f"{WATCHDOG_STALE_MINUTES} 分钟），beat/scheduler 可能已经停了"
             if overdue else
-            f"心跳正常：最近一次巡检是 {minutes} 分钟前"
+            f"周期心跳正常：最近一次周期巡检是 {minutes} 分钟前"
+            if heartbeat else "周期心跳未知：还没有周期巡检留痕，手动巡检不能证明调度器正常"
         ),
-        "note": "来源：最近一次巡检留痕（knowledge.patrol，只读检查，未修改任何资料）",
+        "note": "来源：最近一批巡检留痕（knowledge.patrol，按资料 ID 轮转，只读检查）",
     }
 
 
@@ -255,5 +268,7 @@ def verification_snapshot() -> dict[str, Any]:
         "checked": run.checked,
         "mismatches": mismatches,
         "detail": detail,
-        "note": "来源：最近一次巡检的一致性检查项（向量完整性 / 原件哈希 / 重试上限）",
+        "coverage": run.coverage,
+        "note": "来源：最近一批巡检的一致性检查项（向量完整性 / 原件哈希 / 重试上限）；"
+        "结果仅代表本批检查范围，后续批次继续轮转",
     }

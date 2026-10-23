@@ -52,6 +52,11 @@ class Command(BaseCommand):
         queryset = IngestedFile._base_manager.filter(parse_status__in=statuses).filter(free_lease)
         if options["file"]:
             queryset = IngestedFile._base_manager.filter(pk=options["file"]).filter(free_lease)
+        else:
+            # 在取批次前排除不会被自动处理的记录，避免每轮被同一批旧资料占满。
+            queryset = queryset.filter(
+                parse_attempts__lt=IngestedFile.MAX_PARSE_ATTEMPTS
+            ).exclude(library__write_gate__frozen_at__isnull=False)
         records = list(queryset.order_by("id")[: options["limit"]])
 
         if not records:
@@ -59,7 +64,11 @@ class Command(BaseCommand):
             return
 
         ok = failed = busy = frozen = 0
+        frozen_libraries = set()
         for record in records:
+            if record.library_id in frozen_libraries:
+                frozen += 1
+                continue
             try:
                 step = (
                     retry_file(record)
@@ -73,15 +82,16 @@ class Command(BaseCommand):
             except WriteFrozen as exc:
                 # 库正在重建/换代：**不是这份资料的问题**，不要计入失败，
                 # 也不要让 RuntimeError 冒成 traceback。整库都在冻结窗口内，
-                # 后面的资料同样写不进去，直接停止本轮。
+                # 同库后续资料跳过，其他库继续推进。
                 frozen += 1
+                frozen_libraries.add(record.library_id)
                 self.stdout.write(
                     self.style.WARNING(
                         f"[冻结] #{record.pk} {record.original_name}：{exc}"
-                        "；本库处于重建/换代窗口，本轮停止（等其结束后重跑）"
+                        "；跳过本库，继续处理其他信息库"
                     )
                 )
-                break
+                continue
             except PipelineError as exc:
                 failed += 1
                 record.refresh_from_db()
@@ -104,7 +114,7 @@ class Command(BaseCommand):
         if frozen:
             self.stdout.write(
                 self.style.WARNING(
-                    "本轮因库处于重建/换代冻结窗口而中止；等重建结束后重跑本命令即可"
+                    f"因库处于重建/换代窗口跳过 {frozen} 份；重建结束后可重新处理"
                 )
             )
         if failed:

@@ -16,7 +16,7 @@ from django.conf import settings
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -425,10 +425,15 @@ class OperationListView(APIView):
             intent="restart_stalled_task",
             status=OperationRecord.Status.EXECUTED,
         ).count()
+        totals = OperationRecord.objects.filter(user=request.user).aggregate(
+            total=Count("pk"),
+            executed=Count("pk", filter=Q(status=OperationRecord.Status.EXECUTED)),
+            settled=Count("pk", filter=Q(status__in=OperationRecord.TERMINAL_STATUSES)),
+        )
         return Response(
             {
                 "results": [_operation_dict(row) for row in queryset[:100]],
-                "summary": {"restart_stalled_executed": restarts},
+                "summary": {"restart_stalled_executed": restarts, **totals},
             }
         )
 

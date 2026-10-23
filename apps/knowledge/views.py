@@ -1366,6 +1366,7 @@ class KnowledgeIndexStatsView(APIView):
                     {
                         "name": record.name,
                         "library": record.library.code if record.library else "",
+                        "build_status": record.build_status,
                         "dimension": record.dimension,
                         "model": record.embedding_model,
                         "model_version": record.model_version,

@@ -392,15 +392,38 @@ def patrol(limit: int = 200, source: str = "beat") -> dict:
     from django.utils import timezone
 
     from apps.knowledge.integrity import STALE_AFTER_MINUTES
-    from apps.knowledge.models import IngestedFile, ParseStatus
+    from apps.knowledge.models import IngestedFile, ParseStatus, PatrolRun
     from apps.knowledge.storage import verify_blob
 
-    started = time.monotonic()
+    timer_started = time.monotonic()
+    limit = max(1, int(limit))
+    source = str(source or "beat")[:16]
     now = timezone.now()
     # 阈值只有一个来源：apps/knowledge/integrity.py 的 STALE_AFTER_MINUTES
     # （此前这里硬编码 30，与留痕/界面口径分开维护，存在漂移风险）。
     stale_before = now - timedelta(minutes=STALE_AFTER_MINUTES)
     base = IngestedFile._base_manager.select_related("library")
+    # 每种触发来源独立轮转；一轮固定 ID 上界，新上传不会挤掉旧资料的检查机会。
+    previous = PatrolRun.objects.filter(source=source).order_by("-id").first()
+    previous_coverage = previous.coverage if previous else {}
+    continuing = (
+        previous_coverage.get("strategy") == "id_cursor"
+        and not previous_coverage.get("cycle_complete", True)
+    )
+    after_id = int(previous_coverage.get("last_id", 0)) if continuing else 0
+    high_water_id = (
+        int(previous_coverage["high_water_id"]) if continuing
+        else (base.order_by("-pk").values_list("pk", flat=True).first() or 0)
+    )
+    candidates = list(base.filter(pk__gt=after_id, pk__lte=high_water_id).order_by("pk")[:limit + 1])
+    records = candidates[:limit]
+    coverage = {
+        "strategy": "id_cursor", "after_id": after_id,
+        "first_id": records[0].pk if records else None,
+        "last_id": records[-1].pk if records else after_id,
+        "high_water_id": high_water_id, "cycle_complete": len(candidates) <= limit,
+        "total_files": base.count(),
+    }
     findings: dict[str, list] = {
         "failed_exhausted": [],
         "stalled": [],
@@ -408,7 +431,7 @@ def patrol(limit: int = 200, source: str = "beat") -> dict:
         "blob_missing": [],
     }
 
-    for row in base.all()[:limit]:
+    for row in records:
         if (
             row.parse_status == ParseStatus.FAILED
             and row.parse_attempts >= row.MAX_PARSE_ATTEMPTS
@@ -427,16 +450,16 @@ def patrol(limit: int = 200, source: str = "beat") -> dict:
             # created_at：一份创建于 2 小时前、5 分钟前才真正开始重跑的资料
             # 会被误报"停滞"（判据用了创建时间，不是推进时间）。
             if row.parse_status == ParseStatus.RUNNING:
-                started = getattr(row, "parse_lease_started_at", None) or row.created_at
+                processing_started = getattr(row, "parse_lease_started_at", None) or row.created_at
             else:
-                started = row.created_at
-            overdue = (started is not None and started < stale_before) and (
+                processing_started = row.created_at
+            overdue = (processing_started is not None and processing_started < stale_before) and (
                 lease is None or lease < now
             )
             if overdue:
                 findings["stalled"].append(
                     {"file_id": row.pk, "status": row.parse_status,
-                     "since": started.isoformat() if started else ""}
+                     "since": processing_started.isoformat() if processing_started else ""}
                 )
         if row.chunk_count and row.embedded_chunk_count < row.chunk_count:
             findings["vector_incomplete"].append(
@@ -453,16 +476,16 @@ def patrol(limit: int = 200, source: str = "beat") -> dict:
     if total:
         logger.warning("巡检发现 %s 项待处理：%s", total, summary)
     else:
-        logger.info("巡检通过：未发现异常")
-    result = {"ok": True, "checked": min(limit, base.count()), "counts": summary,
-              "findings": findings}
+        logger.info("本批巡检通过：未发现异常")
+    result = {"ok": True, "checked": len(records), "counts": summary,
+              "findings": findings, "coverage": coverage}
     # **留痕**：让「解析看门狗 / 结果校验」有可复盘的判定来源。
     # 留痕失败不影响巡检结论（巡检只读，结论照样返回）。
     try:
         from apps.knowledge.integrity import record_patrol_run
 
         record_patrol_run(
-            result, source=source, duration_ms=int((time.monotonic() - started) * 1000)
+            result, source=source, duration_ms=int((time.monotonic() - timer_started) * 1000)
         )
     except Exception:  # noqa: BLE001 - 留痕失败绝不能影响巡检
         logger.exception("巡检留痕失败（巡检结论仍然有效）")

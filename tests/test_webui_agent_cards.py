@@ -43,7 +43,7 @@ def test_cards_read_the_real_backend_snapshots(source):
     assert "verificationCard," in source
     assert "resweepCard," in source
     # 没跑过巡检时必须**回退到灰点**，并说明可以点「立即巡检」
-    assert 'patrolHint = "还没跑过巡检（可点右侧「立即巡检」）"' in source
+    assert '"还没跑过巡检（可点右侧「立即巡检」）"' in source
     assert "watchdog.available" in source
     assert "verification.available" in source
 

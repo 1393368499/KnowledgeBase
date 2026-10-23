@@ -19,6 +19,9 @@ docker compose exec web python manage.py kbcreateuser --username X --password Y 
 curl -sS http://127.0.0.1:8800/api/v1/health/ready/       # 期望 200 且 checks.migrations == "ok"
 ```
 
+预检会统一准备 `media/raw`、`media/templates` 与 `deploy/worker/beat-state` 的目录权限。
+Linux 上不要省略这一步，否则原件或模板上传可能因 uid 10001 没有写权限而失败。
+
 | 数据 | 位置 |
 |---|---|
 | **向量数据** | **Docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015`（由 Docker 管理，**不在项目根**） |

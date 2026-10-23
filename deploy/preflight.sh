@@ -39,7 +39,7 @@ fi
 
 echo "[3/4] 检查宿主绑定目录与属主（容器内运行用户 uid/gid 10001）"
 uid_gid="${KB_UID_GID:-10001}"
-for dir in media/raw deploy/worker/beat-state; do
+for dir in media/raw media/templates deploy/worker/beat-state; do
   mkdir -p "$dir"
   if [ "$(id -u)" = "0" ]; then
     chown -R "$uid_gid:$uid_gid" "$dir"

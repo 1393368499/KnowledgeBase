@@ -91,7 +91,7 @@ ALLOWED_HOSTS = _env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserve
 # ---- 生产安全基线（2026-10-22 审计收口）------------------------------------
 #
 # 为什么要在导入期硬校验：默认密钥是公开字面量。一旦以 DEBUG=0 部署却忘了设置
-# DJANGO_SECRET_KEY，任何拿到本仓库的人都能伪造 session / CSRF 签名。这种配置
+# DJANGO_SECRET_KEY，签名密钥就不再是秘密，依赖它的数据完整性保护也不再可信。这种配置
 # 错误必须在启动时炸掉，而不是"带病上线"。
 # 测试进程不承载真实会话：换一个进程内随机密钥即可，避免"跑测试要先配密钥"。
 _INSECURE_DEV_KEY = "dev-only-insecure-key-change-me"
@@ -103,8 +103,7 @@ if SECRET_KEY == _INSECURE_DEV_KEY:
     else:
         raise ImproperlyConfigured(
             "DJANGO_DEBUG=0 时必须显式设置 DJANGO_SECRET_KEY：默认值 "
-            "'dev-only-insecure-key-change-me' 是公开的开发占位密钥，用于生产等于"
-            "把会话与 CSRF 签名交给所有人"
+            "'dev-only-insecure-key-change-me' 是公开的开发占位密钥，不能用于生产签名"
         )
 
 # HTTPS 相关开关**默认关闭**：本系统常见部署是 127.0.0.1 明文回环（http://127.0.0.1:8800）。

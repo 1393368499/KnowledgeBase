@@ -56,7 +56,7 @@ class Command(BaseCommand):
             return
 
         counts = dict(result.get("counts") or {})
-        self.stdout.write(f"检查资料：{result.get('checked')} 份（上限 {limit}）")
+        self.stdout.write(f"本批检查资料：{result.get('checked')} 份（上限 {limit}，按批轮转）")
         for name, label in (
             ("failed_exhausted", "重试上限用尽"),
             ("stalled", "疑似停滞"),
@@ -73,7 +73,7 @@ class Command(BaseCommand):
         if total:
             self.stdout.write(self.style.WARNING(f"巡检结论：发现 {total} 项待处理"))
         else:
-            self.stdout.write(self.style.SUCCESS("巡检结论：未发现异常"))
+            self.stdout.write(self.style.SUCCESS("巡检结论：本批未发现异常"))
         self.stdout.write(
             "只读巡检：未修改任何资料；结论已留痕（source=manual），"
             "界面「解析看门狗 / 结果校验」即以此为依据。"

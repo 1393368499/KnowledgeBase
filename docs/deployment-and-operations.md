@@ -49,7 +49,7 @@ Windows 上把前两步换成 `powershell -File deploy/build-app.ps1`（prefligh
 |---|---|
 | external 卷先存在 | `up` 直接中止：`external volume "knowledgebase-pgdata" not found` |
 | 先建镜像，或设 `KB_BASE_IMAGE` | `deploy/app/Dockerfile` 的 `FROM` 是基座 tag，新机器没有它 → BuildKit 去 Docker Hub 解析 `kb-worker` 而失败 |
-| `media/raw` / `deploy/worker/beat-state` 属主 10001 | 上传写不进去；beat 建不了 `celerybeat-schedule`（Windows 上由 Docker Desktop 兜住，Linux 上必须 `chown`） |
+| `media/raw` / `media/templates` / `deploy/worker/beat-state` 属主 10001 | 原件或模板上传写不进去；beat 建不了 `celerybeat-schedule`（预检脚本已统一准备；Windows 上由 Docker Desktop 兜住，Linux 上必须 `chown`） |
 | 根 `.env` 里 `KB_PG_PASSWORD` 等 | 用 `-f deploy/docker-compose.unified.yml` 时根的 `.env` **不参与** `${}` 插值 → postgres 用默认口令初始化、应用读真口令 → `password authentication failed for user "kb"`（要么从根跑，要么加 `--env-file .env`） |
 | 管理员账号 | 镜像**不会**自动建账号；迁移与触发器现在由 `migrate` 服务自动跑（它成功退出后 web/worker/scheduler 才启动） |
 
@@ -70,6 +70,11 @@ docker compose ps            # web/worker/scheduler/postgres/redis/qdrant 都应
 ---
 
 ## 2. 应用启动
+
+后台巡检按资料 ID 分批轮转，并将检查范围、每轮 ID 上界和下一批位置保存在
+`PatrolRun.coverage`。周期与手动巡检各自续做；一轮开始后的新增资料在下一轮检查，
+避免持续上传让旧资料永远轮不到。控制台的“本批检查”只代表该批结果。
+更新到此版本时需应用 `knowledge.0023_patrolrun_coverage` 迁移，再更新应用容器。
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py migrate

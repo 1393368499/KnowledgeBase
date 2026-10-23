@@ -21,6 +21,8 @@
   const STATUS_TEXT = {
     pending: "待处理", processing: "处理中", completed: "已完成",
     failed: "失败", archived: "已归档", done: "已完成", running: "处理中",
+    executed: "已执行", expired: "已过期", rejected: "已放弃", proposed: "待确认",
+    armed: "待执行", executing: "执行中",
   };
   const TYPE_ICON = { pdf: "▬", docx: "▭", pptx: "▮", xlsx: "▯", image: "◪", txt: "▫" };
 
@@ -94,8 +96,31 @@ function renderInline(text) {
   return esc(String(text || "")).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 }
 
+function showAgentResult(title, result) {
+  result = result || {};
+  const warning = result.ok === false || result.failed > 0 || result.incomplete > 0 ||
+    (Object.prototype.hasOwnProperty.call(result, "global_reset") && !result.global_reset);
+  const rows = result.items || result.reset || [];
+  const table = rows.length ? '<table class="table"><thead><tr><th>资料 / 服务</th><th>结果</th>' +
+    '<th>说明</th></tr></thead><tbody>' + rows.map(function (row) {
+      return '<tr><td>' + esc(row.name || row.service || "—") + '</td><td>' +
+        esc(row.status || (row.reset === true ? "已重置" : row.reset === false ? "未重置" : "—")) +
+        '</td><td>' + esc(row.detail || row.error || "") + '</td></tr>';
+    }).join("") + '</tbody></table>' : '';
+  KB.modal('<div class="modal-head"><b>' + esc(title) + ' · 结果</b></div>' +
+    '<div class="modal-body paper"><p class="notice-bar' + (warning ? ' danger' : '') + '">' +
+    esc(result.detail || result.note || "操作已完成") + '</p>' +
+    (result.note && result.detail ? '<p>' + esc(result.note) + '</p>' : '') + table + '</div>' +
+    '<div class="modal-foot"><button class="btn sm" data-close>关闭</button></div>');
+}
+
 async function loadAgent() {
   const main = document.getElementById("main");
+  function readError(response, label) {
+    return response.status === 403
+      ? "无权限读取" + label + "（只有系统管理员可查看）"
+      : KB.errorText(response, "读取" + label + "失败，请刷新重试");
+  }
   const [operations, stats, rtMetrics, feedbackList, indexStats, auditList] = await Promise.all([
     KB.api("/api/v1/planner/operations/"),
     KB.api("/api/v1/knowledge/stats/"),
@@ -115,8 +140,9 @@ async function loadAgent() {
   // 再按 patrolHint 引导用户去点注定 403 的运维动作 —— 把"无权限"说成"没数据"。
   const runtimeDenied = rtMetrics.status === 403;
   const rm = (rtMetrics.ok && rtMetrics.body) || null;
-  const breakers = (rm && rm.breakers && rm.breakers.items) || [];
   const breakerScope = (rm && rm.breakers && rm.breakers.scope) || "";
+  const breakers = (rm && rm.breakers &&
+    (breakerScope === "global" ? rm.breakers.shared : rm.breakers.items)) || [];
   const queue = (rm && rm.broker_queue) || null;
   // 检索反馈：后端只返回**我自己**的行（按 user 过滤），
   // 净分与「重扫未处理反馈」同一口径（净负分才会被覆盖重扫）。
@@ -145,8 +171,14 @@ async function loadAgent() {
     const exists = row.exists_in_qdrant ? "存在" : "缺失";
     // 退役待删：既不是生效代次，也**不能**被设成生效（后端会拒绝）。如实标出来，
     // 并提示"下次重建/清理会自动重试删除"，而不是把它伪装成普通历史代次。
-    const action = row.retiring
+    const action = !row.library
+      ? '<span class="tiny muted">无关联信息库，不可切换</span>'
+      : !row.exists_in_qdrant
+      ? '<span class="tiny muted">集合缺失，不可切换</span>'
+      : row.retiring
       ? '<span class="tiny muted">待删除（下次重建/清理自动重试）</span>'
+      : row.build_status && row.build_status !== "ready"
+      ? '<span class="tiny muted">构建尚未就绪，不可切换</span>'
       : row.is_active
       ? '<span class="tiny muted">当前生效</span>'
       : '<button class="btn sm" data-gen-activate="' + esc(row.name) + '" data-gen-library="' +
@@ -162,6 +194,9 @@ async function loadAgent() {
   const indexCard = indexDenied
     ? '<div class="card"><div class="card-title">索引与代次</div>' +
       '<div class="hint">只有系统管理员能查看索引状态（当前账号无权限）。</div></div>'
+    : !indexStats.ok
+    ? '<div class="card"><div class="card-title">索引与代次</div><div class="hint">' +
+      esc(readError(indexStats, "索引状态")) + '</div></div>'
     : '<div class="card"><div class="card-title">索引与代次（切换/回退走受控操作）</div>' +
       (fileCounts
         ? '<div class="hint">资料 ' + esc(String(fileCounts.total || 0)) + " 份（已解析 " +
@@ -176,8 +211,15 @@ async function loadAgent() {
       (libraryCodes.length
         ? '<div class="row" style="margin-top:8px">' +
           libraryCodes.map(function (code) {
+            // 与后端默认回退规则一致：最近登记的非当前、非退役代次。
+            const target = collections.filter(function (row) {
+              return row.library === code && !row.is_active && !row.retiring;
+            }).slice(-1)[0];
+            const eligible = target && target.exists_in_qdrant &&
+              (!target.build_status || target.build_status === "ready");
             return '<button class="btn sm" data-gen-rollback="' + esc(code) +
-              '">「' + esc(code) + "」回退到上一代</button>";
+              '"' + (eligible ? '' : ' disabled title="没有可用的历史代次"') + '>「' +
+              esc(code) + "」回退到上一代</button>";
           }).join("") + "</div>"
         : "") +
       "</div>";
@@ -193,7 +235,8 @@ async function loadAgent() {
                 esc(item.action) + "</span></div><div>" +
                 esc(item.resource_kind + " · " + (item.resource_key || "—")) + "</div></div>";
             }).join("") + "</div>"
-          : '<div class="hint">还没有审计事件。</div>') +
+          : '<div class="hint">' + (auditList.ok ? "还没有审计事件。" :
+            esc(readError(auditList, "审计事件"))) + '</div>') +
       '<div class="row" style="margin-top:8px">' +
       '<button class="btn sm" id="audit-verify">校验审计链</button></div>' +
       '<div class="hint" id="audit-verify-note">校验会重算整条哈希链，证明记录没有被改过。</div>') +
@@ -241,18 +284,19 @@ async function loadAgent() {
     return parts.join(" · ");
   }
 
-  const patrolHint = "还没跑过巡检（可点右侧「立即巡检」）";
+  const patrolHint = !rtMetrics.ok ? readError(rtMetrics, "运行指标")
+    : "还没跑过巡检（可点右侧「立即巡检」）";
   // 没有任何心跳时**不能**显示成"正常"：overdue 是 null（无法判断），界面照实说。
   const patrolUnknown = "心跳未知：还没有任何巡检留痕，无法判断调度器是否在跑（这不等于正常）";
   const watchdogCard = watchdog && watchdog.available
-    ? ["解析看门狗", watchdog.issues === 0,
-       "最近巡检 " + ageText(watchdog.age_seconds) + "（" +
-       (watchdog.source === "manual" ? "手动" : "周期") + "）· 检查 " + watchdog.checked +
+    ? ["解析看门狗", watchdog.overdue === true ? false : watchdog.overdue === false ? watchdog.issues === 0 : null,
+       (watchdog.verdict || "") + " · 最近巡检 " + ageText(watchdog.age_seconds) + "（" +
+       (watchdog.source === "manual" ? "手动" : "周期") + "）· 本批检查 " + watchdog.checked +
        " 份 · " + (watchdog.issues === 0 ? "未发现异常" : "发现：" + issuesText(watchdog.counts))]
     : ["解析看门狗", null, patrolHint];
   const verificationCard = verification && verification.available
     ? ["结果校验", verification.ok,
-       "检查 " + verification.checked + " 份 · " +
+       "本批检查 " + verification.checked + " 份（按批轮转）· " +
        (verification.ok ? "无不一致" : "发现：" + issuesText(verification.detail))]
     : ["结果校验", null, patrolHint];
   const resweepCard = resweep && typeof resweep.total === "number"
@@ -260,11 +304,11 @@ async function loadAgent() {
        "待补扫 一阶段 " + (resweep.phase1.total || 0) + " 份（待清扫 " +
        (resweep.phase1.pending || 0) + " + 停滞 " + (resweep.phase1.stalled || 0) +
        "）· 二阶段 " + (resweep.phase2.total || 0) + " 份"]
-    : ["双阶段补扫", null, "暂无状态"];
+    : ["双阶段补扫", null, !rtMetrics.ok ? patrolHint : "暂无状态"];
 
   // ---- 6 张状态卡：**标签与顺序严格照原型** ----
   // 缺指标一律 null → 灰色"暂无状态"；不拿别的能力顶替，也不给假绿灯。
-  const backlog = (counts.pending || 0) + (counts.processing || 0);
+  const backlog = stats.ok ? (counts.pending || 0) + (counts.processing || 0) : null;
   // API 熔断器：有真实快照就照实显示（含**进程内**口径）；没有服务进过熔断器就"暂无状态"
   const breakerOk = breakers.length
     ? breakers.every(function (b) { return b.state === "closed"; })
@@ -276,15 +320,16 @@ async function loadAgent() {
             return b.service + "：" + b.state + "（连续失败 " + b.consecutive_failures +
               "/" + b.failure_threshold + "）";
           }).join(" · ") + (breakerScope === "process" ? " · 口径：进程内" : "")
-        : "暂无状态");
+        : (!rtMetrics.ok ? readError(rtMetrics, "运行指标") : "暂无状态"));
   // 资源调控：队列深度是**实测**值（broker 指向非业务库才探测）
-  const queueOk = queue && typeof queue.depth === "number" ? true : null;
+  let queueOk = queue && typeof queue.depth === "number" ? true : null;
   // 跨进程模型并发闸门：额度在 Redis 里共享，与上面"进程内"的熔断器**不是同一口径**，
   // 所以这里把 scope 的来源写清楚（Redis 不可用会如实说已降级放行多少次）。
   const gate = (rm && rm.model_concurrency) || null;
   let gateText = "";
   if (gate && gate.enabled !== false) {
     if (gate.available === false) {
+      queueOk = false;
       const fellBack = (gate.fallback && gate.fallback.total) || 0;
       gateText = " · 并发闸门：Redis 不可用，已降级放行 " + fellBack + " 次";
     } else {
@@ -299,12 +344,12 @@ async function loadAgent() {
   }
   const queueText = queue && typeof queue.depth === "number"
     ? "队列深度 " + queue.depth + "（DB" + queue.url_db + "）" + gateText
-    : ((queue && queue.note) || (runtimeDenied ? "无权限读取运行指标" : "暂无状态")) + gateText;
+    : ((queue && queue.note) || (!rtMetrics.ok ? readError(rtMetrics, "运行指标") : "暂无状态")) + gateText;
   const dogs = [
     watchdogCard,
     // 索引队列：唯一有真实数据的一项（待处理 + 处理中）
     ["索引队列", backlog === 0 ? true : null,
-      backlog === 0 ? "队列已清空" : "待处理 " + (counts.pending || 0) + " 份 · 处理中 " +
+      backlog === null ? readError(stats, "资料处理统计") : backlog === 0 ? "当前可见资料无待处理任务" : "待处理 " + (counts.pending || 0) + " 份 · 处理中 " +
         (counts.processing || 0) + " 份"],
     ["资源调控", queueOk, queueText],
     ["API熔断器", breakerOk, breakerText],
@@ -313,9 +358,6 @@ async function loadAgent() {
   ];
 
   // ---- 5 张指标卡：**标签与顺序严格照原型**，只有 stat-value + stat-label ----
-  const TERMINAL = ["executed", "failed", "expired", "rejected"];
-  const settled = ops.filter(function (op) { return TERMINAL.indexOf(op.status) >= 0; });
-  const succeeded = settled.filter(function (op) { return op.status === "executed"; }).length;
   const breakerFailures = breakers.reduce(function (n, b) {
     return n + (Number(b.consecutive_failures) || 0);
   }, 0);
@@ -323,12 +365,13 @@ async function loadAgent() {
     // 三项曾经是"—"占位，现在是真实读数：停滞任务/待处理反馈来自实时查询，
     // 重启次数来自审计记录；后端给不出时仍然是"—"，不填假数。
     ["停滞任务", stalledTasks === null ? "—" : String(stalledTasks)],
-    ["重启次数", restarts === null ? "—" : String(restarts)],
+    ["重启操作次数", restarts === null ? "—" : String(restarts)],
     ["熔断失败数", breakers.length ? String(breakerFailures) : "—"],
     // 口径写清楚（Codex 审计 OP-14）：这里的成功率来自**我自己的操作记录**
     // （/planner/operations/ 按 request.user 过滤），不是全站任务成功率；
     // 旧标签会让人误以为是系统整体指标。
-    ["我的操作成功率", settled.length ? Math.round((succeeded / settled.length) * 100) + "%" : "—"],
+    ["我的操作成功率", operations.ok && operations.body.summary && operations.body.summary.settled
+      ? Math.round(operations.body.summary.executed / operations.body.summary.settled * 100) + "%" : "—"],
     ["待处理反馈", feedbackPending === null ? "—" : String(feedbackPending)],
   ];
 
@@ -340,7 +383,8 @@ async function loadAgent() {
           "<div>" + esc(op.target_label || "") + " · " + esc(statusText(op.status)) + "</div></div>"
         );
       }).join("")
-    : '<div class="hint">还没有操作事件</div>';
+    : '<div class="hint">' + (operations.ok ? "还没有操作事件" :
+      esc(readError(operations, "操作事件"))) + '</div>';
 
   // 反馈表：**表头恒定 5 列**（空态也保留，只换 tbody）。
   // "处理结果"只说净分口径下会发生什么，**不假装已经重扫过**；
@@ -368,12 +412,14 @@ async function loadAgent() {
       }).join("") + "</tbody>"
     : '<tbody><tr><td colspan="5"><div class="empty-state" ' +
       'style="text-align:center;padding:20px 0"><p class="muted">' +
-      "还没有检索反馈：在「搜索」里对结果点「准确 / 不准确」就会记在这里。" +
+      (feedbackList.ok ? "还没有检索反馈：在「搜索」里对结果点「准确 / 不准确」就会记在这里。" :
+        esc(readError(feedbackList, "检索反馈"))) +
       "</p></div></td></tr></tbody>";
 
   main.innerHTML = shell(
     "Agent 控制台",
     "系统运行状态、最近事件与运维动作。",
+    '<div class="row" style="margin-bottom:10px"><button class="btn sm" id="agent-refresh">刷新状态</button></div>' +
     '<div class="grid-3">' +
       dogs.map(function (item) { return stateCard(item[0], item[1], item[2]); }).join("") +
     "</div>" +
@@ -398,7 +444,7 @@ async function loadAgent() {
       // 这时必须在页面上报警，不能只把数字变小了事。
       '<div class="hint" style="margin-top:8px">最近操作：' + ops.length + " 条" +
         (watchdog && watchdog.available
-          ? " · 看门狗心跳：" + ageText(watchdog.age_seconds) + "（最近一次巡检）"
+          ? " · 看门狗：" + esc(watchdog.verdict || "周期心跳未知")
           : " · 看门狗心跳：" + patrolHint) + "</div>" +
       (watchdog && watchdog.overdue
         ? '<div class="notice-bar danger" style="margin-top:8px">调度器心跳过期：' +
@@ -420,6 +466,8 @@ async function loadAgent() {
     "</div>" +
     '<div class="grid-2" style="margin-top:14px">' + indexCard + auditCard + "</div>"
   );
+
+  document.getElementById("agent-refresh").addEventListener("click", loadAgent);
 
   // 代次切换/回退：一律走**受控操作**（提案→确认→执行），绝不直连 PUT
   main.querySelectorAll("[data-gen-activate]").forEach(function (button) {
@@ -490,8 +538,9 @@ async function loadAgent() {
       // 只说后端给的事实：ok 与 checked；不做超出证据的推断。
       const text = body.ok
         ? "校验通过：已重算 " + (body.checked || 0) + " 条记录的哈希链，未发现被改动。"
-        : "校验不通过：第 " + (body.broken_at || "?") + " 条记录对不上（checked " +
-          (body.checked || 0) + "）。请勿在此基础上继续删除，先留证排查。";
+        : "校验未通过：已检查 " + (body.checked || 0) + " 条记录，发现 " +
+          (body.mismatch_count || 1) + " 条不匹配，首条编号 " + (body.broken_at || "?") +
+          "。原始记录与摘要均已保留，请核对历史写入来源。";
       if (note) KB.notice(note, text, body.ok ? "ok" : "err");
     });
   }
@@ -500,6 +549,7 @@ async function loadAgent() {
   main.querySelectorAll("[data-agent-action]").forEach(function (button) {
     button.addEventListener("click", async function () {
       const key = button.getAttribute("data-agent-action");
+      if (button.disabled) return;
       const intent = ACTION_INTENT[key];
       if (!intent) {
         KB.modal(
@@ -510,9 +560,15 @@ async function loadAgent() {
         );
         return;
       }
-      const outcome = await KB.controlled({
+      button.disabled = true;
+      let outcome;
+      try {
+        outcome = await KB.controlled({
         intent: intent, params: {}, labels: { title: button.textContent },
-      });
+        });
+      } finally {
+        button.disabled = false;
+      }
       if (outcome.skipped) {
         KB.toast("已取消，未做任何改动");
         return;
@@ -521,12 +577,8 @@ async function loadAgent() {
         KB.toast(outcome.detail);
         return;
       }
-      // 结果优先显示后端给的 detail（人话），没有再退回截断的 JSON
-      const summary = outcome.result && outcome.result.detail
-        ? outcome.result.detail
-        : JSON.stringify(outcome.result || {}).slice(0, 120);
-      KB.toast("已执行：" + summary);
       await loadAgent();
+      showAgentResult(button.textContent, outcome.result);
     });
   });
   // 非管理员：把管理员专属控件置灰并写明原因（后端仍会独立判定权限）

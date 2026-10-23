@@ -4134,7 +4134,7 @@ def _dispatch(user, operation: OperationRecord, spec: OperationSpec) -> dict[str
             rows = rows.filter(file__library_id__in=allowed)
         # 聚合口径**复用唯一实现**（apps/knowledge/feedback.py），不在这里重写一遍，
         # 否则权重规则一旦调整，这里报出的"当前规则"就会与真实排序漂移。
-        candidate_ids = list(rows.values_list("file_id", flat=True).distinct()[: 200])
+        candidate_ids = list(rows.order_by("file_id").values_list("file_id", flat=True).distinct()[:200])
         weights = feedback_weights(candidate_ids)
         counts = feedback_counts(candidate_ids)
         names = {
@@ -4167,7 +4167,7 @@ def _dispatch(user, operation: OperationRecord, spec: OperationSpec) -> dict[str
             "items": items,
             "max_adjust": MAX_ADJUST,
             "detail": (
-                f"当前生效的规则：{len(items)} 份资料带人工反馈，加权上限 ±{MAX_ADJUST:.0%}"
+                f"当前生效的规则：本次展示 {len(items)} 份带人工反馈的资料，加权上限 ±{MAX_ADJUST:.0%}"
                 "（本系统不做训练：反馈在检索时实时生效，不更新模型、不改向量、不改源文档）"
                 if items
                 else "当前没有任何人工反馈 → 加权为空、检索次序完全按相关性（本系统不做训练）"

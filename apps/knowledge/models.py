@@ -717,6 +717,7 @@ class PatrolRun(models.Model):
     findings = models.JSONField(default=dict, blank=True, verbose_name="问题明细")
     #: 巡检耗时（毫秒）
     duration_ms = models.PositiveIntegerField(default=0, verbose_name="耗时（毫秒）")
+    coverage = models.JSONField(default=dict, blank=True, verbose_name="检查范围与轮转位置")
     created_at = models.DateTimeField(
         auto_now_add=True, db_index=True, verbose_name="巡检时间"
     )
