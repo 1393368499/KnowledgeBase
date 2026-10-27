@@ -30,6 +30,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.knowledge.models import DocumentChunk, IngestedFile, ParseStatus
 from apps.planner import document_templates as dt
 from apps.planner import services
+from tests.planner_fixtures import legacy_proposal
 from apps.planner.document_templates import TemplateError
 from apps.planner.llm import LlmReply
 from apps.planner.models import DerivedDocument, DocumentTemplate, Message, OperationRecord
@@ -566,7 +567,7 @@ def _proposal(user, **params):
     """
     body = {"title": "通知", "topic": "质保"}
     body.update(params)
-    payload = services.propose_operation(user, intent="compose_document", params=body)
+    payload = legacy_proposal(user, intent="compose_document", params=body)
     return OperationRecord.objects.get(pk=payload["operation_id"])
 
 
@@ -676,7 +677,7 @@ def test_set_operation_template_locked_once_confirmed(client, user):
 def test_set_operation_template_rejects_other_intents(user):
     """只有「编写新文档」的待办能选模板 —— 别的卡上出现模板下拉就是接线错了。"""
     operation = OperationRecord.objects.get(
-        pk=services.propose_operation(user, intent="list_files", params={})["operation_id"]
+        pk=legacy_proposal(user, intent="list_files", params={})["operation_id"]
     )
     template = _make_template(user)
     with pytest.raises(services.PlannerError) as excinfo:

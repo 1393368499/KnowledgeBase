@@ -25,6 +25,7 @@ import httpx
 import pytest
 
 from apps.planner import services
+from tests.planner_fixtures import prepare_automatic_operation
 from apps.planner.llm import LlmClient, LlmProfile
 from apps.planner.models import Conversation, Message, OperationRecord
 
@@ -74,22 +75,9 @@ def _conversation(user) -> Conversation:
 
 
 def _arm(user, intent: str, params: dict, *, scope=None) -> OperationRecord:
-    """走真实链路：提案 → 一次确认 → 得到可执行的操作（不手搓 ARMED 行）。
-
-    只用于**仍需确认**的意图（list_files / read_file / compose_document）；
-    ``search_knowledge`` 已是免确认（提案即执行），见 ``_run``。
-    """
-    proposal = services.propose_operation(
-        user,
-        intent=intent,
-        params=params,
-        conversation=_conversation(user),
-        library_scope=scope,
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    return operation
+    """Pause before execution to test racing scope changes and denied dispatch."""
+    payload = prepare_automatic_operation(user, intent=intent, params=params, conversation=_conversation(user), library_scope=scope)
+    return OperationRecord.objects.get(pk=payload["operation_id"])
 
 
 def _run(user, intent: str, params: dict, *, scope=None) -> dict:
@@ -363,7 +351,7 @@ def test_compose_document_requires_explicit_source_selection(
             {"title": "出行报告", "topic": "陶鑫宇出差行程"},
             scope=[scope_lib.code],
         )
-    assert "请至少选择一份参考文件" in str(exc.value)
+    assert "参考文件" in str(exc.value)
 
 
 def test_compose_document_scoped_sources_pin_the_library_scope(

@@ -36,6 +36,11 @@ db/
 *.sqlite3
 *.db
 artifacts/
+!artifacts/
+artifacts/*
+!artifacts/voice-tools/
+artifacts/voice-tools/*
+!artifacts/voice-tools/cloudflared-linux-amd64
 
 # --- 测试与文档：运行镜像不需要 ---
 tests/
@@ -62,3 +67,5 @@ knowledge-base-prototype.html
 *.log
 logs/
 tmp/
+firmware/note4/build/
+firmware/note4/managed_components/

@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 RISK_LOW = "low"
@@ -31,13 +31,7 @@ class OperationSpec:
     requires_destructive_flow: bool = False
     ticket_scope: str = ""
     summary: str = ""
-    # 免确认执行：提案即执行，界面上不出现"待确认卡"。
-    #
-    # 只允许**纯只读、不写库、不产生副作用**的意图打开（``test_operation_registry``
-    # 有守卫）。仍然会被完整审计：OperationRecord 照旧落库，状态从 proposed 直接
-    # 走到 executed，事件照旧记 —— "不需要人点确认"不等于"不记账"。
-    # 打开它的前提是用户明确要求（2026-10-19：搜索知识库每次都要点一下确认，
-    # 用户反馈"搜索知识库不需要用户确认"）。
+    # 仅删除保留确认；其它登记动作经权限校验后立即执行并保留审计。
     auto_execute: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -60,7 +54,16 @@ OPERATIONS: dict[str, OperationSpec] = {}
 RETIRED_INTENTS = frozenset({"archive_file", "unarchive_file"})
 
 
+def is_deletion(intent: str) -> bool:
+    # reset_demo_data clears business records, so it is a deletion despite its name.
+    return intent.startswith("delete_") or intent == "reset_demo_data"
+
+
 def register(spec: OperationSpec) -> OperationSpec:
+    deleting = is_deletion(spec.intent)
+    spec = replace(spec, requires_confirmation=deleting, auto_execute=not deleting,
+                   requires_destructive_flow=deleting and spec.requires_destructive_flow,
+                   ticket_scope=spec.ticket_scope if deleting else "")
     OPERATIONS[spec.intent] = spec
     return spec
 
@@ -85,27 +88,15 @@ register(OperationSpec(
     "search_knowledge", "搜索知识库",
     {"query": "str", "library": "str?", "customer": "str?", "department": "str?", "amount": "str?"},
     permission="library:read",
-    # 纯只读检索：不改任何数据、可重复执行、结果对用户即时可见。
-    # 让用户为"搜一下"点一次确认纯属多余摩擦 —— 提案即执行，结果直接铺在卡片上。
-    # 注意：**只读**是这里放开的前提，不要顺手把 list_files/read_file 之外的
-    # 写操作也标上（写操作必须保留确认卡）。
+    # 与其它非删除意图一样，校验通过后直接执行。
     auto_execute=True,
     summary="关键词 + 结构化筛选检索（只读，提案即执行）",
 ))
-# 检索反馈：让"准确/不准确"也能由首页 AI 提案提交（目标 ④）。
-# 它是**写操作**（会落库 + 写审计），但不是删除，所以不套用三次确认。
-#
-# `requires_confirmation` 的口径（独立审计 A2 修正）：它是**风险提示**，
-# 不是"确认次数开关"。真正的次数由服务端定死 —— 破坏性动作 3 次、其余一律 1 次
-# （`services.propose_operation`；执行端 `execute_operation` 要求状态为 ARMING 后的 ARMED）。
-# 早先的写法是 `1 if spec.requires_confirmation else 1`（两侧同值），看起来像
-# "无需确认的动作零确认"，实际也是 1，容易被误读 —— 现在表达式只剩一处 1，并且：
-#   * **会写库的动作必须为 True**（由 `tests/test_operation_registry.py` 锁住）；
-#   * 纯只读动作可以是 False，含义只是"没有破坏性影响"，仍会经过同一个确认卡。
+# 非删除操作直接执行；权限、参数与目标身份在执行前仍需校验。
 register(OperationSpec(
     "submit_search_feedback", "标记检索反馈",
     {"query": "str", "verdict": "str", "file_id": "int?", "chunk_ordinal": "int?", "note": "str?"},
-    permission="library:read", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="library:read", risk=RISK_MEDIUM,
     summary="把某次检索命中标记为准确/不准确（可改判；不修改源资料）",
 ))
 register(OperationSpec("runtime_metrics", "查看真实运行指标", {}, permission="system:read",
@@ -120,7 +111,7 @@ register(OperationSpec(
 register(OperationSpec("get_stats", "查看运行状态", {}, permission="system:read",
                        summary="资料/库/任务统计"))
 # 反馈处理：让 AI 能提案"哪些资料被反复判为不准确"（重扫的**定位**步骤，只读）。
-# 真正的重排/重建仍需人工确认，且不会改动源资料。
+# 重排/重建经权限校验直接执行，不改动源资料。
 register(OperationSpec(
     "list_feedback_targets", "查看待重扫资料",
     {"limit": "int?"},
@@ -165,42 +156,42 @@ register(OperationSpec(
 ))
 register(OperationSpec(
     "rebuild_index", "重建信息库索引", {"library": "str", "profile": "str?"},
-    permission="library:admin", risk=RISK_HIGH, requires_confirmation=True,
+    permission="library:admin", risk=RISK_HIGH,
     summary="新建一代 → 全量重建 → 真实 coverage 校验 → 原子激活；失败保留旧代",
 ))
 register(OperationSpec(
     "activate_generation", "切换向量代次", {"library": "str", "collection": "str"},
-    permission="library:admin", risk=RISK_HIGH, requires_confirmation=True,
+    permission="library:admin", risk=RISK_HIGH,
     summary="把某个**已登记且构建完成**的代次切上线（会做真实 points coverage 校验）",
 ))
 register(OperationSpec(
     "rollback_generation", "回退向量代次", {"library": "str", "to_generation": "int?"},
-    permission="library:admin", risk=RISK_HIGH, requires_confirmation=True,
+    permission="library:admin", risk=RISK_HIGH,
     summary="回退到上一代（或指定代次）；不重嵌入，直接按真实登记维度切换",
 ))
 
 # ------------------------------------------------------------ 需确认的写入 ----
 register(OperationSpec(
     "upload_file", "上传资料", {"library": "str"}, permission="library:write",
-    risk=RISK_MEDIUM, requires_confirmation=True,
+    risk=RISK_MEDIUM,
     summary="上传需要用户亲自选文件；服务端只负责把选中的文件入库",
 ))
 register(OperationSpec(
     "parse_file", "解析资料", {"file_id": "int"}, permission="library:write",
-    risk=RISK_MEDIUM, requires_confirmation=True, summary="触发解析与向量化",
+    risk=RISK_MEDIUM, summary="触发解析与向量化",
 ))
 register(OperationSpec(
     "add_to_library", "把资料添加到信息库", {"file_id": "int", "library": "str"},
-    permission="library:write", risk=RISK_MEDIUM, requires_confirmation=True,
-    summary="改变资料归属，需要确认卡",
+    permission="library:write", risk=RISK_MEDIUM,
+    summary="按原件不可变规则校验资料归属",
 ))
 register(OperationSpec(
     "create_library", "新建信息库", {"code": "str", "name": "str", "level": "str?"},
-    permission="library:admin", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="library:admin", risk=RISK_MEDIUM,
 ))
 register(OperationSpec(
     "restart_stalled_task", "重启停滞任务", {"task_id": "int?"}, permission="system:operate",
-    risk=RISK_MEDIUM, requires_confirmation=True,
+    risk=RISK_MEDIUM,
     summary=(
         "把**租约已过期、卡在 RUNNING** 的资料重新推进（真的执行一次），"
         "并如实区分：实际推进 / 失败 / 租约被占跳过 / 未完成；"
@@ -209,11 +200,11 @@ register(OperationSpec(
 ))
 register(OperationSpec(
     "reset_breaker", "重置熔断器", {}, permission="system:operate",
-    risk=RISK_MEDIUM, requires_confirmation=True,
+    risk=RISK_MEDIUM,
 ))
 register(OperationSpec(
     "reparse_failed", "重扫未处理反馈", {"limit": "int?", "include_failed": "str?"},
-    permission="system:operate", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="system:operate", risk=RISK_MEDIUM,
     summary=(
         "对**净负分**（被反复判不准确）的资料真正重跑一次流水线：复用同一份只读原件，"
         "重建分段与向量，不改源字节；逐份如实报成功/失败/租约被占/未完成。"
@@ -223,7 +214,7 @@ register(OperationSpec(
 
 register(OperationSpec(
     "archive_file", "归档资料（移出检索）", {"file_id": "int", "reason": "str?"},
-    permission="library:admin", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="library:admin", risk=RISK_MEDIUM,
     ticket_scope="archive_file",
     summary=(
         "把一份资料**归档**：原件与已完成分段一个字节不动，只是不再参与检索与索引重建"
@@ -235,7 +226,7 @@ register(OperationSpec(
 
 register(OperationSpec(
     "unarchive_file", "恢复归档资料（重新纳入检索）", {"file_id": "int"},
-    permission="library:admin", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="library:admin", risk=RISK_MEDIUM,
     ticket_scope="unarchive_file",
     summary=(
         "把一份**已归档**的资料恢复：按只读原件重新解析/分段/嵌入，写回当前生效代次，"
@@ -248,12 +239,12 @@ register(OperationSpec(
 
 register(OperationSpec(
     "classify_file", "修改资料性质", {"file_id": "int", "classification": "str?"},
-    permission="library:admin", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="library:admin", risk=RISK_MEDIUM,
     ticket_scope="classify_file",
     summary=(
         "把一份资料的**性质**改成词表里的一个取值（申请 / 合同 / 报表 / 普通文档 / "
         "涉密文档；传空字符串表示清空）。只改这一个**元数据**字段：原件字节、分段、"
-        "向量与解析状态一行都不动。需要该库管理员权限 + 一次独立确认，并写审计事件"
+        "向量与解析状态一行都不动。需要该库管理员权限，并写审计事件"
         "（含旧值 → 新值）。值不在词表里会被拒绝，不静默写入"
     ),
 ))
@@ -261,19 +252,19 @@ register(OperationSpec(
 # --------------------------------------------------------- 破坏性（三次确认） ----
 register(OperationSpec(
     "delete_file", "删除资料", {"file_id": "int"}, permission="library:admin",
-    risk=RISK_DESTRUCTIVE, requires_confirmation=True, requires_destructive_flow=True,
+    risk=RISK_DESTRUCTIVE, requires_destructive_flow=True,
     ticket_scope="delete_file",
     summary="三次独立确认：第 1、2 次点确认，第 3 次必须准确输入文件名",
 ))
 register(OperationSpec(
     "delete_library", "删除信息库", {"library": "str"}, permission="system:operate",
-    risk=RISK_DESTRUCTIVE, requires_confirmation=True, requires_destructive_flow=True,
+    risk=RISK_DESTRUCTIVE, requires_destructive_flow=True,
     ticket_scope="delete_library",
     summary="三次独立确认：第 3 次必须准确输入信息库名称",
 ))
 register(OperationSpec(
     "reset_demo_data", "重置演示数据", {"library": "str"}, permission="system:operate",
-    risk=RISK_DESTRUCTIVE, requires_confirmation=True, requires_destructive_flow=True,
+    risk=RISK_DESTRUCTIVE, requires_destructive_flow=True,
     ticket_scope="reset_demo_data",
     summary=(
         "受控重置**指定的**演示库（code 必须以 demo- 开头，且三次确认覆盖"
@@ -283,10 +274,10 @@ register(OperationSpec(
 
 register(OperationSpec(
     "reset_library_index", "重置信息库索引", {"library": "str"}, permission="system:operate",
-    risk=RISK_DESTRUCTIVE, requires_confirmation=True, requires_destructive_flow=True,
-    ticket_scope="reset_library_index",
+    risk=RISK_HIGH, requires_destructive_flow=False,
+    ticket_scope="",
     summary=(
-        "三次独立确认：第 3 次必须准确输入信息库名称。**只重建分段与向量**"
+        "直接执行，只重建分段与向量"
         "（逐份强制重跑同一份只读原件），原件与业务记录一行不动；"
         "有资料在处理中、超过本次上限或有资料无法重建时如实报 partial，"
         "且**不清任何旧代次**"
@@ -296,7 +287,7 @@ register(OperationSpec(
 # ------------------------------------------------- 会话（个人聊天记录，一次确认） ----
 register(OperationSpec(
     "delete_conversation", "删除会话", {"conversation": "int"},
-    permission="conversation:own", risk=RISK_MEDIUM, requires_confirmation=True,
+    permission="conversation:own", risk=RISK_MEDIUM,
     summary=(
         "删除自己的会话与其聊天消息（一次确认）。不销毁审计：该会话关联的"
         "受控操作记录与凭证会保留，只解除与会话的关联。"
@@ -305,11 +296,11 @@ register(OperationSpec(
 
 # ------------------------------------------------------------ 生成类（可写新文档） ----
 register(OperationSpec(
-    "compose_document", "编写新文档（需选参考文件）",
+    "compose_document", "编写新文档（需指定参考文件）",
     # `template_id` 是**可选**的公文模板：留空 = 不用模板（用户要求：
     # "如果用户未选择，那么就不用模板"）。它是唯一一个"不许模型自己编"的参数，
     # 说明写在 services.PARAM_DESCRIPTIONS 里，会合并进工具 schema。
-    # 模型提案时可以暂不填写 sources，用户必须在确认卡上选择至少一份参考文件；
+    # 模型提案时可以暂不填写 sources，用户必须指定至少一份参考文件；
     # 确认与执行均校验，空选不能回落到全库。
     {"title": "str", "topic": "str", "sources": "refs?", "template_id": "int?"},
     permission="library:read", risk=RISK_LOW,

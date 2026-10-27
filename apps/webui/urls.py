@@ -14,6 +14,7 @@ from .views import (
     settings_page,
     tasks_page,
     templates_page,
+    devices_page,
 )
 
 app_name = "webui"
@@ -33,4 +34,5 @@ urlpatterns = [
     path("templates/", templates_page, name="templates"),
     path("tasks/", tasks_page, name="tasks"),
     path("docs/", docs_page, name="docs"),
+    path("devices/", devices_page, name="devices"),
 ]

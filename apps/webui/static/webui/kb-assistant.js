@@ -342,7 +342,7 @@ let currentDocTemplateCategory = "";
     }
     if (!templateRows.length) {
       box.innerHTML = '<div class="tiny muted">还没有上传模板。上传一份后，下面的' +
-        "「生成草稿」和对话里生成的待确认卡都能套用它的格式（不选则不用模板）。</div>";
+        "撰写文档时可以套用它的格式，不选则不用模板。</div>";
       return;
     }
     box.innerHTML = "";
@@ -452,7 +452,7 @@ let currentDocTemplateCategory = "";
       return;
     }
     KB.notice($("tpl-notice"), "已上传模板「" + (result.body.name || file.name) +
-      "」：可在「撰写模板」里选它，或在对话里的待确认卡上选。", "ok");
+      "」：可在「撰写模板」里选它，或在对话中明确指定要使用的模板。", "ok");
     await loadTemplates(true);
   }
 
@@ -802,7 +802,7 @@ let currentDocTemplateCategory = "";
       return TOOL_NAMES[call.name] || call.name;
     }).join("、");
     return '<span class="muted">（这一轮没有正文回答，只发起了操作：' + esc(names) +
-      "。检索类操作已直接执行；写操作会在下方生成待确认卡片。）</span>";
+      "。仅删除操作需要确认；具体执行结果或失败原因以回复和操作记录为准。）</span>";
   }
 
   function renderMessage(message) {
@@ -974,7 +974,8 @@ let currentDocTemplateCategory = "";
       return null;
     }
     return ((result.body && result.body.results) || []).filter(function (op) {
-      return ["archive_file", "unarchive_file"].indexOf(op.intent) < 0;
+      return op.requires_confirmation === true ||
+        (op.requires_confirmation === undefined && (String(op.intent).startsWith("delete_") || op.intent === "reset_demo_data"));
     });
   }
 
@@ -1019,7 +1020,8 @@ let currentDocTemplateCategory = "";
       // **操作来自 response.operations**（消息本身没有 operation_id）。
       // 之前依赖 message.operation_id → 所有待确认卡都被丢掉。
       const operations = ((result.ok && result.body && result.body.operations) || []).filter(function (op) {
-        return ["archive_file", "unarchive_file"].indexOf(op.intent) < 0;
+        return op.requires_confirmation === true ||
+        (op.requires_confirmation === undefined && (String(op.intent).startsWith("delete_") || op.intent === "reset_demo_data"));
       });
       inner.innerHTML = messages.map(function (message) {
         const payload = message.payload || {};
@@ -1521,6 +1523,9 @@ let currentDocTemplateCategory = "";
     // 提示不在这里插 DOM：renderHome 会替换 inner，插了也会被冲掉。
     // 降级状态已写进助手消息 payload，由 renderMessage 渲染出**持久**提示。
     await renderHome();
+    (result.body.proposals || []).forEach(function (op) {
+      if (op.auto_executed && op.status === "executed") offerResultEntry(op.result);
+    });
   }
 
   // ------------------------------------------------------------ 工具栏 ----
@@ -1693,6 +1698,12 @@ let currentDocTemplateCategory = "";
     });
     if (!result.ok) {
       KB.toast((result.body && result.body.detail) || "无法生成提案");
+      return;
+    }
+    if (result.body.auto_executed) {
+      if (conversationId) await renderHome();
+      offerResultEntry(result.body.result);
+      KB.toast("操作已执行");
       return;
     }
     if (conversationId) {
@@ -3021,5 +3032,50 @@ let currentDocTemplateCategory = "";
     loadTemplates();                         // 失败也只影响模板区，不阻塞首页
     conversationId = conversationFromUrl();
     await renderHome(!conversationId);
+    startVoiceSync();
   });
+
+  function startVoiceSync() {
+    let cursor = null, running = false, mirror = null;
+    async function pollVoice() {
+      if (running || document.hidden) return;
+      running = true;
+      try {
+        const result = await KB.api("/api/v1/voice/events/?" + (cursor === null ? "latest=1" : "after=" + cursor));
+        if (!result.ok) return;
+        let refresh = false;
+        for (const event of result.body.results || []) {
+          if (Number(event.conversation_id) !== conversationId) {
+            if (event.kind === "answer.ready") KB.toast(event.device_name + " 的语音回复已到达其他会话");
+            continue;
+          }
+          const area = $("composer");
+          if (event.kind === "transcript.final" && area && !area.value && !$("btn-send").disabled) {
+            area.value = event.transcript;
+            mirror = {turn: event.turn_id, text: event.transcript, area: area};
+            KB.toast("来自 " + event.device_name + "，正在发送");
+          }
+          if (["turn.submitted", "answer.ready", "turn.failed", "turn.canceled"].includes(event.kind)) {
+            if (mirror && mirror.turn === event.turn_id) {
+              const owned = mirror;
+              setTimeout(function () {
+                if (owned.area.value === owned.text && mirror === owned) { owned.area.value = ""; mirror = null; }
+              }, 500);
+            }
+            refresh = true;
+          }
+          if (event.kind === "turn.failed") KB.toast(event.device_name + "：" + (event.detail || "语音处理失败"), "err");
+        }
+        // When keyboard sending is active, keep the cursor so the events are
+        // replayed after that request completes, without racing its rendering.
+        if (refresh && $("btn-send") && $("btn-send").disabled) return;
+        if (refresh && conversationId) await renderHome(false);
+        cursor = result.body.next_cursor;
+      } finally { running = false; }
+    }
+    document.addEventListener("input", function (event) { if (event.target.id === "composer") mirror = null; });
+    pollVoice().catch(function () {});
+    setInterval(function () { pollVoice().catch(function () {}); }, 1000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) pollVoice().catch(function () {}); });
+  }
 })();

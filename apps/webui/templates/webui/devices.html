@@ -1,0 +1,39 @@
+{% extends "webui/base.html" %}
+{% load static %}
+{% block title %}设备管理 · 智库{% endblock %}
+{% block head_extra %}
+<style>
+#device-form{max-width:640px}
+#device-form>label{display:grid;gap:8px;font-size:14px}
+#device-form .input,#device-token{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d8d8d8;border-radius:4px;font:inherit;background:white;color:inherit}
+#device-form fieldset{border:1px solid #ddd;padding:12px}
+#device-form .row{margin-top:8px;gap:8px}
+#device-list .row{flex-wrap:wrap;gap:8px}
+#device-notice{padding:8px 0}
+#device-secret-close{margin-top:14px}
+</style>
+{% endblock %}
+{% block main %}
+<div style="max-width:1000px;margin:28px auto;padding:0 20px">
+  <div class="row" style="justify-content:space-between"><div><h1>设备管理</h1><p class="muted">添加语音设备，为每台设备选择会话和知识库范围。</p></div><button class="btn primary" id="add-device" type="button">＋ 添加设备</button></div>
+  <div id="device-notice" role="status" aria-live="polite"></div>
+  <section id="device-editor" hidden class="card" style="padding:24px;margin:20px 0">
+    <h2 id="device-editor-title">添加设备</h2>
+    <form id="device-form" style="display:grid;gap:14px">
+      <label>设备名称<input id="device-name" class="input" maxlength="80" required placeholder="例如：书桌上的 Note 4"></label>
+      <label>设备类型<select id="device-type" class="input"><option value="zectrix-note4">ZECTRIX Note 4</option></select></label>
+      <label>发送到会话<select id="device-conversation" class="input"><option value="">新建设备专用会话</option></select></label>
+      <label>知识库范围<select id="device-scope" class="input"><option value="all_authorized">全部有权访问的知识库</option><option value="selected">仅选择的知识库</option></select></label>
+      <fieldset id="device-libraries" hidden><legend>选择知识库</legend><div id="device-library-options"></div></fieldset>
+      <div class="row"><button class="btn primary" id="device-save" type="submit">添加设备</button><button class="btn" id="device-cancel" type="button">取消</button></div>
+    </form>
+  </section>
+  <section id="device-secret" hidden class="card" style="padding:20px;margin:20px 0">
+    <h2>设备凭据</h2><p>仅显示这一次，请保存后通过设备配置工具写入设备。不要分享给他人。</p>
+    <input id="device-token" class="input" readonly aria-label="设备凭据" autocomplete="off">
+    <button class="btn" id="device-secret-close" type="button">已保存，关闭</button>
+  </section>
+  <div id="device-list" aria-live="polite">正在读取设备…</div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'webui/kb-devices.js' %}?v={{ KB_ASSET_VERSION }}"></script>{% endblock %}

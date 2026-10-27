@@ -273,4 +273,5 @@ CELERY_TASK_ALWAYS_EAGER = True  # noqa: F405
 KB_TEST_ADAPTER = os.environ.get("KB_TEST_ADAPTER", "").strip().lower()
 
 # 密码哈希提速（测试专用，生产用默认）
+VOICE_AUDIO_ROOT = str(_TEST_MEDIA_DIR / "voice-audio")
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # noqa: F405

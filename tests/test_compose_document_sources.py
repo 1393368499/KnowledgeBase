@@ -6,11 +6,12 @@ import pytest
 
 from apps.knowledge.models import ParseStatus
 from apps.planner import services
+from tests.planner_fixtures import legacy_proposal
 from apps.planner.models import OperationRecord
 
 
 def _propose(user, *, scope=None):
-    payload = services.propose_operation(
+    payload = legacy_proposal(
         user,
         intent="compose_document",
         params={"title": "送货说明", "topic": "质保"},
@@ -179,7 +180,7 @@ def test_set_sources_locked_once_armed(api, user, library, make_file, grant_memb
 def test_set_sources_rejects_other_intents(user, library, make_file, grant_member):
     grant_member(library, user)
     source = make_file(library, "参考.pdf")
-    payload = services.propose_operation(
+    payload = legacy_proposal(
         user,
         intent="list_files",
         params={"library": library.code},
@@ -251,7 +252,7 @@ def test_empty_selection_blocks_confirmation_without_consuming_ticket(
 def test_blank_optional_params_are_treated_as_absent(user):
     """生产实测（2026-10-19 11:1x）：模型提案 `{"template_id": ""}` 被 int 校验拒掉，
     用户侧什么卡都看不到。空串/纯空白对可选参数等价于"没传"，应被摘掉。"""
-    payload = services.propose_operation(
+    payload = legacy_proposal(
         user,
         intent="compose_document",
         params={
@@ -267,7 +268,7 @@ def test_blank_optional_params_are_treated_as_absent(user):
     assert operation.params["title"] == "出差情况说明"
 
     # 纯空白同样处理
-    whitespace = services.propose_operation(
+    whitespace = legacy_proposal(
         user,
         intent="compose_document",
         params={"title": "出差情况说明", "topic": "出差", "template_id": "   "},
@@ -276,7 +277,7 @@ def test_blank_optional_params_are_treated_as_absent(user):
 
     # 真正的非法值仍然拒绝：不能借这条放宽把"随便什么"都放过去
     with pytest.raises(services.PlannerError, match="必须是整数"):
-        services.propose_operation(
+        legacy_proposal(
             user,
             intent="compose_document",
             params={"title": "出差情况说明", "topic": "出差", "template_id": "abc"},

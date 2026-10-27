@@ -34,6 +34,7 @@ from apps.knowledge.models import (
 )
 from apps.knowledge.pipeline import StepResult
 from apps.planner import services
+from tests.planner_fixtures import prepare_automatic_operation
 from apps.planner.models import OperationRecord
 from apps.planner.operations import DESTRUCTIVE_SCOPES
 
@@ -65,20 +66,8 @@ def _original(library, make_file, name: str, text: str = "重置索引测试内�
 
 
 def _prepare(admin_user, library, typed_name: str = ""):
-    """提案 + 三次确认（第 3 次输入库名），返回 (proposal, operation)。"""
-    proposal = services.propose_operation(
-        admin_user, intent="reset_library_index", params={"library": library.code}
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    token = proposal["confirm_token"]
-    name = typed_name or proposal["target_label"]
-    for _ in range(services.DESTRUCTIVE_CONFIRMATIONS):
-        step = services.confirm_operation(
-            admin_user, operation, token=token, typed_name=name
-        )
-        token = step.get("next_confirm_token") or ""
-    operation.refresh_from_db()
-    return proposal, operation
+    proposal = prepare_automatic_operation(admin_user, intent="reset_library_index", params={"library": library.code})
+    return proposal, OperationRecord.objects.get(pk=proposal["operation_id"])
 
 
 def _ok_retry(monkeypatch, calls: list | None = None, ok: bool = True):
@@ -101,14 +90,15 @@ def _spy_drop(monkeypatch, results: list):
 # ------------------------------------------------------------------ 登记 ----
 
 
-def test_spec_registered_as_destructive():
+def test_index_rebuild_is_automatic_without_deletion_confirmation():
     spec = services.get_spec("reset_library_index")
     assert spec is not None
     assert spec.params == {"library": "str"}
     assert spec.permission == "system:operate"
-    assert spec.requires_destructive_flow is True
-    assert spec.ticket_scope == "reset_library_index"
-    assert spec.ticket_scope in DESTRUCTIVE_SCOPES
+    assert spec.requires_destructive_flow is False
+    assert spec.auto_execute is True
+    assert spec.ticket_scope == ""
+    assert "reset_library_index" not in DESTRUCTIVE_SCOPES
 
 
 def test_non_admin_cannot_propose(user, library):
@@ -132,7 +122,7 @@ def test_unknown_library_rejected(admin_user):
 def test_proposal_records_manifest_and_impact(admin_user, library, make_file):
     _original(library, make_file, name="a.md")
     proposal, operation = _prepare(admin_user, library)
-    assert proposal["required_confirmations"] == 3
+    assert proposal["required_confirmations"] == 0
     impact = proposal["impact"]
     assert impact["file_count"] == 1
     assert "重建分段与向量" in impact["index_note"]
@@ -140,24 +130,10 @@ def test_proposal_records_manifest_and_impact(admin_user, library, make_file):
     assert operation.status == OperationRecord.Status.ARMED
 
 
-def test_final_confirmation_requires_exact_library_name(admin_user, library, make_file):
-    _original(library, make_file, name="a.md")
-    proposal = services.propose_operation(
-        admin_user, intent="reset_library_index", params={"library": library.code}
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    token = proposal["confirm_token"]
-    for _ in range(2):
-        step = services.confirm_operation(
-            admin_user, operation, token=token, typed_name=proposal["target_label"]
-        )
-        token = step["next_confirm_token"]
-    with pytest.raises(services.PlannerError):
-        services.confirm_operation(
-            admin_user, operation, token=token, typed_name="不是这个库"
-        )
-    operation.refresh_from_db()
-    assert operation.status != OperationRecord.Status.ARMED
+def test_index_rebuild_executes_without_name_confirmation(admin_user, library):
+    proposal = services.propose_operation(admin_user, intent="reset_library_index", params={"library": library.code})
+    assert proposal["status"] == OperationRecord.Status.EXECUTED
+    assert proposal["required_confirmations"] == 0 and proposal["confirm_token"] == ""
 
 
 def test_execution_requires_confirmed_armed_operation(admin_user, library, make_file):

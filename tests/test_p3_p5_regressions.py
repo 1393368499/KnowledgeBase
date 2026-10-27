@@ -43,6 +43,7 @@ from apps.knowledge.models import (
     ParseStatus,
 )
 from apps.planner import services
+from tests.planner_fixtures import legacy_proposal
 from apps.planner.llm import LlmClient, LlmProfile
 from apps.planner.models import (
     ActionTicket,
@@ -121,7 +122,7 @@ def _chunked(library, make_file, *, name="用例.md", count=2, status=ParseStatu
 # --------------------------------------------------- 1) 会话与 LLM 分支 ----
 
 
-def test_llm_tool_call_is_parsed_but_not_executed(library, make_file, user, grant_member):
+def test_read_only_llm_tool_call_executes_immediately(library, make_file, user, grant_member):
     """模型提的工具调用只变成**提案**，绝不直接执行。
 
     ``user`` 默认对 ``library`` 没有权限，所以这里**按产品口径授权**（把用户
@@ -143,8 +144,8 @@ def test_llm_tool_call_is_parsed_but_not_executed(library, make_file, user, gran
     assert proposal.get("rejected") is not True, proposal
     # 只落了 proposed，没有执行
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    assert operation.status == OperationRecord.Status.PROPOSED
-    assert operation.result == {}
+    assert operation.status == OperationRecord.Status.EXECUTED
+    assert operation.result
 
 
 def test_llm_illegal_tool_arguments_become_rejected_proposal(library, make_file, user):
@@ -426,7 +427,7 @@ def test_armed_expires_and_execute_is_refused(admin_user, library, make_file):
     断言 execute 被拒且操作落到 EXPIRED（要求重新提案）。
     """
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -465,7 +466,7 @@ def test_armed_expires_and_execute_is_refused(admin_user, library, make_file):
 def test_armed_without_expiry_is_fail_closed(admin_user, library, make_file):
     """没有执行窗口信息（``armed_expires_at`` 为空）一律视为过期，不放行。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="read_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -480,7 +481,7 @@ def test_armed_without_expiry_is_fail_closed(admin_user, library, make_file):
 def test_resume_refuses_expired_armed(api, admin_user, library, make_file):
     """刷新恢复接口对已过期的 ARMED 返回 409 `armed_expired`（要求重新提案）。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="read_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -505,7 +506,7 @@ def test_resume_returns_confirmations_for_correct_step(api, admin_user, library,
     必然失败。界面必须能知道"下一次是第几次"。
     """
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -537,7 +538,7 @@ def test_name_check_accepts_name_with_surrounding_spaces(admin_user, library, ma
     record = _chunked(library, make_file, name="  合同 v2 .md  ")  # 首尾都有空格
     assert record.original_name == "  合同 v2 .md  ", repr(record.original_name)
 
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -554,7 +555,7 @@ def test_name_check_accepts_name_with_surrounding_spaces(admin_user, library, ma
 def test_name_check_still_rejects_trimmed_variant(admin_user, library, make_file):
     """但**去掉空格**的变体仍要被拒（原样比对不等于放宽）。"""
     record = _chunked(library, make_file, name="  合同 v3 .md  ")
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -577,7 +578,7 @@ def test_name_check_still_rejects_trimmed_variant(admin_user, library, make_file
 def test_operation_list_exposes_armed_window(api, admin_user, library, make_file):
     """列表要暴露 ARMED 及其 TTL，界面才能给受窗口约束的执行入口。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="read_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -617,7 +618,7 @@ def test_chat_requires_staff_for_system_operations(user):
 
 
 def _destructive_operation(user, library, record) -> OperationRecord:
-    payload = services.propose_operation(
+    payload = legacy_proposal(
         user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=payload["operation_id"])
@@ -627,7 +628,7 @@ def _destructive_operation(user, library, record) -> OperationRecord:
 def test_destructive_requires_three_confirmations_and_exact_name(admin_user, library, make_file):
     """删除类操作：必须三次确认，且第 3 次名称必须完全一致。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -686,7 +687,7 @@ def test_confirmation_skipping_is_rejected(admin_user, library, make_file):
 def test_ticket_replay_is_rejected(admin_user, library, make_file):
     """一次性凭证用过即废（重放拒绝）。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -699,7 +700,7 @@ def test_ticket_replay_is_rejected(admin_user, library, make_file):
 
 def test_expired_ticket_is_rejected(admin_user, library, make_file):
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     ActionTicket.objects.update(
@@ -739,7 +740,7 @@ def test_target_change_invalidates_operation(admin_user, library, make_file, mon
 def test_library_rename_invalidates_operation(admin_user, library, make_file):
     """库**合法改名**后，旧提案的展示名不再匹配 → 拒绝（无需碰任何受保护字段）。"""
     _chunked(library, make_file, name="rename.md")
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_library", params={"library": library.code}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -751,7 +752,7 @@ def test_library_rename_invalidates_operation(admin_user, library, make_file):
 def test_library_manifest_change_requires_reproposal(admin_user, library, make_file):
     """整库删除：库内资料清单变化 → 必须重新提案。"""
     _chunked(library, make_file, name="a.md")
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_library", params={"library": library.code}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -764,7 +765,7 @@ def test_library_manifest_change_requires_reproposal(admin_user, library, make_f
 def test_duplicate_execute_only_runs_once(admin_user, library, make_file):
     """并发/重复执行：CAS 只允许一次成功。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="read_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -781,7 +782,7 @@ def test_duplicate_execute_only_runs_once(admin_user, library, make_file):
 def test_controlled_delete_cascades_chunks(admin_user, library, make_file):
     """级联删除分段必须成功（授权感知触发器；旧实现会被无条件拒绝挡住）。"""
     record = _chunked(library, make_file, count=3)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -806,7 +807,7 @@ def test_deletion_reports_partial_when_vector_cleanup_fails(
 ):
     """向量清理失败 → job 停 partial，**不谎报完成**，且可重试。"""
     record = _chunked(library, make_file)
-    proposal = services.propose_operation(
+    proposal = legacy_proposal(
         admin_user, intent="delete_file", params={"file_id": record.pk}
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])

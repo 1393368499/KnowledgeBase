@@ -1,0 +1,73 @@
+# Additional services; run from root with -f docker-compose.yml -f deploy/docker-compose.voice.yml.
+services:
+  voice-asr:
+    build:
+      context: .
+      dockerfile: deploy/voice-asr/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASR_MODEL: /models/small
+      HF_HUB_DISABLE_XET: "1"
+    volumes:
+      - ./media/voice-models:/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=5)"]
+      interval: 20s
+      start_period: 300s
+      retries: 5
+
+  voice-worker:
+    image: kb-app:delivery
+    env_file: .env
+    environment:
+      KB_SKIP_DOTENV: "1"
+      DB_ENGINE: postgres
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
+      KB_PG_HOST: postgres
+      KB_PG_PORT: "5432"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      KB_QDRANT_URL: http://qdrant:6333
+      QDRANT_URL: http://qdrant:6333
+      KB_REDIS_URL: redis://redis:6379/14
+      KB_BREAKER_REDIS_URL: redis://redis:6379/14
+      KB_MODEL_LIMIT_REDIS_URL: redis://redis:6379/14
+      KB_VOICE_ASR_URL: http://voice-asr:8090/transcribe
+      KB_VOICE_AUDIO_ROOT: /app/media/voice-audio
+    command: ["python", "manage.py", "voiceworker"]
+    restart: unless-stopped
+    volumes:
+      - ./media/voice-audio:/app/media/voice-audio
+      - ./media/fonts:/usr/local/share/fonts/kb:ro
+      - ./media/raw:/app/media/raw:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      voice-asr:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+  web:
+    volumes:
+      - ./media/voice-audio:/app/media/voice-audio
+
+  voice-gateway:
+    build:
+      context: .
+      dockerfile: deploy/voice-gateway/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+
+  voice-tunnel:
+    build:
+      context: .
+      dockerfile: deploy/voice-tunnel/Dockerfile
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--edge-ip-version", "4", "--url", "http://voice-gateway:8080"]
+    depends_on:
+      - voice-gateway
+

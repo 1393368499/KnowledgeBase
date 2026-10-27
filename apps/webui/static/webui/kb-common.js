@@ -604,6 +604,12 @@
       return { ok: false, detail: (proposed.body && proposed.body.detail) || "无法生成操作提案" };
     }
     const body = proposed.body;
+    if (body.auto_executed && body.status === "executed") {
+      return { ok: true, result: body.result || {}, operation_id: body.operation_id };
+    }
+    if (body.requires_confirmation === false) {
+      return { ok: false, detail: "操作未完成，请查看执行记录", operation_id: body.operation_id };
+    }
     const destructive = !!body.requires_destructive_flow;
     const total = Number(body.required_confirmations || (destructive ? 3 : 1));
     // **影响范围来自提案响应**（后端权威）：前端只负责排版，

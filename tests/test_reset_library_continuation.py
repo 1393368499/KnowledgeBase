@@ -36,6 +36,7 @@ from apps.knowledge.models import (
 )
 from apps.knowledge.pipeline import PipelineError, StepResult
 from apps.planner import services
+from tests.planner_fixtures import prepare_automatic_operation
 from apps.planner.models import LibraryRebuildRun, OperationRecord
 
 pytestmark = pytest.mark.django_db
@@ -66,19 +67,8 @@ def _original(library, make_file, name: str, text: str = "续做测试内容"):
 
 
 def _prepare(admin_user, library):
-    """提案 + 三次确认（第 3 次准确输入库名），返回 operation。"""
-    proposal = services.propose_operation(
-        admin_user, intent="reset_library_index", params={"library": library.code}
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    token = proposal["confirm_token"]
-    for _ in range(services.DESTRUCTIVE_CONFIRMATIONS):
-        step = services.confirm_operation(
-            admin_user, operation, token=token, typed_name=proposal["target_label"]
-        )
-        token = step.get("next_confirm_token") or ""
-    operation.refresh_from_db()
-    return operation
+    proposal = prepare_automatic_operation(admin_user, intent="reset_library_index", params={"library": library.code})
+    return OperationRecord.objects.get(pk=proposal["operation_id"])
 
 
 def _ok_retry(monkeypatch, calls: list | None = None):
@@ -121,7 +111,7 @@ def test_switch_paths_refuse_retiring_collection(api, admin_user, library):
     """
     from apps.knowledge import vectorindex
 
-    stale_name = vectorindex.active_collection_name(library.pk, 1)
+    stale_name = vectorindex.active_collection_name(library.pk, 1).removesuffix("__offline_test")
     stale = _stale_collection(library, stale_name)
     stale.retiring_at = timezone.now()
     stale.save(update_fields=["retiring_at", "updated_at"])
@@ -136,25 +126,11 @@ def test_switch_paths_refuse_retiring_collection(api, admin_user, library):
     assert direct.status_code == 403, direct.content[:300]
     assert direct.json().get("code") == "immutable_resource", direct.json()
 
-    # 受控意图：提案 → 一次确认 → 执行，必须因"退役"被拒。
-    # 名字改成**不含测试适配器后缀**的形式：`_generation_of` 才能解析出代次，
-    # 否则会在进入退役判断前以"解析不出代次"被拒，测不到目标分支。
-    parsed_name = f"{vectorindex.collection_prefix()}-{library.pk}-g1"
-    VectorCollection.objects.filter(pk=stale.pk).update(name=parsed_name)
-    stale.refresh_from_db()
-
-    # 受控意图：提案 → 一次确认 → 执行，必须因"退役"被拒
-    proposal = services.propose_operation(
-        admin_user,
-        intent="activate_generation",
-        params={"library": library.code, "collection": parsed_name},
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(admin_user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    with pytest.raises(Exception) as exc:
-        services.execute_operation(admin_user, operation)
-    assert "退役" in str(exc.value), exc.value
+    # Activation now runs during proposal; retiring targets must still fail closed.
+    with pytest.raises(services.PlannerError) as exc:
+        services.propose_operation(admin_user, intent="activate_generation",
+            params={"library": library.code, "collection": stale_name})
+    assert "退役" in str(exc.value)
 
     after = KnowledgeLibrary.objects.get(pk=library.pk)
     assert after.active_generation == before.active_generation

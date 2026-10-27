@@ -143,6 +143,7 @@ INSTALLED_APPS = [
     "apps.audit",
     "apps.knowledge",
     "apps.planner",
+    "apps.voice",
     # 浏览器验收界面（模板 + 静态资源；业务仍然走 REST API）
     "apps.webui",
 ]
@@ -548,3 +549,8 @@ LOGGING = {
     "loggers": {"governance": {"handlers": ["console"], "level": "WARNING"}},
     "root": {"handlers": ["console"], "level": os.environ.get("DJANGO_LOG_LEVEL", "INFO")},
 }
+
+# Dedicated device audio is temporary, not part of the immutable raw store.
+VOICE_AUDIO_ROOT = os.environ.get('KB_VOICE_AUDIO_ROOT', str(PROJECT_ROOT / 'media' / 'voice-audio'))
+VOICE_ASR_URL = os.environ.get('KB_VOICE_ASR_URL', 'http://voice-asr:8090/transcribe')
+VOICE_FONT_PATH = os.environ.get('KB_VOICE_FONT_PATH', '')

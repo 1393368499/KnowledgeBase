@@ -87,3 +87,8 @@ def tasks_page(request):
 def docs_page(request):
     """使用说明：**独立整页**（原型里也是单独一页，首页不塞说明卡）。"""
     return render(request, "webui/docs.html", {"page": "docs"})
+
+
+@login_required
+def devices_page(request):
+    return render(request, "webui/devices.html", {"page": "devices"})

@@ -59,3 +59,9 @@ deploy/worker/beat-state/celerybeat-schedule*
 # Qdrant 初始化标记与本地快照目录
 .qdrant-initialized
 snapshots/
+
+# NOTE4 local builds and provisioning (never commit device credentials)
+firmware/note4/build/
+firmware/note4/managed_components/
+firmware/note4/sdkconfig
+firmware/note4/sdkconfig.old

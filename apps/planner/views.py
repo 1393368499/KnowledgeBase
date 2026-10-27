@@ -1,12 +1,4 @@
-"""P3 会话与操作 API：AI 提案 → 权限核验 → 用户确认 → 执行。
-
-设计要点
---------
-- AI 只能**提案**：``POST /planner/chat/`` 只会落成 OperationRecord(proposed)；
-- 确认是**独立的一次性凭证**，每次确认核销一枚（绑定用户/操作/对象/过期）；
-- 破坏性操作需要三次，第三次必须准确输入目标名称（服务端比对）；
-- 模型不可用时返回 **503 + 明确原因**，不返回假回答。
-"""
+"""会话与操作 API：仅删除需要确认，其余参数完整且通过权限核验后直接执行。"""
 
 from __future__ import annotations
 
@@ -27,6 +19,7 @@ from apps.knowledge.resilience import ServiceUnavailable
 from governance.immutable import immutable_endpoint
 
 from . import services
+from apps.voice.locking import ConversationBusy
 from .document_templates import (
     TemplateError,
     TemplateStorageError,
@@ -145,6 +138,10 @@ class ChatView(APIView):
             payload = services.reply_to_message(
                 request.user, conversation, content, library_codes=library_codes
             )
+        except services.PlannerError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except ConversationBusy as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except ServiceUnavailable as exc:
             # 模型服务不可用：**不伪造回答**
             Message.objects.create(
@@ -194,9 +191,9 @@ class ConversationView(APIView):
                 # 历史不会被删：审计记录在「我的操作记录」里照旧可查。
                 "operations": [
                     _operation_dict(row)
-                    for row in conversation.operations.exclude(
-                        status__in=OperationRecord.TERMINAL_STATUSES
-                    ).order_by("-id")[:50]
+                    for row in conversation.operations.filter(
+                        intent__in=[spec.intent for spec in all_specs() if spec.requires_confirmation]
+                    ).exclude(status__in=OperationRecord.TERMINAL_STATUSES).order_by("-id")[:50]
                 ],
             }
         )
@@ -599,6 +596,7 @@ def _operation_dict(row: OperationRecord) -> dict:
         "target_label": row.target_label,
         "confirmations": row.confirmations,
         "required_confirmations": row.required_confirmations,
+        "requires_confirmation": bool(spec and spec.requires_confirmation),
         "requires_destructive_flow": bool(
             spec.requires_destructive_flow if spec else False
         ),
@@ -1155,13 +1153,13 @@ class GuideView(APIView):
                     {
                         "title": "4. 用 AI 助手（首页）",
                         "body": "可以直接提问，也可以让它提出操作提案。"
-                        "**AI 只能提议，不能自己执行**；任何写入/删除都要你确认后才生效。",
+                        "仅删除操作需要确认；其它操作通过权限校验且参数完整后直接执行。",
                     },
                     {
                         "title": "5. 编写新文档",
-                        "body": "助手可以按主题检索、或基于你在卡片上勾选的参考文件"
+                        "body": "助手可以基于你明确指定的参考文件"
                         "写一份**新的**派生文档，在右侧预览、编辑并下载。"
-                        "参考文件支持全选，至少选择一份才能继续确认；已入库的源资料不会被修改。",
+                        "参考文件支持全选，至少指定一份后直接生成；已入库的源资料不会被修改。",
                     },
                     {
                         "title": "6. 删除需要三次确认",

@@ -16,6 +16,7 @@
     ["/app/search/", "搜索", "◎"],
     ["/app/agent/", "Agent 控制台", "◈"],
     ["/app/settings/", "系统配置", "⚙︎"],
+    ["/app/devices/", "设备管理", "◉"],
     ["/app/knowledge/", "信息库", "▥"],
     ["/app/tasks/", "添加记录", "≡"],
     ["/app/docs/", "使用说明", "▫"],

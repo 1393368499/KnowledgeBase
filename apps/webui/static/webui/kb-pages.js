@@ -962,9 +962,11 @@ async function loadKnowledge() {
   const ops = (operations.ok && operations.body && operations.body.results) || [];
 
   // 原型 4 统计：信息库 / 会话资料 / 已处理 / 待确认
-  // "待确认"是**尚未确认的添加/上传类操作**，不是 pending 解析——两者含义不同。
+  // 仅删除操作计入待确认；旧非删除待办保留在审计记录中。
   const pendingConfirm = ops.filter(function (op) {
-    return ["proposed", "confirmed_1", "confirmed_2"].indexOf(op.status) >= 0;
+    return ["proposed", "confirmed_1", "confirmed_2"].indexOf(op.status) >= 0 &&
+      (op.requires_confirmation === true || (op.requires_confirmation === undefined &&
+       (String(op.intent).startsWith("delete_") || op.intent === "reset_demo_data")));
   }).length;
 
   // 每个库**单独抓前 6 份**（用全局第一页会在库多时漏库、误报 0）
@@ -1191,7 +1193,7 @@ function openCreateLibraryDialog() {
 }
 
 /**
- * 重置信息库索引：**受控重建**（三次独立确认 + 末次准确输入库名 + 一次性凭证）。
+ * 重置信息库索引：权限校验后直接执行，保留原件与业务记录。
  *
  * 为什么要有它：适配器/模型换代后，索引可能与资料对不上，需要「按原件重跑一遍」。
  * 但它**绝不等于清库**：业务记录一行不动、原件字节不擦除；只有**逐份强制重跑全部成功**

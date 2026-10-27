@@ -23,17 +23,13 @@ from apps.planner.operations import DESTRUCTIVE_SCOPES, all_specs, is_mutation
 pytestmark = pytest.mark.django_db
 
 
-def test_every_mutation_is_registered_as_needing_confirmation():
-    """会写库的动作不允许登记成"无需确认"。"""
-    offenders = [
-        spec.intent
-        for spec in all_specs()
-        if is_mutation(spec.intent) and not spec.requires_confirmation
-    ]
-    assert offenders == [], (
-        "这些动作按风险分级属于写操作，却登记为无需确认："
-        f"{offenders}（确认次数由服务端定死，但登记必须诚实）"
-    )
+def test_only_deletions_require_confirmation():
+    from apps.planner.operations import is_deletion
+    for spec in all_specs():
+        assert spec.requires_confirmation == is_deletion(spec.intent), spec.intent
+        assert spec.auto_execute != spec.requires_confirmation, spec.intent
+        if spec.auto_execute:
+            assert not spec.requires_destructive_flow
 
 
 def test_destructive_specs_require_three_confirmations_and_scope():
@@ -68,13 +64,14 @@ def test_param_kinds_are_supported():
     assert used == supported, f"有 kind 没有任何操作在用：{sorted(supported - used)}"
 
 
-def test_required_confirmations_are_one_or_three(admin_user, library, make_file):
+def test_required_confirmations_are_zero_or_deletion_strength(admin_user, library, make_file):
     """真实提案：破坏性=3，其余=1（把口径钉死在服务端，而不是文档里）。"""
     record = make_file(library=library, name="确认口径.md")
     plain = services.propose_operation(
         admin_user, intent="classify_file", params={"file_id": record.pk, "classification": "合同"}
     )
-    assert plain["required_confirmations"] == 1
+    assert plain["required_confirmations"] == 0
+    assert plain["status"] == "executed"
     assert plain["requires_destructive_flow"] is False
 
     heavy = services.propose_operation(

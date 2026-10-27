@@ -90,22 +90,18 @@ def _search_once(user, *, scope=None, params=None) -> dict:
 # ============================================= 1) 登记表：只有只读意图免确认 ===
 
 
-def test_only_search_knowledge_is_exempt_from_confirmation():
-    """免确认是**逐意图**打开的白名单，不能被顺手扩散到写操作。"""
-    assert get_spec("search_knowledge").auto_execute is True
-    # 其它只读意图仍走确认（用户只要求了"搜索知识库"）
-    for intent in ("list_files", "read_file", "get_stats", "runtime_metrics"):
-        assert get_spec(intent).auto_execute is False, intent
+def test_search_and_other_non_deletions_execute_without_confirmation():
+    for intent in ("search_knowledge", "list_files", "read_file", "get_stats", "runtime_metrics", "create_library"):
+        assert get_spec(intent).auto_execute, intent
+        assert not get_spec(intent).requires_confirmation, intent
 
 
-def test_auto_execute_specs_are_never_mutations_or_destructive():
-    """不变量：免确认只能给"不写库、不可破坏"的意图。"""
+def test_auto_execute_specs_never_include_deletions():
+    from apps.planner.operations import is_deletion
     for spec in all_specs():
-        if not spec.auto_execute:
-            continue
-        assert spec.requires_destructive_flow is False, spec.intent
-        assert not is_mutation(spec.intent), spec.intent
-        assert spec.risk == "low", spec.intent
+        if spec.auto_execute:
+            assert not is_deletion(spec.intent)
+            assert not spec.requires_destructive_flow
 
 
 # =============================================== 2) 提案即执行（真链路） ===
@@ -125,7 +121,7 @@ def test_propose_search_executes_immediately(user, library, grant_member, search
 
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
     assert operation.status == OperationRecord.Status.EXECUTED
-    assert operation.confirmations == 1  # 记了账：那一次确认是系统代用户完成的
+    assert operation.confirmations == 0  # 无需人工或代点确认，仍保留执行审计
     assert operation.result == proposal["result"]
     assert operation.error == ""
 
@@ -155,18 +151,11 @@ def test_confirming_an_auto_executed_search_is_refused(user, library, grant_memb
     assert "已结束" in str(exc.value) or "状态" in str(exc.value)
 
 
-def test_writes_still_require_confirmation(admin_user, library, make_file):
-    """边界：写操作照旧停在"待确认"，不会因为这次改动被自动执行。"""
-    record = make_file(library=library, name="要归档.md")
-    proposal = services.propose_operation(
-        admin_user, intent="classify_file", params={"file_id": record.pk, "classification": "合同"}
-    )
-    assert proposal["status"] == OperationRecord.Status.PROPOSED
-    assert proposal["required_confirmations"] == 1
-    assert proposal["confirm_token"]
-
-
-# ============================================= 3) 会话链路（模型发起检索） ===
+def test_non_deletion_writes_execute_immediately(admin_user):
+    proposal = services.propose_operation(admin_user, intent="create_library", params={"code": "new-lib", "name": "新库"})
+    assert proposal["status"] == OperationRecord.Status.EXECUTED
+    assert proposal["required_confirmations"] == 0
+    assert proposal["confirm_token"] == ""
 
 
 def test_chat_tool_call_returns_executed_proposal(user, library, grant_member, search):
