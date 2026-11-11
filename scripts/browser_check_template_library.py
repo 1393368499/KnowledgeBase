@@ -28,7 +28,7 @@ from playwright.sync_api import sync_playwright, expect
 from pptx import Presentation
 
 from apps.knowledge.models import DocumentChunk
-from apps.planner.models import Conversation, Message, OperationRecord
+from apps.planner.models import Conversation, Message
 from apps.planner import services
 
 

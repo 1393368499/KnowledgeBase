@@ -26,7 +26,7 @@ django.setup()
 from django.contrib.auth import get_user_model
 from django.test import Client
 
-from apps.knowledge.models import IngestedFile, KnowledgeLibrary
+from apps.knowledge.models import IngestedFile
 from apps.planner.models import Conversation, OperationRecord
 from apps.planner.services import executed_history_summary
 

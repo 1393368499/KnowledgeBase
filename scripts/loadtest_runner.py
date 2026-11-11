@@ -31,12 +31,9 @@ import json
 import os
 import re
 import secrets
-import shutil
-import signal
 import subprocess
 import sys
 import time
-import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -280,7 +277,6 @@ class LoadTestRun:
         )
 
         # ②③ 轮询：健康 + **登录后**核对 guide 身份 + 进程存活
-        import json as _json
 
         sys.path.insert(0, str(SCRIPTS))
         import load_probe as _lp
