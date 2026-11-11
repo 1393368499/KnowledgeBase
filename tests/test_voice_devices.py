@@ -8,9 +8,8 @@ from unittest.mock import patch
 import pytest
 from rest_framework.test import APIClient
 from apps.planner.models import Conversation, Message
-from apps.voice.models import VoiceDevice, VoiceTurn, VoiceEvent
+from apps.voice.models import VoiceDevice, VoiceTurn
 from apps.voice import services
-from apps.voice.locking import ConversationBusy
 
 pytestmark = pytest.mark.django_db
 
@@ -22,7 +21,7 @@ def manager(user):
 
 
 def added(user, name="书桌 Note 4"):
-    response = manager(user).post("/api/v1/voice/devices/", {"name": name}, format="json")
+    response = manager(user).post("/api/v1/voice/devices/", {"name": name, "conversation_mode": "fixed"}, format="json")
     assert response.status_code == 201, response.data
     data = response.data
     api = APIClient()
@@ -38,14 +37,17 @@ def wav():
     return out.getvalue()
 
 
-def upload(api, d, turn_id=None, audio=None):
+def upload(api, d, turn_id=None, audio=None, route_version=None):
     from django.core.files.uploadedfile import SimpleUploadedFile
     raw = audio or wav()
-    return api.post("/api/v1/voice/device/turns/", {
+    payload = {
         "file": SimpleUploadedFile("audio.wav", raw, "audio/wav"),
         "turn_id": str(turn_id or uuid.uuid4()), "config_version": d["config_version"],
         "audio_sha256": hashlib.sha256(raw).hexdigest(),
-    }, format="multipart")
+    }
+    if route_version is not None:
+        payload["route_version"] = route_version
+    return api.post("/api/v1/voice/device/turns/", payload, format="multipart")
 
 
 def test_add_multiple_devices_keeps_independent_identity(user):
