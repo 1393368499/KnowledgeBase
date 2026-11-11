@@ -1,0 +1,16 @@
+{
+  "mode": "built-in image_gen",
+  "source": "launcher-emblem-master.png",
+  "prompt": "Blue-white Android icon: a single open book merged with three voice bars, pale cyan accent, no text, transparent foreground; broad readable shapes.",
+  "background": "#2856E8",
+  "adaptive_foreground_canvas_px": 432,
+  "safe_foreground_radius_px": 126,
+  "packing": "resized original alpha artwork, no drawn replacement",
+  "visible_viewport_px": [
+    72,
+    72,
+    360,
+    360
+  ],
+  "exact_prompt_file": "README.md"
+}

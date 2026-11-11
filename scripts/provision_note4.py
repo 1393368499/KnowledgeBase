@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--user", default="admin")
     parser.add_argument("--server", required=True)
+    parser.add_argument("--transport", choices=["ble", "wifi"], default="ble")
     parser.add_argument("--idf-root", default="E:/Espressif/esp-idf")
     parser.add_argument("--idf-python", default="E:/Espressif/tools/python_env/idf6.0_py3.13_env/Scripts/python.exe")
     args = parser.parse_args()
@@ -41,15 +42,18 @@ def main():
         data = json.loads(result.stdout.strip().splitlines()[-1])
     data["server"] = args.server
     device_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    wifi = json.loads((PRIVATE / "note4-wifi.json").read_text(encoding="utf-8-sig"))
-    if not 1 <= len(wifi["ssid"].encode("utf-8")) <= 32:
-        raise SystemExit("热点名称必须不超过 32 个 UTF-8 字节")
+    values = {"server": args.server, "token": data["token"], "transport": args.transport}
+    if args.transport == "wifi":
+        wifi = json.loads((PRIVATE / "note4-wifi.json").read_text(encoding="utf-8-sig"))
+        if not 1 <= len(wifi["ssid"].encode("utf-8")) <= 32:
+            raise SystemExit("热点名称必须不超过 32 个 UTF-8 字节")
+        values.update(ssid=wifi["ssid"], password=wifi["password"])
     target = PRIVATE / "note4-nvs.csv"
     with target.open("w", encoding="utf-8", newline="") as output:
         writer = csv.writer(output)
         writer.writerow(["key", "type", "encoding", "value"])
         writer.writerow(["kbvoice", "namespace", "", ""])
-        for key, value in {"ssid": wifi["ssid"], "password": wifi["password"], "server": args.server, "token": data["token"]}.items():
+        for key, value in values.items():
             writer.writerow([key, "data", "string", value])
     generator = Path(args.idf_root) / "components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py"
     result = subprocess.run([args.idf_python, str(generator), "generate", str(target), str(PRIVATE / "note4-nvs.bin"), "0x6000"], capture_output=True)

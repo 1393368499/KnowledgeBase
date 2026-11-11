@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.knowledgebase.relay.tests">
+    <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="36" />
+    <application android:label="Relay Protocol Checks" android:allowBackup="false" />
+    <instrumentation android:name="cn.knowledgebase.relay.RelayChecks" android:targetPackage="cn.knowledgebase.relay" />
+</manifest>
