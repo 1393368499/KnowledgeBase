@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from django.core.files.uploadedfile import SimpleUploadedFile
 from docx import Document
 from pypdf import PdfWriter
 

@@ -242,7 +242,6 @@ def test_history_skips_when_all_items_unreadable(history_setup):
     （实测报"必须走受控删除通道"，这是正确的保护）。这里改用**不存在的文件 ID**
     模拟"来源已不可读/已不存在"，效果等价且不触碰保护。
     """
-    from apps.planner.models import OperationRecord
     from apps.planner.services import executed_history_summary
 
     user, conversation, _lib, _records, operation, _ids = history_setup

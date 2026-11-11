@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-import io
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile

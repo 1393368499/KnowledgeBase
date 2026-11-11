@@ -15,6 +15,7 @@ from apps.planner.document_templates import create_template, delete_template, te
 from apps.planner.models import DocumentTemplate, OperationRecord
 from apps.planner import services
 from apps.planner import document_templates
+from tests.planner_fixtures import legacy_proposal
 
 pytestmark = pytest.mark.django_db
 
@@ -74,7 +75,10 @@ def test_ppt_upload_classification_and_export(auth_api, user):
     assert row["category_label"] == "PPT模板"
     template = DocumentTemplate.objects.get(pk=row["id"])
     assert "第1页" in template.content_text and "项目概况" in template.content_text
-    proposal = services.propose_operation(user, intent="compose_document", params={"title": "汇报", "topic": "进展"})
+    # compose_document 现在要求先选参考文件（指定后直接生成、无需确认）；
+    # 本用例验证的是"给待执行的操作挂模板"这条旧协议路径，因此用 legacy 夹具
+    # 模拟一条策略变更前已存在的待确认记录（不是公共 API 的新行为）。
+    proposal = legacy_proposal(user, intent="compose_document", params={"title": "汇报", "topic": "进展"})
     selected = api.post(f"/api/v1/planner/operations/{proposal['operation_id']}/template/",
                         {"template_id": template.pk}, format="json")
     assert selected.status_code == 200

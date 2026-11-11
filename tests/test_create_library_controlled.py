@@ -1,8 +1,8 @@
 """「新建信息库」的受控创建回归（信息库页新增入口）。
 
-口径（与删除一致）：
-  * 只能走 planner 受控操作 `create_library`（提案 → 确认 → 执行），
-    **没有**直连建库的旁路；
+口径（现行策略：只有删除保留人工确认，其它非删除动作提案即执行）：
+  * 只能走 planner 受控操作 `create_library`（一次提案即执行），
+    **没有**直连建库的旁路；审计、权限复核与目标身份核验仍然生效；
   * `level` 必须真的落库（internal/external），非法值明确报错；
   * 仅**系统管理员**可建（非管理员即便给了库标识也会被拒）；
   * 库标识重复 → 明确报错，不静默改写成别的标识；
@@ -22,14 +22,17 @@ pytestmark = pytest.mark.django_db
 
 
 def _create_via_controlled(user, *, code: str, name: str, level: str):
-    """走完整的受控流程：提案 → 确认（1 次）→ 执行。"""
+    """走现行受控流程：一次提案即执行（非删除动作零人工确认）。"""
     proposal = services.propose_operation(
         user, intent="create_library", params={"code": code, "name": name, "level": level}
     )
+    assert proposal["auto_executed"] is True, proposal
+    assert proposal["confirm_token"] == "", "非删除动作不应签发确认凭证"
+    assert proposal["required_confirmations"] == 0
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    return services.execute_operation(user, operation)["result"]
+    assert operation.status == OperationRecord.Status.EXECUTED, operation.status
+    assert operation.confirmations == 0
+    return proposal["result"]
 
 
 def test_admin_creates_library_with_level(admin_user):
@@ -52,35 +55,35 @@ def test_external_level_is_honored(admin_user):
 
 
 def test_invalid_level_is_rejected_without_creating(admin_user):
-    proposal = services.propose_operation(
-        admin_user,
-        intent="create_library",
-        params={"code": "ui-bad-level", "name": "非法级别库", "level": "super-secret"},
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(admin_user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
+    """非法 level 在**执行时**被拒（提案即执行 → 拒绝直接抛回调用方），不建库。"""
     with pytest.raises(services.PlannerError) as exc:
-        services.execute_operation(admin_user, operation)
+        services.propose_operation(
+            admin_user,
+            intent="create_library",
+            params={"code": "ui-bad-level", "name": "非法级别库", "level": "super-secret"},
+        )
     assert "level" in str(exc.value)
     assert not KnowledgeLibrary.objects.filter(code="ui-bad-level").exists(), "非法级别却建了库"
+    # 失败必须如实落成 failed，不能假装成功
+    operation = OperationRecord.objects.get(intent="create_library")
+    assert operation.status == OperationRecord.Status.FAILED
+    assert "level" in operation.error
 
 
 def test_duplicate_code_is_rejected(admin_user, make_library):
     make_library(code="ui-dup", name="已存在的库")
-    proposal = services.propose_operation(
-        admin_user,
-        intent="create_library",
-        params={"code": "ui-dup", "name": "想重名建库", "level": "internal"},
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(admin_user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
     with pytest.raises(services.PlannerError) as exc:
-        services.execute_operation(admin_user, operation)
+        services.propose_operation(
+            admin_user,
+            intent="create_library",
+            params={"code": "ui-dup", "name": "想重名建库", "level": "internal"},
+        )
     assert "已存在" in str(exc.value)
     # 原有库未被改名
     assert KnowledgeLibrary.objects.get(code="ui-dup").name == "已存在的库"
+    operation = OperationRecord.objects.get(intent="create_library")
+    assert operation.status == OperationRecord.Status.FAILED
+    assert "已存在" in operation.error
 
 
 def test_non_admin_cannot_create_library(user):

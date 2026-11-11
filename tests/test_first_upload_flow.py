@@ -13,7 +13,6 @@ from django.test import override_settings
 import pytest
 
 from apps.knowledge import vectorindex
-from apps.knowledge import testing_adapter as ta
 from apps.knowledge.models import (
     IngestedFile,
     KnowledgeLibrary,

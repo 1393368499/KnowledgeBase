@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from django.urls import resolve
 
 from apps.planner.operations import OPERATIONS

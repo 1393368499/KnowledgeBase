@@ -7,7 +7,9 @@
 
 本文件把新的真实口径钉死：
 
-* 恢复是**受控入口**：`library:admin` 权限 + 一次独立确认 + 审计事件；
+* 恢复是**受控入口**：`library:admin` 权限 + 审计事件；公开入口已按
+  ``RETIRED_INTENTS`` 停用（410 / 目录不出现），登记表保留定义供历史记录校验，
+  内部实现与其它非删除动作一样**提案即执行**（零人工确认）；
 * 恢复**真的重建索引**（真原件 → 真解析/分段/嵌入 → 写回当前生效代次 → DONE）；
   完整走一遍"归档 → 恢复"往返，核对向量点数、分段与原件字节；
 * 只有 ``ARCHIVED`` 能恢复；``DONE`` 幂等返回 ``already_active``；其它状态明确拒绝；
@@ -148,13 +150,11 @@ def _real_vector_file(library, make_file, isolated_paths, client, name="恢复�
 
 
 def _run(user, file_id: int, *, intent: str = "unarchive_file") -> dict:
-    """提案 → 一次确认 → 执行，返回执行结果体。"""
+    """提案即执行（现行策略：非删除动作零人工确认），返回执行结果体。"""
     proposal = services.propose_operation(user, intent=intent, params={"file_id": file_id})
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    assert operation.status == OperationRecord.Status.ARMED, operation.status
-    return services.execute_operation(user, operation)["result"]
+    assert proposal["auto_executed"] is True, proposal
+    assert proposal["confirm_token"] == "", "非删除动作不应再签发确认凭证"
+    return proposal["result"]
 
 
 # ------------------------------------------------------------------ 登记 ----
@@ -163,10 +163,16 @@ def test_spec_is_controlled_with_library_admin():
     assert spec is not None
     assert spec.params == {"file_id": "int"}
     assert spec.permission == "library:admin"
-    assert spec.requires_confirmation is True
-    # 恢复不是删除：**不**走三次确认的破坏性流程
+    # 只有删除要求人工确认；恢复归档不是删除 → 提案即执行、不签发凭证
+    assert spec.auto_execute is True
+    assert spec.requires_confirmation is False
     assert spec.requires_destructive_flow is False
-    assert spec.ticket_scope == "unarchive_file"
+    assert spec.ticket_scope == ""
+    # 公开入口已停用：目录里不再出现（历史记录仍可校验）
+    from apps.planner.operations import RETIRED_INTENTS, all_specs
+
+    assert "unarchive_file" in RETIRED_INTENTS
+    assert "unarchive_file" not in {row.intent for row in all_specs()}
 
 
 def test_reader_cannot_propose(library, user, make_file, grant_member):
@@ -316,19 +322,22 @@ def test_background_pipeline_cannot_restore(admin_user, library, make_file):
 
 
 def test_parse_file_intent_cannot_restore(admin_user, library, make_file):
-    """planner 的 `parse_file`（library:write）不得反归档：明确失败且状态不变。"""
+    """planner 的 `parse_file`（library:write）不得反归档：明确失败且状态不变。
+
+    现行策略下提案即执行，所以拒绝发生在 ``propose_operation`` 内部（执行失败会
+    如实落成 ``failed`` 并把原因抛回调用方），不再有"确认完才报错"的中间态。
+    """
     record = _archived(library, make_file, name="解析意图越权.md")
-    proposal = services.propose_operation(
-        admin_user, intent="parse_file", params={"file_id": record.pk}
-    )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(admin_user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
     with pytest.raises(services.PlannerError) as exc:
-        services.execute_operation(admin_user, operation)
+        services.propose_operation(
+            admin_user, intent="parse_file", params={"file_id": record.pk}
+        )
     assert "已归档" in str(exc.value)
     record.refresh_from_db()
     assert record.parse_status == ParseStatus.ARCHIVED, "parse_file 把归档恢复了"
+    operation = OperationRecord.objects.get(intent="parse_file")
+    assert operation.status == OperationRecord.Status.FAILED
+    assert "已归档" in operation.error
 
 
 def test_admin_controlled_restore_still_works_after_guard(

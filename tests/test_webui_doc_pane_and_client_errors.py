@@ -307,9 +307,9 @@ def test_api_failures_are_not_rendered_as_empty_states():
     assert "清理任务读取失败" in js
     assert "这不等于「没有清理任务」" in js
     # 统计失败不显示 0
-    assert "function welcomeHtml(counts, statsFailed)" in js
+    assert "function welcomeHtml(counts, statsError)" in js
     assert "统计读取失败" in js
-    assert 'return statsFailed ? "—" : value;' in js
+    assert 'return statsError ? "—" : value;' in js
 
 
 def test_tasks_page_uses_the_shared_nature_wording():

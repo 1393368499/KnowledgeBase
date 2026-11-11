@@ -69,13 +69,22 @@ def _list(admin_api, **params):
 
 
 def _run_classify(user, file_id: int, classification: str) -> dict:
-    """提案 → 一次确认 → 执行，返回执行结果体。"""
+    """提案即执行（2026-11 起 classify_file 为元数据类非删除操作，直接执行）。
+
+    ``classify_file`` 只改元数据字段、权限与审计都在服务端，因此不再签发确认凭证；
+    测试保留"提案 → 执行结果"的业务契约，但对已自动执行的操作不再二次确认。
+    """
     proposal = services.propose_operation(
         user,
         intent="classify_file",
         params={"file_id": file_id, "classification": classification},
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
+    if proposal.get("auto_executed"):
+        assert proposal["status"] == OperationRecord.Status.EXECUTED, proposal["status"]
+        operation.refresh_from_db()
+        assert operation.status == OperationRecord.Status.EXECUTED, operation.status
+        return proposal["result"]
     services.confirm_operation(user, operation, token=proposal["confirm_token"])
     operation.refresh_from_db()
     assert operation.status == OperationRecord.Status.ARMED, operation.status
@@ -245,10 +254,13 @@ def test_spec_is_controlled_and_not_destructive():
     # 末尾的问号 = 可选：空字符串表示「清空/未设置」，必须允许（填错了要能改回来）
     assert spec.params == {"file_id": "int", "classification": "str?"}
     assert spec.permission == "library:admin"
-    assert spec.requires_confirmation is True
-    # 改的是元数据而不是删除：**不**走三次确认的破坏性流程
+    # 只改元数据：权限（库管理员）在服务端校验、写审计事件，因此直接执行；
+    # 它**不是**删除类操作，不进三次确认的破坏性流程。
+    assert spec.auto_execute is True
+    assert spec.requires_confirmation is False
     assert spec.requires_destructive_flow is False
-    assert spec.ticket_scope == "classify_file"
+    # 直接执行的操作不签发确认凭证，因此没有 ticket_scope
+    assert spec.ticket_scope == ""
 
 
 def test_reader_cannot_change_nature(library, user, make_file, grant_member):

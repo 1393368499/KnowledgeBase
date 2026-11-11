@@ -69,7 +69,6 @@ def test_intact_verified_passes_precondition(fixture_source, monkeypatch):
 
 
 def test_replaced_archive_is_rejected(fixture_source):
-    import storage_migrate as sm
 
     data, backup = fixture_source
     _backup(data, backup)

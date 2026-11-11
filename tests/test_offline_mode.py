@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import httpx
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -78,7 +77,6 @@ def test_rerank_and_ocr_fail_fast():
 @override_settings(KB_MODEL_CALLS_DISABLED=True)
 def test_search_degrades_instantly_and_keeps_keyword(db, library, make_file, offline_paths):
     """离线模式下检索**立刻**降级（不等超时），关键字那一路照常工作。"""
-    from apps.knowledge.parsers import ParsedBlock
 
     record = make_file(library, name="离线检索.txt")
     DocumentChunk.objects.create(
@@ -119,7 +117,6 @@ def test_search_degrades_instantly_and_keeps_keyword(db, library, make_file, off
 @override_settings(KB_MODEL_CALLS_DISABLED=True)
 def test_indexing_fails_clearly_without_writing_fake_vectors(db, library, make_file, offline_paths):
     """离线模式下不能建索引：必须**明确失败**，而不是写假向量进正式库。"""
-    from apps.knowledge import vectorindex
     from tests.test_vector_profiles import FakeQdrant
 
     record = make_file(library, name="离线入库.txt")

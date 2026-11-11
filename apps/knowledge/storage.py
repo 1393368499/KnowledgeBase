@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Iterable
 
-from config.paths import PROJECT_ROOT, assert_inside_project_root
+from config.paths import assert_inside_project_root
 
 #: 流式读写块大小
 CHUNK_BYTES = 1024 * 1024

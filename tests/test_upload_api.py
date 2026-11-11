@@ -50,7 +50,6 @@ def _force_pending_source(monkeypatch):
     但上传流水线必须从 PENDING 开始，否则 ``process_file`` 会走"已处理，跳过"
     分支，测试就变成假通过。
     """
-    from django.db import models as django_models
 
     from apps.knowledge.models import IngestedFile as Model
 

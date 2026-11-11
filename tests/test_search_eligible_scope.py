@@ -18,7 +18,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from apps.knowledge import pipeline
-from apps.knowledge.models import DocumentChunk, IngestedFile, KnowledgeLibrary
+from apps.knowledge.models import IngestedFile, KnowledgeLibrary
 
 pytestmark = pytest.mark.django_db
 

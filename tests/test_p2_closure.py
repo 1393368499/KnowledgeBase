@@ -13,8 +13,7 @@ import re
 from pathlib import Path
 
 import pytest
-from django.conf import settings
-from django.test import Client, override_settings
+from django.test import Client
 from django.urls import reverse
 
 from apps.knowledge.models import IngestedFile, KnowledgeLibrary, ParseStatus

@@ -23,14 +23,12 @@
 
 from __future__ import annotations
 
-import os
 import threading
 import uuid
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import close_old_connections, connections
-from django.test import override_settings
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.knowledge.models import (
@@ -237,7 +235,6 @@ def test_ensure_index_keeps_allocation_when_remote_post_create_fails(
     """
     _require_postgres()
     from apps.knowledge import pipeline, vectorindex
-    from apps.knowledge.embedding import active_profile
 
     library = _fresh_library(f"load-test-{uuid.uuid4().hex[:6]}")
 

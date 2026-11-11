@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from apps.knowledge.models import IngestedFile, KnowledgeLibrary
 from apps.planner.operations import get

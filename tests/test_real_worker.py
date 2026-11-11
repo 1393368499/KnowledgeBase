@@ -40,7 +40,7 @@ from celery import Celery
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 
-from apps.knowledge.models import IngestedFile, KnowledgeLibrary, ParseStatus
+from apps.knowledge.models import IngestedFile, KnowledgeLibrary, ParseStatus, VectorCollection
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.real_broker]
 
@@ -211,7 +211,7 @@ def _drop_test_collections(namespace: str) -> list[str]:
 
 
 @pytest.fixture(autouse=True)
-def _parent_namespace(namespace, run_resources):
+def _parent_namespace(namespace, run_resources, embedding_stub, monkeypatch, request):
     """**父进程也必须在同一个 collection 命名空间里**（审查指出的缺口）。
 
     早期版本只把 ``namespace`` 传给子进程和用于断言，父进程并没有应用它——
@@ -223,6 +223,14 @@ def _parent_namespace(namespace, run_resources):
     就把父进程的 ``KB_QDRANT_COLLECTION_PREFIX`` 与 ``QDRANT_MODE`` 定好；
     teardown 的清理**在覆盖仍然有效时**执行。
     """
+    from apps.knowledge.embedding import active_profile, profiles
+
+    # 上传会先把模型地址写进数据库，子 worker 随后按这份登记快照调用。
+    monkeypatch.setenv("KB_EMBED_ACTIVE_PROFILE", "bge1024")
+    monkeypatch.setenv("KB_EMBED_PROFILES", json.dumps({"bge1024": {"base_url": embedding_stub.base_url}}))
+    profiles.cache_clear()
+    request.addfinalizer(profiles.cache_clear)
+    assert active_profile().base_url == embedding_stub.base_url
     with override_settings(KB_QDRANT_COLLECTION_PREFIX=namespace, QDRANT_MODE="server"):
         yield
         # 清理必须发生在覆盖生效期间（此时前缀仍是本用例的命名空间）。
@@ -523,6 +531,7 @@ def test_real_worker_roundtrip_consumes_and_indexes(
     assert collection, "上传接口应自动初建索引"
     # 父进程自己建的 collection 也必须落在测试命名空间里
     assert collection.startswith(namespace), f"collection 不在测试命名空间：{collection}"
+    assert VectorCollection.objects.get(name=collection).base_url == embedding_stub.base_url
     assert record.parse_status == ParseStatus.PENDING
     worker = _start_worker(queue_name, namespace, embedding_url=embedding_stub.base_url)
     try:

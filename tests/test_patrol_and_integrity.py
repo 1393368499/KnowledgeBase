@@ -22,7 +22,7 @@ from django.core.management import call_command
 from django.utils import timezone
 
 from apps.knowledge import integrity
-from apps.knowledge.models import IngestedFile, ParseStatus, PatrolRun, SearchFeedback
+from apps.knowledge.models import ParseStatus, PatrolRun, SearchFeedback
 from apps.planner import services
 from apps.planner.operations import get
 

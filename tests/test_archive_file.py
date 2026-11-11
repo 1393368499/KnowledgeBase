@@ -10,7 +10,10 @@
 * 归档要**真的把它移出检索**：删掉它在 collection 里的向量点
   （``point_id_for`` 是稳定派生，可精确删除）；
 * 归档是**单向**的（终态），重复归档是幂等的、且不重复留痕；
-* 需要 ``library:admin``；走受控提案（一次确认），没有不受控入口；
+* 需要 ``library:admin``；公开入口（catalog / 提案 / 确认 / 执行 API、模型工具）
+  已按 ``RETIRED_INTENTS`` 停用（410 / 目录不出现），登记表仍保留参数与权限定义
+  供历史记录校验；内部实现与其它非删除动作一样**提案即执行**（零人工确认），
+  审计、目标身份核验、权限复核与幂等语义不变；
 * 向量点删失败时**仍然归档**，但如实报 ``complete=False``。
 
 全部使用隔离测试数据（临时库/临时原件/临时向量目录）。
@@ -139,29 +142,47 @@ def _real_vector_file(library, make_file, isolated_paths, client):
 
 
 def _run(user, file_id: int, params_extra: dict | None = None) -> dict:
-    """提案 → 一次确认 → 执行，返回执行结果体。"""
+    """提案即执行（现行策略：非删除动作零人工确认），返回执行结果体。
+
+    不再有"确认一次再执行"这一步：``propose_operation`` 内部就把操作执行完，
+    签发/核销确认凭证的分支只对删除保留。
+    """
     params = {"file_id": file_id}
     params.update(params_extra or {})
     proposal = services.propose_operation(user, intent="archive_file", params=params)
+    assert proposal["auto_executed"] is True, proposal
+    assert proposal["confirm_token"] == "", "非删除动作不应再签发确认凭证"
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    assert operation.status == OperationRecord.Status.ARMED, operation.status
-    return services.execute_operation(user, operation)["result"]
+    assert operation.status == OperationRecord.Status.EXECUTED, operation.status
+    assert operation.confirmations == 0
+    assert operation.error == ""
+    return proposal["result"]
 
 
 # ------------------------------------------------------------------ 登记 ----
 
 
-def test_spec_registered_as_controlled_read_action():
+def test_spec_keeps_historical_definition_but_is_retired_and_auto_executes():
+    """归档已从公开入口停用；登记表保留定义供历史记录校验，内部实现直接执行。
+
+    现行策略（``docs/delete-only-confirmation-2026-10-27.md``）：只有删除保留
+    人工确认，其它非删除动作校验通过后直接执行 —— 归档不再有"一次确认"这一步。
+    停用只作用于界面 / 模型工具 / 公共 API（``RETIRED_INTENTS``）。
+    """
     spec = services.get_spec("archive_file")
     assert spec is not None
     assert spec.params == {"file_id": "int", "reason": "str?"}
     assert spec.permission == "library:admin"
-    assert spec.requires_confirmation is True
-    # 归档不是删除：**不**走三次确认的破坏性流程（一次确认即可）
+    # 只有删除要求人工确认；归档不是删除 → 提案即执行、不签发凭证
+    assert spec.auto_execute is True
+    assert spec.requires_confirmation is False
     assert spec.requires_destructive_flow is False
-    assert spec.ticket_scope == "archive_file"
+    assert spec.ticket_scope == ""
+    # 公开入口已停用：操作目录里不再出现（但登记项本身仍可被历史记录校验）
+    from apps.planner.operations import RETIRED_INTENTS, all_specs
+
+    assert "archive_file" in RETIRED_INTENTS
+    assert "archive_file" not in {row.intent for row in all_specs()}
 
 
 # ------------------------------------------------------------------ 状态机 ----

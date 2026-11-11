@@ -183,10 +183,11 @@ def test_progress_endpoints_require_login(api):
 @pytest.mark.django_db
 @pytest.mark.parametrize('fail', [False, True])
 def test_real_execution_reports_after_claim_and_terminal_database_state(cache, user, monkeypatch, fail):
-    proposal = services.propose_operation(user, intent='list_files', params={})
-    operation = OperationRecord.objects.get(pk=proposal['operation_id'])
-    services.confirm_operation(user, operation, token=proposal['confirm_token'])
-    operation.refresh_from_db()
+    """提案即执行：进度只在真正的执行窗口里可见，终态与重复执行都如实落库。
+
+    现行策略下 ``propose_operation`` 内部就调用 ``execute_operation``，
+    所以 ``_dispatch`` 必须在提案**之前**替换，才能观察到 EXECUTING 中间态。
+    """
     def dispatch(actor, op, spec):
         op.refresh_from_db()
         assert op.status == 'executing'
@@ -198,9 +199,12 @@ def test_real_execution_reports_after_claim_and_terminal_database_state(cache, u
     monkeypatch.setattr(services, '_dispatch', dispatch)
     if fail:
         with pytest.raises(services.PlannerError):
-            services.execute_operation(user, operation)
+            services.propose_operation(user, intent='list_files', params={})
     else:
-        assert services.execute_operation(user, operation)['result']['count'] == 3
+        proposal = services.propose_operation(user, intent='list_files', params={})
+        assert proposal['auto_executed'] is True
+        assert proposal['result']['count'] == 3
+    operation = OperationRecord.objects.get(intent='list_files')
     operation.refresh_from_db()
     assert progress.operation_snapshot(operation)['state'] == ('failed' if fail else 'done')
     before = cache.data.copy()

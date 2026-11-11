@@ -20,7 +20,7 @@ from rest_framework import serializers
 from apps.audit.services import append_event
 
 from .models import DocumentChunk, IngestedFile, KnowledgeLibrary, ParseStatus
-from .storage import StoredBlob, store_bytes, store_stream
+from .storage import StoredBlob, store_stream
 
 CHUNK_READ_BYTES = 1024 * 1024
 

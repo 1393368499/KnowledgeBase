@@ -27,7 +27,7 @@ import pytest
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from apps.knowledge.models import DocumentChunk, IngestedFile, ParseStatus
+from apps.knowledge.models import DocumentChunk, IngestedFile
 from apps.planner import document_templates as dt
 from apps.planner import services
 from tests.planner_fixtures import legacy_proposal

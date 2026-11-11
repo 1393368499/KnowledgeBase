@@ -20,7 +20,7 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 
-from apps.knowledge import pipeline, vectorindex
+from apps.knowledge import pipeline
 from apps.knowledge.models import IngestedFile, ParseStatus
 
 pytestmark = pytest.mark.django_db

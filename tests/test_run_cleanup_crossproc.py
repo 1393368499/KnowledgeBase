@@ -262,7 +262,6 @@ def test_two_concurrent_recoverers_are_mutually_exclusive(runs_dir):
       * 断言：`ok == 1` **且** `refused == 1`，且被拒那次的消息必须是"锁忙"；
         其它错误单独计数，出现即失败（不得把"端点校验失败"当拒绝）。
     """
-    import json as _json
 
     run_id = uuid.uuid4().hex[:12]
     res = rr.RunResources.new(

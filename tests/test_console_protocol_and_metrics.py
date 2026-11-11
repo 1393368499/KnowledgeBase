@@ -48,24 +48,32 @@ def test_operation_summary_covers_all_history_not_latest_hundred(api, admin_user
 
 
 @pytest.mark.parametrize("intent", ["run_patrol", "restart_stalled_task", "reset_breaker", "feedback_learning_report", "reparse_failed"])
-def test_console_actions_use_real_propose_confirm_execute_protocol(api, admin_user, intent):
+def test_console_actions_execute_without_confirmation_and_cannot_replay(api, admin_user, intent):
+    """控制台动作按现行策略**提案即执行**：没有确认卡，也不能被重复执行。
+
+    ``docs/delete-only-confirmation-2026-10-27.md``：只有删除保留人工确认；其它
+    非删除动作参数完整且权限通过后直接执行。所以一次提案请求就拿到 executed 结果，
+    不再有 ``confirm``/``execute`` 的两次点击；旧入口对已完成操作必须明确拒绝。
+    """
     api.force_authenticate(admin_user)
     proposed = api.post("/api/v1/planner/operations/propose/", {"intent": intent, "params": {}}, format="json")
     assert proposed.status_code in (200, 201), proposed.data
+    assert proposed.data["status"] == "executed", proposed.data
+    assert proposed.data["required_confirmations"] == 0, proposed.data
+    assert proposed.data["auto_executed"] is True, proposed.data
+    assert proposed.data["confirm_token"] == "", "非删除动作不应签发确认凭证"
+    assert isinstance(proposed.data["result"], dict), proposed.data
     operation_id = proposed.data["operation_id"]
     base = f"/api/v1/planner/operations/{operation_id}/"
-    early = api.post(base + "execute/", {}, format="json")
-    assert early.status_code == 409
-    token = proposed.data["confirm_token"]
-    for _ in range(proposed.data["required_confirmations"]):
-        confirmed = api.post(base + "confirm/", {"token": token}, format="json")
-        assert confirmed.status_code == 200, confirmed.data
-        token = confirmed.data.get("next_confirm_token", "")
-    done = api.post(base + "execute/", {}, format="json")
-    assert done.status_code == 200, done.data
-    assert done.data["status"] == "executed"
-    assert isinstance(done.data["result"], dict)
+    # 旧入口（确认 / 执行）对已完成的操作必须明确拒绝，而不是再执行一次
+    assert api.post(base + "confirm/", {}, format="json").status_code == 400
     assert api.post(base + "execute/", {}, format="json").status_code == 409
+    # 再执行一遍仍然拒绝（没有第二次副作用）
+    assert api.post(base + "execute/", {}, format="json").status_code == 409
+    row = OperationRecord.objects.get(pk=operation_id)
+    assert row.status == "executed"
+    assert row.confirmations == 0
+    assert row.error == ""
 
 
 @pytest.mark.parametrize("intent", ["run_patrol", "restart_stalled_task", "reset_breaker", "feedback_learning_report", "reparse_failed"])
@@ -87,9 +95,9 @@ def test_learning_report_samples_distinct_files_before_feedback_limit(api, admin
         for i in range(201)
     ])
     payload = services.propose_operation(admin_user, intent="feedback_learning_report", params={})
-    operation = OperationRecord.objects.get(pk=payload["operation_id"])
-    services.confirm_operation(admin_user, operation, token=payload["confirm_token"])
-    result = services.execute_operation(admin_user, operation)["result"]
+    assert payload["auto_executed"] is True, payload
+    assert payload["confirm_token"] == ""
+    result = payload["result"]
     assert {row["file_id"] for row in result["items"]} == {first.pk, second.pk}
 
 

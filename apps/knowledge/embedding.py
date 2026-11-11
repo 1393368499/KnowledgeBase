@@ -36,8 +36,6 @@ from django.conf import settings
 from .httpclient import build_http_client
 from .resilience import (
     CircuitBreaker,
-    RetryExhausted,
-    ServiceUnavailable,
     breaker_for,
     call_with_resilience,
 )

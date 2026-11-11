@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from django.db import transaction
 
 from apps.knowledge import embedding as emb
 from apps.knowledge import pipeline, vectorindex

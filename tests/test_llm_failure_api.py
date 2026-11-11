@@ -15,7 +15,6 @@ import uuid
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.test import Client
 
 from apps.knowledge.models import (
     DocumentChunk,

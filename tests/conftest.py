@@ -36,7 +36,6 @@ import pytest
 # ---------------------------------------------------------------------------
 # ⑦ 会话级 run：独占 run_uuid + 本次 run 专属 raw 目录
 # ---------------------------------------------------------------------------
-import os  # noqa: E402
 import sys  # noqa: E402
 import uuid  # noqa: E402
 from pathlib import Path  # noqa: E402
