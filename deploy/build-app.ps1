@@ -1,34 +1,18 @@
-﻿# 交付镜像的**唯一可复现构建入口**
-#
-# 用法（Windows PowerShell 5.1 与 PowerShell 7 都可直接运行）：
-#   powershell -File deploy/build-app.ps1            # 优先交付路径（缓存基座），不可用则自动降级
-#   pwsh       -File deploy/build-app.ps1            # 同上（装了 PowerShell 7 时）
-#   ... -Standard                                    # 强制标准路径（完全从源码构建）
-#   ... -Tag mytag                                   # 指定产物 tag（默认 kb-app:delivery）
-#
-# 部署审查纠正的三个要点（都实现在下面）：
-#   1. **不能**用 `tag@sha256:<image ID>` 作为 FROM：那是本地 image ID，
-#      不是 Registry manifest digest；拼上去会让 BuildKit 去 Docker Hub 解析 `kb-worker`，
-#      造成长时间等待或失败。这里改为：FROM 只写 **tag**，构建前**严格校验** `.Id`。
-#   2. 标准路径的第一步构建**必须立刻检查退码**：否则第一次失败后，
-#      可能残留旧的 `kb-worker:local-build` tag，让第二步"成功"把失败掩盖掉。
-#   3. 文件**必须存为带 BOM 的 UTF-8**：Windows PowerShell 5.1 对没有 BOM 的 .ps1
-#      按系统 ANSI 代码页解码，本文件的中文注释会被解成乱码进而**直接语法报错**
-#      （表现为"表达式或语句中包含意外的标记"）。改这个文件时别把 BOM 弄丢。
-#   4. docker 把构建进度写在 **stderr**；一旦 stderr 被重定向（`2>&1`、CI 日志、
-#      `*>&1`），`$ErrorActionPreference='Stop'` 会把"退码 0 的正常进度输出"当成
-#      终止性错误（NativeCommandError）中断构建。故所有 docker 调用统一走
-#      `Invoke-Docker`：把两个流都收成文本，**只**按 `$LASTEXITCODE` 判成败。
+﻿# Build knowledgebase:app from current source.
+# Default: use the ID-verified local worker base when present.
+# -Standard: build the self-contained Dockerfile from Python and requirements.txt.
+# Compatible with Windows PowerShell 5.1; preserve the UTF-8 BOM.
+# Docker progress on stderr is collected as text; only exit codes determine success.
 param(
     [switch]$Standard,
-    [string]$Tag = "kb-app:delivery"
+    [string]$Tag = "knowledgebase:app"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 try {
-    $baseTag = "kb-worker:phase2-review-20261015"
+    $baseTag = "knowledgebase:build-base"
     # 期望的**本地 image ID**（不是 manifest digest —— 见 Dockerfile 顶部说明）
     $expectedId = "sha256:63c6532ef74939dee3bb9ceca4abfdc5639ffbcf454c3568774096ba9e4bdea8"
 
@@ -79,16 +63,35 @@ try {
     }
 
     if ($usePinned) {
-        Invoke-Build @("build", "-f", "deploy/app/Dockerfile", "-t", $Tag, ".")
+        Invoke-Build @("build", "-f", "deploy/app/Dockerfile", "--build-arg", "BASE_IMAGE=$baseTag", "-t", $Tag, ".")
     } else {
-        # 第一步：从源码构建 worker 基座。**构建后立即检查退码**，
-        # 不允许第一次失败后靠旧 tag 让第二次"成功"。
-        Invoke-Build @("build", "-f", "deploy/worker/Dockerfile", "-t", "kb-worker:local-build", ".")
-        Invoke-Build @("build", "-f", "deploy/app/Dockerfile",
-                       "--build-arg", "BASE_IMAGE=kb-worker:local-build", "-t", $Tag, ".")
+        # Dockerfile now includes the complete source-base stage.
+        Invoke-Build @("build", "-f", "deploy/app/Dockerfile", "-t", $Tag, ".")
     }
 
     Write-Host "[完成] 产物 = $Tag"
+
+    # 记录发布制品摘要（规则第 5 节：关键发行件记录来源与摘要）。
+    # 记到 snapshots/builds/（本地证据目录，不入版本库），同时打印到控制台。
+    $idInspect = Invoke-Docker @("image", "inspect", $Tag, "--format", "{{.Id}}")
+    $digestInspect = Invoke-Docker @("image", "inspect", $Tag, "--format", "{{json .RepoDigests}}")
+    $recordDir = Join-Path $root "snapshots\builds"
+    New-Item -ItemType Directory -Force -Path $recordDir | Out-Null
+    $recordPath = Join-Path $recordDir ((Get-Date).ToString("yyyyMMdd-HHmmss") + "-build.json")
+    $dirtyCount = @(& git status --porcelain 2>$null).Count
+    $record = [pscustomobject]@{
+        tag         = $Tag
+        imageId     = ($idInspect.Lines | Select-Object -First 1).Trim()
+        repoDigests = (($digestInspect.Lines | Select-Object -First 1).Trim())
+        gitHead     = ((& git rev-parse HEAD 2>$null) | Select-Object -First 1)
+        gitDirty    = ($dirtyCount -gt 0)
+        dirtyFiles  = $dirtyCount
+        baseImage   = $(if ($usePinned) { "$baseTag ($expectedId)" } else { "source-base（python:3.13-slim@sha256:70729b46… 固定 digest）" })
+        createdAt   = (Get-Date).ToString("o")
+    }
+    ($record | ConvertTo-Json -Depth 3) | Set-Content -LiteralPath $recordPath -Encoding UTF8
+    Write-Host "[构建记录] $recordPath"
+    Write-Host "[镜像摘要] $($record.imageId)"
     Write-Host "[下一步] docker compose up -d web worker scheduler   # 项目根即统一入口"
 } finally {
     Pop-Location

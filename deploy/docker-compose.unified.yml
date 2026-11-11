@@ -26,7 +26,7 @@
 #   docker compose logs -f web
 # ⚠️ 用 `-f deploy/...` 而**不加 `--env-file .env`** 时：项目目录变成 deploy/，根的 .env
 #   不参与 `${}` 插值（KB_PG_PASSWORD 等会静默退回默认值，postgres 与应用口令不一致）。
-# ⚠️ 换机器/首次部署：先建镜像（两选一），再 up -d：
+# 换机器可直接 docker compose up -d --build；也可预先运行构建脚本：
 #   bash deploy/build-app.sh             # Linux/macOS（等价于 Windows 的 build-app.ps1 -Standard）
 #   powershell -File deploy/build-app.ps1
 #   若你的基座 tag 不是默认值，用 KB_BASE_IMAGE=<tag> 覆盖 web/worker/scheduler 的 build args。
@@ -62,6 +62,7 @@ x-common-env: &common-env
   KB_CELERY_QUEUE: kb_worker_v2
   KB_QDRANT_URL: http://qdrant:6333
   KB_QDRANT_MODE: server
+  KB_OFFICE_SOCKET: /run/kb-office/convert.sock
   RAW_STORE_DIR: /app/media/raw
   # **可插值**：写死在 environment 里会覆盖 env_file —— 用 IP/域名访问就会 HTTP 400
   # DisallowedHost，而容器内 curl localhost 仍然 200（假绿灯）。部署时设 KB_ALLOWED_HOSTS。
@@ -83,6 +84,9 @@ x-app-env: &app-env
   environment:
     <<: *common-env
   restart: unless-stopped
+  networks:
+    - default
+    - vector
   # 日志上限：默认 json-file 不封顶，长期运行会把宿主磁盘写满
   logging:
     driver: json-file
@@ -91,18 +95,18 @@ x-app-env: &app-env
       max-file: "5"
 
 #: 应用镜像的构建参数（web/worker/scheduler 共用同一份镜像）
-#: ⚠️ 默认值是**本机交付基座**；换机器请先跑 deploy/build-app.sh（产出 kb-worker:local-build），
-#:    并设 KB_BASE_IMAGE=kb-worker:local-build，否则 build 会因找不到基座而失败。
+#: 默认从 Dockerfile 内部 source-base 阶段构建，不依赖本机历史镜像。
+#: KB_BASE_IMAGE 仅用于显式复用已有依赖基座。
 x-app-build: &app-build
   context: ..
   dockerfile: deploy/app/Dockerfile
   args:
-    BASE_IMAGE: "${KB_BASE_IMAGE:-kb-worker:phase2-review-20261015}"
+    BASE_IMAGE: "${KB_BASE_IMAGE:-source-base}"
 
 services:
   # ---------------- 基础设施（与根 docker-compose.yml 一致，勿改） ----------------
   postgres:
-    image: postgres:17.6-alpine3.22
+    image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
     container_name: knowledgebase-postgres
     restart: unless-stopped
     logging:
@@ -135,7 +139,7 @@ services:
       - log_min_duration_statement=200
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     container_name: knowledgebase-redis
     restart: unless-stopped
     logging:
@@ -160,17 +164,23 @@ services:
       - ""
 
   qdrant:
-    image: qdrant/qdrant:v1.15.5
+    image: knowledgebase:qdrant-1.16.3
+    build:
+      context: ./qdrant
     container_name: knowledgebase-qdrant
     restart: unless-stopped
+    environment:
+      QDRANT__CLUSTER__ENABLED: "false"
+      QDRANT__SERVICE__ENABLE_CORS: "false"
+      QDRANT__SERVICE__ENABLE_TLS: "false"
+      QDRANT__TELEMETRY_DISABLED: "true"
+    networks:
+      - vector
     logging:
       driver: json-file
       options:
         max-size: "20m"
         max-file: "5"
-    ports:
-      - "127.0.0.1:${KB_QDRANT_HTTP_PORT:-56333}:6333"
-      - "127.0.0.1:${KB_QDRANT_GRPC_PORT:-56334}:6334"
     volumes:
       # **已获用户明确授权改用 Docker 命名卷**（2026-10-15）：
       #   * 原 `../vector_data/qdrant` 的 bind mount 在 Qdrant 重启后会出现
@@ -190,18 +200,47 @@ services:
       retries: 12
       start_period: 10s
 
+  office:
+    image: knowledgebase:office
+    build:
+      context: ..
+      dockerfile: deploy/app/Dockerfile
+      target: office
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 1024m
+    cpus: 2
+    init: true
+    restart: unless-stopped
+    tmpfs:
+      - /tmp:size=400m,uid=10001,gid=10001,mode=0700
+    volumes:
+      - office_socket:/run/kb-office
+      - ../media/fonts:/usr/local/share/fonts/kb:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(socket.AF_UNIX); s.settimeout(3); s.connect('/run/kb-office/convert.sock'); s.sendall(bytes(5)); assert s.makefile('rb').read(5) == bytes(5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+
   # ---------------- 应用层 ----------------
   # 一次性迁移 + 数据库层不可篡改触发器补建（两者都幂等）。
   # **为什么必须有**：三个镜像都没有 ENTRYPOINT，Compose 原先没有任何服务跑 migrate，
   # 而 ready 探针过去只 `SELECT 1` —— 空库也能报 healthy（假绿灯）。
   # 应用服务通过 depends_on: service_completed_successfully 等它成功退出。
   migrate:
-    image: kb-app:delivery
+    image: knowledgebase:app
     build: *app-build
     env_file:
       - ../.env
     environment:
       <<: *common-env
+    networks:
+      - default
+      - vector
     depends_on: *infra-depends
     container_name: knowledgebase-migrate
     restart: "no"
@@ -213,10 +252,10 @@ services:
     command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py guards --ensure"]
 
   web:
-    # 统一使用**当前源码构建**的交付镜像 kb-app:delivery
+    # 统一使用**当前源码构建**的交付镜像 knowledgebase:app
     # （固定基础镜像 + 仅增装 whitenoise + COPY 当前 config/apps/governance/manage.py）
     build: *app-build
-    image: kb-app:delivery
+    image: knowledgebase:app
     <<: *app-env
     container_name: knowledgebase-web
     # **单行 + 数组形式**：必须避免 YAML 折叠块（`>`）把命令折成多行。
@@ -226,6 +265,8 @@ services:
     command: ["sh", "-c", "fc-cache -f /usr/local/share/fonts/kb && python manage.py collectstatic --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 300 --graceful-timeout 300 --access-logfile - --error-logfile -"]
     depends_on:
       <<: *infra-depends
+      office:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     ports:
@@ -241,6 +282,7 @@ services:
       # Linux 首次部署先创建：install -d -o 10001 -g 10001 media/templates（项目根执行）。
       - ../media/templates:/app/media/templates
       - ../media/fonts:/usr/local/share/fonts/kb:ro
+      - office_socket:/run/kb-office:ro
     healthcheck:
       # 覆盖镜像里 worker 的 celery 健康检查（对 web 恒不健康）
       test: ["CMD-SHELL", "python -c \"import httpx,sys; sys.exit(0 if httpx.get('http://127.0.0.1:8000/api/v1/health/ready/', timeout=8).status_code==200 else 1)\""]
@@ -251,7 +293,7 @@ services:
 
   worker:
     build: *app-build
-    image: kb-app:delivery
+    image: knowledgebase:app
     <<: *app-env
     container_name: knowledgebase-worker
     command: >
@@ -261,6 +303,8 @@ services:
       --loglevel=INFO
     depends_on:
       <<: *infra-depends
+      office:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     volumes:
@@ -269,6 +313,7 @@ services:
       - ../media/raw:/app/media/raw:ro
       - ../media/templates:/app/media/templates:ro
       - ../media/fonts:/usr/local/share/fonts/kb:ro
+      - office_socket:/run/kb-office:ro
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout=10 || exit 1"]
       interval: 60s
@@ -278,7 +323,7 @@ services:
 
   scheduler:
     build: *app-build
-    image: kb-app:delivery
+    image: knowledgebase:app
     <<: *app-env
     container_name: knowledgebase-scheduler
     command: >
@@ -305,7 +350,12 @@ services:
       retries: 5
       start_period: 90s
 
+networks:
+  vector:
+    internal: true
+
 volumes:
+  office_socket:
   # 向量数据卷：名称写死，便于备份/检查；由 Docker 管理（不在项目根）
   qdrantdata:
     name: knowledgebase-qdrantdata-delivery-20261015

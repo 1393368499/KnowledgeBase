@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # 1) fail-closed：这些必须由测试提供，缺一个就拒绝启动

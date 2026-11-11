@@ -1,0 +1,385 @@
+name: knowledgebase
+services:
+  postgres:
+    image: knowledgebase/fnos-postgres:20261104
+    pull_policy: never
+    container_name: knowledgebase-postgres
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/postgres.env
+      format: raw
+    command:
+    - postgres
+    - -c
+    - max_connections=200
+    - -c
+    - shared_buffers=256MB
+    - -c
+    - log_min_duration_statement=200
+    logging: &id001
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: '5'
+    stop_grace_period: 300s
+    networks:
+      kbnet:
+        ipv4_address: 172.29.61.2
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U kb -d kb
+      interval: 60s
+      timeout: 45s
+      start_period: 300s
+      retries: 10
+  redis:
+    image: knowledgebase/fnos-redis:20261104
+    pull_policy: never
+    container_name: knowledgebase-redis
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/redis.env
+      format: raw
+    command:
+    - redis-server
+    - --appendonly
+    - 'yes'
+    - --save
+    - ''
+    logging: *id001
+    stop_grace_period: 300s
+    networks:
+      kbnet:
+        ipv4_address: 172.29.61.3
+    volumes:
+    - redisdata:/data
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 60s
+      timeout: 45s
+      start_period: 300s
+      retries: 10
+  qdrant:
+    image: knowledgebase/fnos-qdrant:20261104
+    pull_policy: never
+    container_name: knowledgebase-qdrant
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/qdrant.env
+      format: raw
+    command:
+    - ./entrypoint.sh
+    logging: *id001
+    stop_grace_period: 300s
+    user: 0:0
+    networks:
+      kbnet:
+        ipv4_address: 172.29.61.4
+    volumes:
+    - qdrantdata:/qdrant/storage
+    healthcheck:
+      test:
+      - CMD
+      - bash
+      - -c
+      - :> /dev/tcp/127.0.0.1/6333
+      interval: 60s
+      timeout: 45s
+      start_period: 300s
+      retries: 10
+  web:
+    image: knowledgebase/fnos-app:20261104
+    pull_policy: never
+    container_name: knowledgebase-web
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/web.env
+      format: raw
+    command:
+    - sh
+    - -c
+    - fc-cache -f /usr/local/share/fonts/kb && python manage.py collectstatic --noinput
+      && exec gunicorn config.wsgi:application --bind 0.0.0.0:8800 --workers 2 --threads
+      4 --timeout 300 --graceful-timeout 300 --access-logfile - --error-logfile -
+    logging: *id001
+    stop_grace_period: 300s
+    user: kb
+    network_mode: host
+    extra_hosts:
+      postgres: 172.29.61.2
+      redis: 172.29.61.3
+      qdrant: 172.29.61.4
+      voice-asr: 172.29.61.5
+      voice-gateway: 172.29.61.6
+      web: 127.0.0.1
+    volumes:
+    - ./media/raw:/app/media/raw
+    - ./media/templates:/app/media/templates
+    - ./media/voice-audio:/app/media/voice-audio
+    - ./media/voice-connection:/app/media/voice-connection:ro
+    - ./media/fonts:/usr/local/share/fonts/kb:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - python -c "import httpx,sys; sys.exit(0 if httpx.get('http://127.0.0.1:8800/api/v1/health/ready/',
+        timeout=8).status_code==200 else 1)"
+      interval: 60s
+      timeout: 45s
+      start_period: 300s
+      retries: 10
+    depends_on:
+      postgres: &id002
+        condition: service_healthy
+      redis: &id003
+        condition: service_healthy
+      qdrant: &id004
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  worker:
+    image: knowledgebase/fnos-app:20261104
+    pull_policy: never
+    container_name: knowledgebase-worker
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/worker.env
+      format: raw
+    command:
+    - celery
+    - -A
+    - config
+    - worker
+    - -Q
+    - kb_worker_v2
+    - --concurrency=2
+    - --loglevel=INFO
+    logging: *id001
+    stop_grace_period: 300s
+    user: kb
+    volumes:
+    - ./media/raw:/app/media/raw:ro
+    - ./media/templates:/app/media/templates:ro
+    - ./media/fonts:/usr/local/share/fonts/kb:ro
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - celery -A config inspect ping -d celery@$$HOSTNAME --timeout=10 || exit 1
+      interval: 60s
+      timeout: 45s
+      start_period: 300s
+      retries: 10
+    depends_on:
+      postgres: *id002
+      redis: *id003
+      qdrant: *id004
+      migrate:
+        condition: service_completed_successfully
+    network_mode: host
+    extra_hosts: &id005
+      postgres: 172.29.61.2
+      redis: 172.29.61.3
+      qdrant: 172.29.61.4
+      voice-asr: 172.29.61.5
+      web: 127.0.0.1
+  scheduler:
+    image: knowledgebase/fnos-app:20261104
+    pull_policy: never
+    container_name: knowledgebase-scheduler
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/scheduler.env
+      format: raw
+    command:
+    - celery
+    - -A
+    - config
+    - beat
+    - --loglevel=INFO
+    - --schedule=/var/lib/kb/celerybeat-schedule
+    logging: *id001
+    stop_grace_period: 300s
+    user: kb
+    volumes:
+    - ./deploy/worker/beat-state:/var/lib/kb
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - f=$$(ls -t /var/lib/kb/celerybeat-schedule* 2>/dev/null | head -1); [ -n "$$f"
+        ] && [ $$(( $$(date +%s) - $$(stat -c %Y "$$f") )) -lt 600 ]
+      interval: 60s
+      timeout: 45s
+      start_period: 300s
+      retries: 10
+    depends_on:
+      postgres: *id002
+      redis: *id003
+      qdrant: *id004
+      migrate:
+        condition: service_completed_successfully
+    network_mode: host
+    extra_hosts: *id005
+  voice-worker:
+    image: knowledgebase/fnos-app:20261104
+    pull_policy: never
+    container_name: knowledgebase-voice-worker-1
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/voice-worker.env
+      format: raw
+    command:
+    - python
+    - manage.py
+    - voiceworker
+    logging: *id001
+    stop_grace_period: 300s
+    user: kb
+    volumes:
+    - ./media/raw:/app/media/raw:ro
+    - ./media/voice-audio:/app/media/voice-audio
+    - ./media/fonts:/usr/local/share/fonts/kb:ro
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres: *id002
+      redis: *id003
+      qdrant: *id004
+      migrate:
+        condition: service_completed_successfully
+      voice-asr:
+        condition: service_healthy
+    network_mode: host
+    extra_hosts: *id005
+  voice-asr:
+    image: knowledgebase/fnos-voice-asr:20261104
+    pull_policy: never
+    container_name: knowledgebase-voice-asr-1
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/voice-asr.env
+      format: raw
+    command:
+    - uvicorn
+    - server:app
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8090'
+    - --workers
+    - '1'
+    logging: *id001
+    stop_grace_period: 300s
+    networks:
+      kbnet:
+        ipv4_address: 172.29.61.5
+    volumes:
+    - ./media/voice-models:/models:ro
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8090/health',
+        timeout=5)
+      interval: 60s
+      timeout: 45s
+      start_period: 600s
+      retries: 10
+  voice-gateway:
+    image: knowledgebase/fnos-voice-gateway:20261104
+    pull_policy: never
+    container_name: knowledgebase-voice-gateway-1
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/voice-gateway.env
+      format: raw
+    command:
+    - python
+    - /srv/server.py
+    logging: *id001
+    stop_grace_period: 300s
+    user: 10001:10001
+    networks:
+      kbnet:
+        ipv4_address: 172.29.61.6
+    extra_hosts:
+      web: 172.29.61.1
+    volumes:
+    - ./config/voice-gateway.py:/srv/server.py:ro
+    depends_on:
+      web:
+        condition: service_healthy
+  voice-tunnel:
+    image: knowledgebase/fnos-voice-tunnel:20261104
+    pull_policy: never
+    container_name: knowledgebase-voice-tunnel-1
+    restart: unless-stopped
+    env_file:
+    - path: ./secrets/voice-tunnel.env
+      format: raw
+    command:
+    - tunnel
+    - --no-autoupdate
+    - --protocol
+    - http2
+    - --edge-ip-version
+    - '4'
+    - --url
+    - http://voice-gateway:8080
+    - --metrics
+    - 127.0.0.1:20241
+    logging: *id001
+    stop_grace_period: 300s
+    user: 10001:10001
+    init: true
+    tmpfs:
+    - /run/voice:size=8m,uid=10001,gid=10001,mode=0700
+    volumes:
+    - ./media/voice-connection:/state
+    depends_on:
+      voice-gateway:
+        condition: service_started
+    network_mode: host
+    extra_hosts:
+      voice-gateway: 172.29.61.6
+  migrate:
+    image: knowledgebase/fnos-app:20261104
+    pull_policy: never
+    container_name: knowledgebase-migrate
+    restart: 'no'
+    env_file:
+    - path: ./secrets/web.env
+      format: raw
+    networks:
+    - kbnet
+    logging: *id001
+    command:
+    - sh
+    - -c
+    - python manage.py migrate --noinput && python manage.py guards --ensure
+    depends_on:
+      postgres: *id002
+      redis: *id003
+      qdrant: *id004
+networks:
+  kbnet:
+    name: knowledgebase_fnos
+    ipam:
+      config:
+      - subnet: 172.29.61.0/24
+        gateway: 172.29.61.1
+volumes:
+  pgdata:
+    name: knowledgebase-pgdata
+    external: true
+  redisdata:
+    name: knowledgebase-redisdata
+    external: true
+  qdrantdata:
+    name: knowledgebase-qdrantdata-delivery-20261015
+    external: true

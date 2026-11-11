@@ -3,7 +3,7 @@ import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import re
 
-ALLOWED = re.compile(r"^/api/v1/voice/device/(?:config/|heartbeat/|turns/|turns/[0-9a-f-]{36}/(?:(?:retry|cancel)/|pages/(?:answer|transcript)/(?:batch/)?[0-9]+/)?)$")
+ALLOWED = re.compile(r"^/api/v1/voice/device/(?:config/|heartbeat/|standby/|tasks/(?:[0-9]+/(?:(?:rename|delete)/)?)?|task-selection/|task-home/|task-menu/[0-9]+/|turns/|turns/[0-9a-f-]{36}/(?:(?:retry|cancel)/|pages/(?:answer|transcript)/(?:batch/)?[0-9]+/)?)$")
 MAX_BODY = 3 * 1024 * 1024
 
 
@@ -84,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
             upstream = conn.getresponse()
             data = upstream.read(1024 * 1024)
             self.send_response(upstream.status)
-            for key in ("Content-Type", "X-Content-SHA256", "X-Page-Count", "X-Frame-Count", "X-Frame-Format"):
+            for key in ("Content-Type", "X-Content-SHA256", "X-Page-Count", "X-Frame-Count", "X-Frame-Format", "X-Menu-Count", "X-Menu-Conversation"):
                 if upstream.getheader(key): self.send_header(key, upstream.getheader(key))
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(data)))

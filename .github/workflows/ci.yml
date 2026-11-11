@@ -1,0 +1,85 @@
+name: ci
+
+# 全栈开发规则第 5/6 节：把能自动验证的条件固化到 CI。
+# 覆盖：静态检查、依赖漏洞、密钥扫描、Django 自检/迁移检查、离线全量回归、部署安全检查。
+# 说明：真实 PostgreSQL/Redis/Qdrant 与真实模型链路由发布前人工专项验证（见 docs/deployment-and-operations.md）；
+# CI 里跑的是 SQLite 全量回归，它必须保持 0 失败。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install linters
+        run: python -m pip install --upgrade pip ruff pip-audit
+      - name: Ruff
+        run: ruff check apps config governance tests scripts
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.test_settings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-deps -r requirements.txt
+          python -m pip check
+      - name: Django check
+        run: python manage.py check
+      - name: Migrations are up to date
+        run: python manage.py makemigrations --check --dry-run
+      - name: Offline regression (SQLite)
+        run: python -m pytest -q --kb-db=sqlite
+
+  deploy-check:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_DEBUG: "0"
+      DJANGO_SECRET_KEY: "ci-only-4d8f3f2a9c7b1e6d5a0f3c8b2e7d4a1f9c6b3e8d5a2f7c4b1e9d6a3f8c5b2e7d"
+      KB_HTTPS_ONLY: "1"
+      KB_ALLOWED_HOSTS: "kb.example.com"
+      KB_CSRF_TRUSTED_ORIGINS: "https://kb.example.com"
+      DB_ENGINE: postgres
+      KB_PG_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-deps -r requirements.txt
+      - name: Production security check
+        run: python manage.py check --deploy

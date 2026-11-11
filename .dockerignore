@@ -30,6 +30,10 @@ media/
 media/raw/
 raw_data/
 vector_data/
+snapshots/
+*.dump
+*.snapshot
+deploy/worker/beat-state/
 *.vhdx
 db/
 *.sqlite
@@ -67,5 +71,7 @@ knowledge-base-prototype.html
 *.log
 logs/
 tmp/
-firmware/note4/build/
-firmware/note4/managed_components/
+firmware/
+android/
+evals/
+.impeccable/

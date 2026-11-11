@@ -8,7 +8,8 @@
 #   **不用 `COPY . .`**。顶层有 `.tmp-*.py` / `_probe_ocr.py` / `db/` / `media/` /
 #   `vector_data/`(65 GiB) / `.env`，`COPY . .` 会把密钥与海量数据带进镜像层。
 #   这里**逐个显式列出运行所需目录**，实测上下文仅 ~1.6 MB。
-FROM python:3.13-slim
+# 基础镜像按 digest 固定（与 deploy/app/Dockerfile 保持一致），避免同名 tag 被上游重推。
+FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -25,8 +26,12 @@ WORKDIR /app
 # 依赖单独一层（改代码不必重装依赖）。
 # requirements.txt 里 pywin32 已加 `sys_platform == "win32"` 标记，
 # 否则 Linux 上没有该发行包会构建失败。
+# 与 deploy/app/Dockerfile 保持同一套安装口径：
+#   --no-deps 证明"清单本身完整"（缺依赖会立刻 import 失败），
+#   pip check 兜底校验依赖关系，不靠 pip 现场解析传递依赖。
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt \
+ && python -m pip check
 
 # ---- 只复制运行时真正需要的代码 ----
 COPY config/ ./config/

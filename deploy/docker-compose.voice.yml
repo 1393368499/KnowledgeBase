@@ -1,6 +1,7 @@
 # Additional services; run from root with -f docker-compose.yml -f deploy/docker-compose.voice.yml.
 services:
   voice-asr:
+    image: knowledgebase:voice-asr
     build:
       context: .
       dockerfile: deploy/voice-asr/Dockerfile
@@ -17,7 +18,7 @@ services:
       retries: 5
 
   voice-worker:
-    image: kb-app:delivery
+    image: knowledgebase:app
     env_file: .env
     environment:
       KB_SKIP_DOTENV: "1"
@@ -35,13 +36,20 @@ services:
       KB_MODEL_LIMIT_REDIS_URL: redis://redis:6379/14
       KB_VOICE_ASR_URL: http://voice-asr:8090/transcribe
       KB_VOICE_AUDIO_ROOT: /app/media/voice-audio
+      KB_OFFICE_SOCKET: /run/kb-office/convert.sock
     command: ["python", "manage.py", "voiceworker"]
+    networks:
+      - default
+      - vector
     restart: unless-stopped
     volumes:
       - ./media/voice-audio:/app/media/voice-audio
       - ./media/fonts:/usr/local/share/fonts/kb:ro
       - ./media/raw:/app/media/raw:ro
+      - office_socket:/run/kb-office:ro
     depends_on:
+      office:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       voice-asr:
@@ -52,8 +60,10 @@ services:
   web:
     volumes:
       - ./media/voice-audio:/app/media/voice-audio
+      - ./media/voice-connection:/app/media/voice-connection:ro
 
   voice-gateway:
+    image: knowledgebase:voice-gateway
     build:
       context: .
       dockerfile: deploy/voice-gateway/Dockerfile
@@ -63,10 +73,16 @@ services:
         condition: service_healthy
 
   voice-tunnel:
+    image: knowledgebase:voice-tunnel
     build:
       context: .
       dockerfile: deploy/voice-tunnel/Dockerfile
     restart: unless-stopped
+    init: true
+    volumes:
+      - ./media/voice-connection:/state
+    tmpfs:
+      - /run/voice:size=8m,uid=10001,gid=10001,mode=0700
     command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--edge-ip-version", "4", "--url", "http://voice-gateway:8080"]
     depends_on:
       - voice-gateway
