@@ -48,12 +48,23 @@ MAX_LIBRARY_SCOPE = 20
 
 
 def _llm_unavailable_response(exc: Exception) -> Response:
-    """模型不可用时的统一响应：**如实说明**，不给假回答。"""
+    """模型不可用时的统一响应：**如实说明**，不给假回答。
+
+    F-05（2026-11-11 复审）：对外只给稳定 ``reason`` 类别与可操作提示；
+    异常原文（可能含上游端点、响应体片段、文件路径）只写日志。
+    """
+    logger.warning("assistant unavailable: %s: %s", type(exc).__name__, exc, exc_info=True)
+    reason = "upstream_unavailable"
+    text = str(exc).lower()
+    if "timeout" in text or "timed out" in text or "超时" in text:
+        reason = "upstream_timeout"
+    elif "429" in text or "rate" in text and "limit" in text or "限流" in text:
+        reason = "upstream_rate_limited"
     return Response(
         {
             "code": "assistant_unavailable",
             "detail": "智能助手当前不可用；你的问题已记录，稍后可以重试。",
-            "reason": str(exc),
+            "reason": reason,
             "hint": "可以在“文件管理/检索”里直接用关键词查找资料，不依赖助手。",
         },
         status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -135,8 +146,11 @@ class ChatView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            research_mode = request.data.get("research_mode", "auto")
+            if not isinstance(research_mode, str) or research_mode not in {"auto", "fast", "deep", "statistics"}:
+                return Response({"detail": "research_mode 只支持 auto/fast/deep/statistics"}, status=400)
             payload = services.reply_to_message(
-                request.user, conversation, content, library_codes=library_codes
+                request.user, conversation, content, library_codes=library_codes, research_mode=research_mode
             )
         except services.PlannerError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -190,7 +204,7 @@ class ConversationView(APIView):
                 # 之后卡片就消失，不再把"已完成/共 N 条"这种东西留在会话里当装饰。
                 # 历史不会被删：审计记录在「我的操作记录」里照旧可查。
                 "operations": [
-                    _operation_dict(row)
+                    _operation_dict(row, request.user)
                     for row in conversation.operations.filter(
                         intent__in=[spec.intent for spec in all_specs() if spec.requires_confirmation]
                     ).exclude(status__in=OperationRecord.TERMINAL_STATUSES).order_by("-id")[:50]
@@ -396,7 +410,7 @@ class OperationProgressView(APIView):
         snapshots = read_many('operation', [row.pk for row in rows if row.status in {'executing', 'failed'}])
         return Response({'results': [{
             'id': row.pk, 'status': row.status, 'progress': operation_snapshot(row, snapshots.get(row.pk, {})),
-            'result': row.result if row.status == OperationRecord.Status.EXECUTED else {},
+            'result': _visible_operation_result(request.user, row) if row.status == OperationRecord.Status.EXECUTED else {},
             'error': row.error if row.status == OperationRecord.Status.FAILED else '',
         } for row in rows]}, headers={'Cache-Control': 'private, no-store'})
 
@@ -429,7 +443,7 @@ class OperationListView(APIView):
         )
         return Response(
             {
-                "results": [_operation_dict(row) for row in queryset[:100]],
+                "results": [_operation_dict(row, request.user) for row in queryset[:100]],
                 "summary": {"restart_stalled_executed": restarts, **totals},
             }
         )
@@ -527,7 +541,7 @@ class OperationResumeView(APIView):
                 scope=scope_for_step,
                 object_ref=locked.target_ref,
             )
-        payload = _operation_dict(locked)
+        payload = _operation_dict(locked, request.user)
         payload["confirm_token"] = token
         payload["next"] = (
             "confirm_final"
@@ -543,7 +557,15 @@ class OperationResumeView(APIView):
         return Response(payload)
 
 
-def _operation_dict(row: OperationRecord) -> dict:
+def _visible_operation_result(user, row: OperationRecord) -> dict:
+    if row.status == OperationRecord.Status.EXECUTED and row.intent in {"list_files", "calculate_evidence"}:
+        from .rag.tool_evidence import accessible
+        if not accessible(user, row):
+            return {}
+    return row.result
+
+
+def _operation_dict(row: OperationRecord, user) -> dict:
     from apps.knowledge.progress import operation_snapshot
     spec = get_spec(row.intent)
     # 「本次检索范围」在卡片上要显示**库名**（只给 code 时对不上界面上的库名）。
@@ -600,7 +622,7 @@ def _operation_dict(row: OperationRecord) -> dict:
         "requires_destructive_flow": bool(
             spec.requires_destructive_flow if spec else False
         ),
-        "result": row.result,
+        "result": _visible_operation_result(user, row),
         "progress": operation_snapshot(row),
         "error": row.error,
         # ARMED 的执行窗口：界面据此显示"可执行 / 已过期"，
@@ -864,7 +886,7 @@ class DerivedDocumentDownloadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ExportUnavailable as exc:
-            # 例如镜像里没有 LibreOffice：**如实** 503，不返回假的 PDF
+            # 例如隔离的 Office 转换服务不可用：**如实** 503，不返回假的 PDF
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except ExportError as exc:  # pragma: no cover - 兜底：导出失败不冒充成功
             return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

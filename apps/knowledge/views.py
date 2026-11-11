@@ -3,10 +3,15 @@
 设计约定：
 - 资料与分段**没有任何写接口**（除了"追加一次上传"），改删由 governance 层与模型层双重拦截。
 - 列表接口按用户可读范围过滤，不泄露无权信息库的数据。
+- **停用（``library__is_active=False``）= 不可读**（O-01 语义收敛）：资料列表、详情、
+  预览、下载、进度、检索候选与统计一律排除停用信息库名下的资料。停用是**访问控制**
+  语义，不只是"界面上灰掉"；重新启用后同一批资料恢复可读（数据未删除、不改写）。
+  上传入口另有"停用库拒绝"校验（见 ``UploadView``），两侧口径一致。
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 
@@ -53,6 +58,8 @@ from .serializers import (
 )
 from .services import ingest_file, require_valid_upload, sha256_of_stream, store_upload
 
+logger = logging.getLogger(__name__)
+
 
 def validate_nature_value(value: str) -> str:
     """性质**取值**校验（写入口）：非空时必须是五项词表之一，否则 400。
@@ -73,6 +80,25 @@ def validate_nature_value(value: str) -> str:
     if text and text not in NATURE_VOCABULARY:
         raise ValidationError({"nature": nature_error_message(text)})
     return text
+
+
+def _index_unavailable_state(code: str) -> dict:
+    """索引初始化失败时**对外安全**的 ``index_state``（F-05）。
+
+    为什么不能回异常原文：失败可能来自 Qdrant/网络，异常文本里常带内部端点、
+    上游响应片段或文件路径；这些只应进日志（``exc_info=True``），客户端只需要
+    "稳定错误码 + 能不能重试 + 下一步做什么"。``error`` 字段（旧字段名）已移除，
+    统一用 ``code``/``detail``，避免调用方继续把内部原因当展示文案。
+    """
+    return {
+        "initialized": False,
+        "code": code,
+        "retryable": True,
+        "detail": (
+            "索引初始化未成功（向量库暂时不可用）；资料已落盘并入库，"
+            "索引恢复后重试处理即可。"
+        ),
+    }
 
 
 class KbPagination(PageNumberPagination):
@@ -144,6 +170,10 @@ class IngestedFileViewSet(viewsets.ReadOnlyModelViewSet):
         allowed = readable_library_ids(self.request.user)
         if allowed is not None:
             queryset = queryset.filter(library_id__in=allowed)
+        # **停用库 = 不可读**（O-01）：成员关系只说明"你有这个库的权限"，
+        # 但库被停用后它名下的资料不再对外可读。这里必须过滤，不能只在库列表
+        # 按钮上灰掉——否则"停用"只是界面效果，详情/处理接口照样能读到。
+        queryset = queryset.filter(library__is_active=True)
         params = self.request.query_params
         library = params.get("library")
         if library:
@@ -438,19 +468,27 @@ class IngestedFileViewSet(viewsets.ReadOnlyModelViewSet):
         #
         # 注意捕获范围：**不只是 PipelineError**。外部依赖（Qdrant/网络）的
         # 任何异常都不能让"已入库"这个事实变成 500 消失。
+        # 对外只回**稳定错误码 + 可操作提示**（F-05）：异常类型/原文（可能含
+        # Qdrant 内部地址或上游响应片段）只写日志，不放进响应体。
         index_state: dict = {}
         index_failed = False
         try:
             index_state = pipeline.ensure_library_index(library)
-        except pipeline.PipelineError as exc:
-            index_state = {"initialized": False, "error": str(exc)}
+        except pipeline.PipelineError:
+            logger.warning(
+                "ensure_library_index 失败：library=%s（内部细节仅日志）",
+                library.pk,
+                exc_info=True,
+            )
+            index_state = _index_unavailable_state("index_setup_failed")
             index_failed = True
-        except Exception as exc:  # noqa: BLE001 - Qdrant/网络等外部失败
-            index_state = {
-                "initialized": False,
-                "error": f"{type(exc).__name__}: {exc}",
-                "retryable": True,
-            }
+        except Exception:  # noqa: BLE001 - Qdrant/网络等外部失败
+            logger.warning(
+                "ensure_library_index 异常：library=%s（内部细节仅日志）",
+                library.pk,
+                exc_info=True,
+            )
+            index_state = _index_unavailable_state("index_unavailable")
             index_failed = True
 
         # 第二步：处理（解析 → 分段 → 嵌入 → 写 Qdrant）。
@@ -524,10 +562,13 @@ class IngestedFileViewSet(viewsets.ReadOnlyModelViewSet):
             deferred = True
             process_report["ok"] = False
             process_report["deferred_reason"] = "index_unavailable"
+            # F-05：不再把 index_state 的内部原因拼进 detail；只带稳定 code。
+            process_report["error_code"] = str(
+                index_state.get("code") or "index_unavailable"
+            )
             process_report["detail"] = (
                 "已落盘并入库，但索引初始化未成功（外部向量库问题）；"
-                "资料处于待处理状态，可在索引恢复后重试处理："
-                + str(index_state.get("error", ""))[:200]
+                "资料处于待处理状态，可在索引恢复后重试处理。"
             )
         elif mode == "inline":
             process_report["attempted"] = True
@@ -673,12 +714,17 @@ def parse_amount_min(raw) -> float | None:
 
 
 def _readable_files(user):
-    """用户可读的全部资料（**不分页**）。检索的候选口径必须与列表页一致。"""
+    """用户可读的全部资料（**不分页**）。检索的候选口径必须与列表页一致。
+
+    **停用库 = 不可读**（O-01）：除了成员/外部库这一层权限，还必须排除
+    ``library__is_active=False`` 的信息库。模块顶部注释解释了这条语义；
+    详情/预览/下载/进度/检索候选全部复用本函数，所以口径只有这一处。
+    """
     queryset = IngestedFile.objects.all()
     allowed = readable_library_ids(user)
     if allowed is not None:
         queryset = queryset.filter(library_id__in=allowed)
-    return queryset
+    return queryset.filter(library__is_active=True)
 
 
 def apply_file_filters(
@@ -1413,6 +1459,9 @@ class KnowledgeStatsView(APIView):
         if allowed is not None:
             files = files.filter(library_id__in=allowed)
             libraries = libraries.filter(id__in=allowed)
+        # 与文件列表/详情同一口径（O-01）：停用库的资料不计入统计，
+        # 否则首页卡片数字会和列表条数对不上（看似"资料丢了"）。
+        files = files.filter(library__is_active=True)
         return Response(
             {
                 "libraries": libraries.count(),
@@ -1514,9 +1563,25 @@ class FilePreviewPageView(APIView):
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as exc:  # noqa: BLE001 - 坏 PDF 如实报错，不返回空图
+        except Exception:  # noqa: BLE001 - 坏 PDF 如实报错，不返回空图
+            # F-05：渲染库（pypdfium2 等）的异常文本可能带**原件路径**或解析器
+            # 内部细节，只写日志（exc_info 保留排障信息），对外只给稳定 code +
+            # 可执行提示。
+            logger.warning(
+                "PDF 页渲染失败：file=%s page=%s（内部细节仅日志）",
+                record.pk,
+                page,
+                exc_info=True,
+            )
             return Response(
-                {"detail": f"该页无法渲染：{type(exc).__name__}: {exc}"},
+                {
+                    "code": "preview_render_failed",
+                    "detail": (
+                        "这一页无法渲染（PDF 可能已损坏或该页格式不受支持）；"
+                        "可以下载原件查看，或重新上传一份完好的文件。"
+                    ),
+                    "retryable": False,
+                },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         response = HttpResponse(png, content_type="image/png")

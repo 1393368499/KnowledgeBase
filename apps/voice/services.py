@@ -17,11 +17,43 @@ from apps.knowledge.models import KnowledgeLibrary
 from apps.knowledge.permissions import readable_library_ids
 from apps.planner.models import Conversation, Message
 from .authentication import credential_hash
-from .models import VoiceDevice, VoiceEvent, VoiceTurn
+from .models import VoiceDevice, VoiceEvent, VoiceTurn, ConversationLease
 from .rendering import frame
 
 logger = logging.getLogger(__name__)
 ACTIVE = ("queued", "transcribing", "transcribed", "answering", "rendering")
+MAX_PARALLEL_TASKS = 4
+MAX_PENDING_TURNS = 12
+
+
+def independent_tasks(device):
+    return device.capabilities.get("conversation_mode", "fixed") in {"per_turn", "tasks"}
+
+
+def task_route(device):
+    version = int(device.capabilities.get("route_version", 1))
+    routes = device.capabilities.get("task_routes", {str(version): None})
+    return version, routes.get(str(version))
+
+
+def select_task(device, conversation_id):
+    with transaction.atomic():
+        device = VoiceDevice.objects.select_for_update().get(pk=device.pk)
+        if device.capabilities.get("conversation_mode") != "tasks":
+            raise ValidationError("请先启用任务会话模式")
+        if conversation_id is not None:
+            if not VoiceTurn.objects.filter(device=device, conversation_id=conversation_id, conversation__user=device.user).exists():
+                raise ValidationError("该任务不属于这台设备")
+        version, _ = task_route(device)
+        routes = dict(device.capabilities.get("task_routes", {}))
+        version += 1
+        routes[str(version)] = conversation_id
+        # Keep recent capture snapshots so changing selection during recording
+        # never redirects an already-started recording to a different task.
+        routes = dict(sorted(routes.items(), key=lambda item: int(item[0]))[-64:])
+        device.capabilities = {**device.capabilities, "route_version": version, "task_routes": routes}
+        device.save(update_fields=["capabilities"])
+        return {"route_version": version, "active_conversation_id": conversation_id}
 
 
 def emit(device, kind, turn=None, **payload):
@@ -49,19 +81,27 @@ def configure(device, data):
     name = str(data.get("name", device.name)).strip()
     if not name or len(name) > 80:
         raise ValidationError("设备名称需为 1–80 个字")
-    mode = data.get("scope_mode", device.scope_mode)
-    codes = scope(device.user, mode, data.get("library_codes", device.library_codes))
+    scope_mode = data.get("scope_mode", device.scope_mode)
+    codes = scope(device.user, scope_mode, data.get("library_codes", device.library_codes))
+    mode = data.get("conversation_mode", device.capabilities.get("conversation_mode", "fixed"))
+    if mode not in {"fixed", "per_turn", "tasks"}:
+        raise ValidationError("任务会话模式无效")
+    device.capabilities = {**device.capabilities, "conversation_mode": mode}
+    if mode == "tasks" and "route_version" not in device.capabilities:
+        device.capabilities.update(route_version=1, task_routes={"1": None})
     conv_id = data.get("conversation_id", device.conversation_id)
     if conv_id:
         try:
             conversation = Conversation.objects.get(pk=conv_id, user=device.user)
         except (ValueError, TypeError, Conversation.DoesNotExist):
             raise ValidationError("会话不存在或不属于你")
-    else:
+    elif mode == "fixed":
         conversation = Conversation.objects.create(user=device.user, title=f"{name} 语音")
+    else:
+        conversation = None
     device.name = name
     device.conversation = conversation
-    device.scope_mode = mode
+    device.scope_mode = scope_mode
     device.library_codes = codes
     if "enabled" in data:
         if not isinstance(data["enabled"], bool):
@@ -73,6 +113,7 @@ def configure(device, data):
 
 
 def add_device(user, data):
+    data = {"conversation_mode": "tasks", **data}
     raw = secrets.token_urlsafe(32)
     with transaction.atomic():
         device = VoiceDevice(user=user, name="新设备", token_hash=credential_hash(raw))
@@ -118,6 +159,8 @@ def accept_audio(device, data, raw):
         device = VoiceDevice.objects.select_for_update().get(pk=device.pk)
         previous = VoiceTurn.objects.filter(device=device, client_turn_id=client_id).first()
         if previous:
+            if previous.state == "removed":
+                return None, "removed"
             if previous.state == "canceled":
                 return previous, "existing"
             if previous.audio_sha256 != digest:
@@ -127,14 +170,45 @@ def accept_audio(device, data, raw):
             raise ValidationError("设备已停用")
         if version != device.config_version:
             return None, "config_changed"
-        if not device.conversation_id:
+        parallel = independent_tasks(device)
+        grouped = device.capabilities.get("conversation_mode") == "tasks"
+        if not parallel and not device.conversation_id:
             raise ValidationError("请在设备管理中选择目标会话")
-        if VoiceTurn.objects.filter(device=device, state__in=ACTIVE).exists():
-            return None, "busy"
+        active_turns = VoiceTurn.objects.filter(device=device, state__in=ACTIVE)
+        route_version, selected_conversation = None, None
+        if grouped:
+            try:
+                route_version = str(int(data.get("route_version", "")))
+            except (ValueError, TypeError):
+                raise ValidationError("缺少录音开始时的任务选择，请连接 App 后重录")
+            routes = dict(device.capabilities.get("task_routes", {}))
+            if route_version not in routes:
+                raise ValidationError("录音的任务选择已过期，请重新选择任务后重录")
+            selected_conversation = routes[route_version]
+            if selected_conversation is not None and not Conversation.objects.filter(pk=selected_conversation, user=device.user).exists():
+                raise ValidationError("录音所属任务已不存在，请重新选择任务")
+            active_tasks = active_turns.values("conversation_id").distinct().count()
+            joining_active = selected_conversation is not None and active_turns.filter(conversation_id=selected_conversation).exists()
+            if active_turns.count() >= MAX_PENDING_TURNS or (not joining_active and active_tasks >= MAX_PARALLEL_TASKS):
+                return None, "capacity"
+        elif active_turns.count() >= (MAX_PARALLEL_TASKS if parallel else 1):
+            return None, "capacity" if parallel else "busy"
         if VoiceTurn.objects.filter(device=device, created_at__gte=timezone.now() - timedelta(minutes=1)).exclude(state="canceled").count() >= 10:
             return None, "rate_limited"
         codes = scope(device.user, device.scope_mode, device.library_codes)
         turn_id = uuid.uuid4()
+        conversation = device.conversation
+        if grouped and selected_conversation is not None:
+            conversation = Conversation.objects.get(pk=selected_conversation, user=device.user)
+        elif parallel:
+            conversation = Conversation.objects.create(user=device.user, title="语音任务 " + str(client_id)[:8])
+            if grouped:
+                routes[route_version] = conversation.pk
+                device.capabilities = {**device.capabilities, "task_routes": routes}
+                device.save(update_fields=["capabilities"])
+        if parallel:
+            device.conversation = conversation
+            device.save(update_fields=["conversation"])
         target = audio_root() / str(device.pk) / f"{turn_id}.wav"
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -142,7 +216,7 @@ def accept_audio(device, data, raw):
                 out.write(raw)
             turn = VoiceTurn.objects.create(
                 id=turn_id, device=device, client_turn_id=client_id,
-                conversation=device.conversation, config_version=version,
+                conversation=conversation, config_version=version,
                 scope_mode=device.scope_mode, library_codes=codes,
                 audio_sha256=digest, audio_path=str(target),
             )
@@ -169,7 +243,7 @@ def cancel_turn(device, client_id):
             if VoiceTurn.objects.filter(device=device, created_at__gte=timezone.now() - timedelta(minutes=1)).count() >= 60:
                 raise ValidationError("取消请求过于频繁，请稍后重试")
             turn = VoiceTurn.objects.create(device=device, client_turn_id=client_id,
-                conversation=device.conversation, config_version=device.config_version,
+                conversation=None if device.capabilities.get("conversation_mode") == "tasks" else device.conversation, config_version=device.config_version,
                 scope_mode=device.scope_mode, library_codes=device.library_codes,
                 audio_sha256="", audio_path="", state="canceled", error="已取消发送")
         else:
@@ -192,8 +266,24 @@ def transcribe(turn):
 
 
 def process_turn(turn_id):
-    # CAS claim: only one worker can process a durable queued row.
-    claimed = VoiceTurn.objects.filter(pk=turn_id, state="queued").update(state="transcribing", claimed_at=timezone.now(), updated_at=timezone.now())
+    # Independent conversations run concurrently. Within one task, only the
+    # earliest recording can claim work; later recordings retain their order.
+    candidate = VoiceTurn.objects.filter(pk=turn_id, state="queued").first()
+    if not candidate:
+        return
+    with transaction.atomic():
+        VoiceDevice.objects.select_for_update().get(pk=candidate.device_id)
+        if candidate.conversation_id:
+            Conversation.objects.select_for_update().get(pk=candidate.conversation_id)
+            from django.db.models import Q
+            previous = VoiceTurn.objects.filter(conversation_id=candidate.conversation_id, state__in=ACTIVE).exclude(pk=candidate.pk)
+            if previous.filter(Q(state__in=["transcribing", "transcribed", "answering", "rendering"]) |
+                               Q(created_at__lt=candidate.created_at) |
+                               Q(created_at=candidate.created_at, pk__lt=candidate.pk)).exists():
+                return
+            if ConversationLease.objects.filter(conversation_id=candidate.conversation_id).exists():
+                return
+        claimed = VoiceTurn.objects.filter(pk=turn_id, state="queued").update(state="transcribing", claimed_at=timezone.now(), updated_at=timezone.now())
     if not claimed:
         return
     turn = VoiceTurn.objects.select_related("device__user", "conversation").get(pk=turn_id)
@@ -214,19 +304,71 @@ def process_turn(turn_id):
                 raise ValueError("设备已停用或发送设置已变化")
             turn.state = "transcribed"
             turn.save()
+            if independent_tasks(locked_device):
+                Conversation.objects.filter(pk=turn.conversation_id, title="语音任务 " + str(turn.client_turn_id)[:8]).update(title=turn.transcript[:60])
             emit(device, "transcript.final", turn, transcript=turn.transcript)
         answer_turn(turn)
     except Exception as exc:
-        logger.warning("Voice turn %s failed at %s (%s)", turn.pk, turn.stage, type(exc).__name__)
+        # F-05（2026-11-11 复审）：对设备只回稳定、可读的失败原因；异常原文
+        # （可能含上游端点/响应体/本地路径）只写日志，不进入 turn.error。
+        logger.warning(
+            "Voice turn %s failed at %s (%s): %s",
+            turn.pk,
+            turn.stage,
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
         with transaction.atomic():
             VoiceDevice.objects.select_for_update().get(pk=turn.device_id)
             current = VoiceTurn.objects.select_for_update().get(pk=turn.pk)
             if current.state == "canceled":
                 return
             turn.state = "uncertain" if turn.stage == "answer" else "failed"
-            turn.error = str(exc)[:500]
+            turn.error = _public_voice_error(turn.stage, exc)
             turn.save(update_fields=["state", "error", "updated_at"])
             emit(turn.device, "turn.failed", turn, detail=turn.error, state=turn.state)
+            record_failure_notice(turn)
+
+
+def _public_voice_error(stage: str, exc: Exception) -> str:
+    """设备可见的失败原因：只给稳定类别 + 可执行下一步，不暴露异常原文。"""
+    text = str(exc).lower()
+    if stage == "answer":
+        if "timeout" in text or "timed out" in text or "超时" in text:
+            return "AI 模型服务超时，本轮未生成完整回复"
+        if "429" in text or "限流" in text or "busy" in text:
+            return "AI 模型服务繁忙，本轮未生成完整回复"
+        return "AI 处理未完成，本轮没有生成完整回复"
+    if stage == "render":
+        return "回复已处理，但屏幕显示生成失败"
+    return "语音识别未完成，请重新录音"
+
+
+def failure_detail(turn):
+    if turn.stage == "answer":
+        reason = "AI 模型服务超时" if any(s in turn.error.lower() for s in ["timeout", "timed out", "超时"]) else "AI 处理未完成"
+        return ("系统提示：" + reason + "，本轮没有生成完整回复。\n"
+                "语音内容已记录；已完成的检索或操作不会撤销。请到网页核对操作记录后再提问，系统不会自动重复提交。")
+    if turn.stage == "render":
+        return "系统提示：回复已处理，但屏幕显示生成失败。请到网页查看会话，或重试显示。"
+    return "系统提示：语音识别未完成，请重新录音。"
+
+
+def record_failure_notice(turn):
+    """Durable system feedback, never a fabricated model answer or auto replay."""
+    with transaction.atomic():
+        VoiceDevice.objects.select_for_update().get(pk=turn.device_id)
+        current = VoiceTurn.objects.select_for_update().get(pk=turn.pk)
+        if current.state not in {"failed", "uncertain"} or not current.conversation_id:
+            return
+        existing = Message.objects.filter(conversation_id=current.conversation_id, role=Message.Role.SYSTEM,
+                                          payload__voice_turn_id=str(current.pk), payload__unavailable=True)
+        if existing.exists():
+            return
+        Message.objects.create(conversation_id=current.conversation_id, role=Message.Role.SYSTEM,
+            content=failure_detail(current), payload={"unavailable": True, "voice_turn_id": str(current.pk),
+                "device_id": str(current.device_id), "state": current.state, "stage": current.stage})
 
 
 def answer_turn(turn):
@@ -251,6 +393,22 @@ def answer_turn(turn):
         turn.state = "queued"
         turn.save(update_fields=["state", "updated_at"])
         return
+    except Exception:
+        # The document tool may already have saved its result. Do not replay
+        # that write merely because the final model acknowledgement timed out.
+        from .documents import documents
+        turn.refresh_from_db()
+        saved = documents(turn)
+        if not saved:
+            raise
+        Message.objects.create(conversation=turn.conversation, role=Message.Role.SYSTEM,
+            content="报告已保存，可在开发板上下翻页阅读正文。AI 回复摘要未完成，已保存的报告不会重复生成。",
+            payload={"voice_turn_id": str(turn.pk), "document_ids": [d.pk for d in saved],
+                     "document_saved_reply_unavailable": True})
+        turn.stage = "render"
+        turn.state = "rendering"
+        render_turn(turn)
+        return
     turn.answer = payload["content"]
     turn.assistant_message_id = payload["assistant_message_id"]
     turn.user_message_id = payload["user_message_id"]
@@ -263,7 +421,7 @@ def answer_turn(turn):
 def render_turn(turn):
     turn.answer = screen_answer(turn)
     _, _, turn.transcript_pages = frame(turn.transcript, "我说")
-    _, _, turn.answer_pages = frame(turn.answer, "AI 回复")
+    _, _, turn.answer_pages = frame(turn.answer, answer_title(turn))
     turn.state = "answer_ready"
     turn.error = ""
     with transaction.atomic():
@@ -272,8 +430,14 @@ def render_turn(turn):
 
 
 def screen_answer(turn):
+    from .documents import report_text
+    report = report_text(turn)
+    if report is not None:
+        return report
     if turn.answer.strip():
         return turn.answer
+    if turn.state in {"failed", "uncertain"}:
+        return failure_detail(turn)
     payload = turn.assistant_message.payload if turn.assistant_message_id else {}
     reasons = [str(p.get("reason", "")) for p in payload.get("rejected_proposals", []) if p.get("reason")]
     if reasons:
@@ -281,7 +445,18 @@ def screen_answer(turn):
     return "AI 本轮没有返回文字。请在网页中查看会话及待确认操作，或换一种说法再试。"
 
 
-def sweep():
+def answer_title(turn):
+    from .documents import document_ids
+    if document_ids(turn):
+        return "报告正文"
+    return "系统提示" if turn.state in {"failed", "uncertain"} and not turn.assistant_message_id else "AI 回复"
+
+
+def answer_revision(turn):
+    return hashlib.sha256((answer_title(turn) + "\n" + screen_answer(turn)).encode("utf-8")).hexdigest()
+
+
+def sweep(*, process_queued=True):
     now = timezone.now()
     # Crashed model requests are not replayed. They can have persisted tool work.
     stale = VoiceTurn.objects.filter(state__in=["transcribing", "transcribed", "answering", "rendering"], claimed_at__lt=now - timedelta(minutes=15))
@@ -307,8 +482,10 @@ def sweep():
             turn.error = "处理进程中断，请核对会话记录后重新提问"
             turn.save(update_fields=["state", "error", "updated_at"])
             emit(turn.device, "turn.failed", turn, detail=turn.error, state=turn.state)
-    for turn in VoiceTurn.objects.filter(state="queued").order_by("created_at")[:20]:
-        process_turn(turn.pk)
+            record_failure_notice(turn)
+    if process_queued:
+        for turn in VoiceTurn.objects.filter(state="queued").order_by("created_at")[:20]:
+            process_turn(turn.pk)
     # No raw audio is part of the immutable knowledge store.
     for turn in VoiceTurn.objects.exclude(state__in=ACTIVE).filter(created_at__lt=now - timedelta(hours=1)).exclude(audio_path="")[:100]:
         path = Path(turn.audio_path)

@@ -30,11 +30,9 @@ from typing import Any, Iterable, Sequence
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
 
 from config.paths import qdrant_embedded_dir, qdrant_server_dir
 
-from .httpclient import build_http_client
 from .models import IngestedFile, KnowledgeLibrary, ParseStatus, VectorCollection
 
 logger = logging.getLogger(__name__)
@@ -111,6 +109,41 @@ def qdrant_url() -> str:
     return str(getattr(settings, "QDRANT_URL", "http://127.0.0.1:6333")).rstrip("/")
 
 
+#: 每个进程只探测/记录一次服务端版本（F-07：版本差异要可见，但不得影响业务）。
+_QDRANT_VERSION_LOGGED = False
+
+
+def _log_qdrant_server_version() -> None:
+    """尽力记录 Qdrant 服务端版本，便于发现客户端/服务端版本漂移。
+
+    ``check_compatibility=False`` 是**刻意的取舍**：客户端固定 1.16.2、服务端固定
+    1.16.3（见 docs/office-qdrant-selection-2026-11-09.md），若开启兼容检查，
+    上游小版本一动就会在运行时抛错。代价是版本漂移不再自动报警——所以这里把
+    服务端版本打进日志，并在版本与客户端主次版本不一致时用 warning 提示。
+    """
+    global _QDRANT_VERSION_LOGGED
+    if _QDRANT_VERSION_LOGGED:
+        return
+    _QDRANT_VERSION_LOGGED = True
+    try:
+        import httpx
+        from importlib.metadata import version as _package_version
+
+        with httpx.Client(timeout=3.0, trust_env=False) as client:
+            payload = client.get(f"{qdrant_url()}/").json()
+        server_version = str(payload.get("version") or "unknown")
+        client_version = _package_version("qdrant-client")
+        same_minor = server_version.split(".")[:2] == client_version.split(".")[:2]
+        log = logger.info if same_minor else logger.warning
+        log(
+            "Qdrant server version=%s client=%s（兼容检查已关闭，版本漂移不会自动报错）",
+            server_version,
+            client_version,
+        )
+    except Exception:  # noqa: BLE001 - 版本探测失败不影响业务
+        logger.debug("无法探测 Qdrant 服务端版本", exc_info=True)
+
+
 def build_client():
     """构造 qdrant 客户端。
 
@@ -129,6 +162,7 @@ def build_client():
         path = qdrant_embedded_dir()
         path.mkdir(parents=True, exist_ok=True)
         return QdrantClient(path=str(path))
+    _log_qdrant_server_version()
     return QdrantClient(
         url=qdrant_url(),
         api_key=getattr(settings, "QDRANT_API_KEY", "") or None,
@@ -693,7 +727,7 @@ def activate_generation(
         # 如果在事务外校验，两个并发切换可能都通过校验，然后一个接一个把指针
         # 切到不同的 collection，第二个就把第一个刚切好的状态覆盖掉。
         # 校验放在锁里，才能保证"我看到的那份资料状态"在整个切换期间不会变。
-        from .writegate import WriteFrozen, assert_freeze_owner, assert_writable_locked
+        from .writegate import assert_freeze_owner, assert_writable_locked
 
         if freeze_token is None:
             # 普通（外部）激活：冻结期一律拒绝 —— 重建窗口内只有重建自己能动指针
@@ -933,13 +967,25 @@ def search_sparse(
     for name in collections:
         if not collection_exists(client, name):
             continue
-        points, _ = client.scroll(
-            collection_name=name,
-            scroll_filter=query_filter,
-            limit=limit,
-            with_payload=True,
-            with_vectors=False,
-        )
+
+        def _scroll():
+            return client.scroll(
+                collection_name=name,
+                scroll_filter=query_filter,
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+            )
+
+        try:
+            points, _ = _scroll()
+        except Exception:
+            # 老 collection 可能没建 ``text`` 全文索引（ensure_text_index 是后加的、
+            # 只在 prepare_generation 里调用），此时 MatchText 会直接报错，稀疏这一路
+            # 就永远是 0 条（实测基线：sparse_hits 恒为 0）。补建索引后重试一次；
+            # 仍失败就把异常抛给 pipeline，由它记"该库稀疏不可用"并退回 DB 关键词兜底。
+            ensure_text_index(client, name)
+            points, _ = _scroll()
         for point in points:
             hits.append(
                 SearchCandidate(

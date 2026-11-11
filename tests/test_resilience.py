@@ -217,6 +217,37 @@ def test_breaker_short_circuits_before_any_call():
 
 
 def test_backoff_is_exponential_and_bounded():
+    """退避上限按指数增长，单次延迟落在 [0, 上限]（full jitter，规则 §4）。"""
+    delays: list[float] = []
+    ceilings: list[float] = []
+
+    def flaky():
+        raise _Retryable("x")
+
+    def uniform(lo: float, hi: float) -> float:
+        # 注入确定随机源：取上界，便于断言指数增长；不依赖真实随机、不 sleep。
+        ceilings.append(hi)
+        return hi
+
+    breaker = CircuitBreaker("svc", failure_threshold=99)
+    with pytest.raises(RetryExhausted):
+        call_with_resilience(
+            service="svc",
+            operation="op",
+            func=flaky,
+            breaker=breaker,
+            max_attempts=4,
+            base_delay_seconds=0.5,
+            sleep=delays.append,
+            uniform=uniform,
+        )
+    assert ceilings == [0.5, 1.0, 2.0]
+    assert delays == ceilings, "取上界采样时延迟应等于指数上限"
+    assert all(0.0 <= delay <= ceiling for delay, ceiling in zip(delays, ceilings))
+
+
+def test_backoff_uses_full_jitter_not_fixed_delays():
+    """同一个失败序列的延迟应随随机源变化，而不是写死的 0.5/1.0/2.0。"""
     delays: list[float] = []
 
     def flaky():
@@ -232,8 +263,9 @@ def test_backoff_is_exponential_and_bounded():
             max_attempts=4,
             base_delay_seconds=0.5,
             sleep=delays.append,
+            uniform=lambda lo, hi: hi / 2,
         )
-    assert delays == [0.5, 1.0, 2.0]
+    assert delays == [0.25, 0.5, 1.0]
 
 
 # ------------------------------------------------- 与嵌入客户端真实联通 ----

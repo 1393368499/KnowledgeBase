@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import json
 import secrets
 import sys
 
@@ -51,6 +52,10 @@ def _env_first(*names: str, default: str = "") -> str:
 # 所以预算不能按"输出字数"估。128 的预算会把正文挤成空串。
 KB_LLM_TIMEOUT_SECONDS = float(os.environ.get("KB_LLM_TIMEOUT_SECONDS", "60"))
 KB_LLM_MAX_TOKENS = int(os.environ.get("KB_LLM_MAX_TOKENS", "4096"))
+# Optional vendor extension for supported Qwen/vLLM endpoints. Unset keeps the
+# endpoint's default; do not send this extension to arbitrary API providers.
+KB_LLM_ENABLE_THINKING = (None if not os.environ.get("KB_LLM_ENABLE_THINKING", "").strip()
+                          else _env_bool("KB_LLM_ENABLE_THINKING", True))
 # 撰写文档正文长，单独给更大的预算与更长的超时
 KB_LLM_DOC_TIMEOUT_SECONDS = float(os.environ.get("KB_LLM_DOC_TIMEOUT_SECONDS", "180"))
 KB_LLM_DOC_MAX_TOKENS = int(os.environ.get("KB_LLM_DOC_MAX_TOKENS", "8192"))
@@ -64,6 +69,22 @@ KB_LLM_DOC_SOURCE_BYTES = int(os.environ.get("KB_LLM_DOC_SOURCE_BYTES", "160000"
 # 注意：必须在这里真正定义，否则 `getattr(settings, "KB_LLM_MAX_TOOL_ROUNDS", 3)`
 # 会永远拿默认值，环境变量设了也不生效（KB_LLM_TEMPERATURE 出过同样的问题）。
 KB_LLM_MAX_TOOL_ROUNDS = max(1, int(os.environ.get("KB_LLM_MAX_TOOL_ROUNDS", "3")))
+
+# Agentic RAG budgets cover planning, retrieval, reading, verification and final output.
+KB_RAG_ENABLED = _env_bool("KB_RAG_ENABLED", True)
+KB_RAG_MAX_SECONDS = float(os.environ.get("KB_RAG_MAX_SECONDS", "120"))
+KB_RAG_MAX_TOOL_CALLS = int(os.environ.get("KB_RAG_MAX_TOOL_CALLS", "12"))
+KB_RAG_MAX_LLM_CALLS = int(os.environ.get("KB_RAG_MAX_LLM_CALLS", "10"))
+KB_RAG_DEEP_ROUNDS = int(os.environ.get("KB_RAG_DEEP_ROUNDS", "6"))
+KB_RAG_READ_CHARS = int(os.environ.get("KB_RAG_READ_CHARS", "12000"))
+KB_RAG_EVIDENCE_CHARS = int(os.environ.get("KB_RAG_EVIDENCE_CHARS", "48000"))
+KB_RAG_VERIFY_SEMANTIC = _env_bool("KB_RAG_VERIFY_SEMANTIC", True)
+# Explicit module paths may be overridden by an environment JSON object.
+KB_RAG_MODULES = json.loads(os.environ.get("KB_RAG_MODULES", "{}"))
+KB_RAG_RETRIEVAL_POLICIES = json.loads(os.environ.get("KB_RAG_RETRIEVAL_POLICIES") or "null") or {
+    name: {"rerank": _env_bool("KB_RAG_USE_RERANK", False), "limit": 10}
+    for name in ("default", "fast", "deep", "statistics")
+}
 
 # ---- 采样模式：全系统统一 greedy（这是**客户端侧**的止血开关，别随手关）----
 # 背景（实测 2026-10-19，证据与复现步骤见 docs/as711-sophgo-vllm-mixed-sampling-crash.md）：
@@ -154,6 +175,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # 登录失败限速：必须在 AuthenticationMiddleware 之后（要读 request.user 判断成功/失败）
+    "governance.middleware.LoginThrottleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # 后端强制的不可篡改守卫，必须排在业务中间件之前生效（Django 自下而上执行，放最后即最先）
@@ -235,8 +258,19 @@ if not DEBUG and DATABASES["default"]["ENGINE"].endswith("sqlite3"):
 # ---------------------------------------------------------------------- 认证 ----
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 10},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# 登录失败限速（/app/login/ 与 /admin/login/ 共用口径）：
+# 同一 IP+用户名 连续失败达到上限后锁定一段时间，成功登录清零。
+# 计数落在 Django cache；生产（USE_REDIS_CACHE=1）为跨进程共享，单机开发为进程内。
+KB_LOGIN_MAX_ATTEMPTS = int(os.environ.get("KB_LOGIN_MAX_ATTEMPTS", "5"))
+KB_LOGIN_LOCKOUT_SECONDS = int(os.environ.get("KB_LOGIN_LOCKOUT_SECONDS", "900"))
 
 # 浏览器界面的登录入口：用我们自己的 session 登录页（不是 Basic，也不是 Django admin）
 LOGIN_URL = "/app/login/"
@@ -456,6 +490,19 @@ REST_FRAMEWORK = {
 KB_ACTION_TICKET_TTL_SECONDS = int(os.environ.get("KB_ACTION_TICKET_TTL_SECONDS", "180"))
 KB_DELETE_NAME_ATTEMPTS = int(os.environ.get("KB_DELETE_NAME_ATTEMPTS", "3"))
 KB_UPLOAD_MAX_BYTES = int(os.environ.get("KB_UPLOAD_MAX_BYTES", str(200 * 1024 * 1024)))
+# 上传相关的框架级内存上限。业务层 200 MiB 是**文件**上限；这里是请求体与内存缓冲上限：
+# - DATA_UPLOAD_MAX_MEMORY_SIZE 限制非文件请求体（JSON/表单），防止超大 JSON 把进程撑爆；
+# - FILE_UPLOAD_MAX_MEMORY_SIZE 决定文件何时从内存落到临时文件（超过即流式落盘）；
+# - DATA_UPLOAD_MAX_NUMBER_FILES 限制一次请求的文件数量。
+# Django 6.1.3 已修复 CVE-2026-108147（base64 分片上传绕过上述阈值整段缓冲），
+# 这里仍显式设限，避免换回旧版本或其它解析路径时失去保护。
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.environ.get("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", str(8 * 1024 * 1024))
+)
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.environ.get("DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE", str(4 * 1024 * 1024))
+)
+DATA_UPLOAD_MAX_NUMBER_FILES = int(os.environ.get("DJANGO_DATA_UPLOAD_MAX_NUMBER_FILES", "10"))
 KB_ALLOWED_UPLOAD_EXT = _env_list(
     "KB_ALLOWED_UPLOAD_EXT",
     # 图片格式不能漏：扫描件（.jpg/.png/…）是 P2 的 OCR 入口，解析器认、
@@ -482,6 +529,10 @@ KB_SEARCH_RESULT_LIMIT = int(os.environ.get("KB_SEARCH_RESULT_LIMIT", "10"))
 KB_SEARCH_USE_RERANK = _env_bool("KB_SEARCH_USE_RERANK", True)
 #: 重排最多送入多少条候选
 KB_RERANK_TOP_N = int(os.environ.get("KB_RERANK_TOP_N", "20"))
+#: 重排分数的最低区分度（max-min）。低于它说明重排分数饱和（模板重复合同实测
+#: 0.9844 vs 0.9922），此时保留 RRF 融合顺序，不让 0.008 的噪声决定排名。
+#: 设为 0 可强制始终采用重排顺序（旧行为）。
+KB_RERANK_MIN_SPREAD = float(os.environ.get("KB_RERANK_MIN_SPREAD", "0.05"))
 #: OCR 超时与单文件最多 OCR 页数（防止一本扫描书把服务打满）
 KB_OCR_TIMEOUT_SECONDS = int(os.environ.get("KB_OCR_TIMEOUT_SECONDS", "120"))
 KB_OCR_MAX_PAGES = int(os.environ.get("KB_OCR_MAX_PAGES", "200"))

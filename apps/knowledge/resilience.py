@@ -22,6 +22,7 @@ AS711 断开时**开发不能停**。所以外呼必须满足四条：
 from __future__ import annotations
 
 import logging
+import random
 import threading
 import time
 from collections.abc import Callable
@@ -653,8 +654,20 @@ def post_json(
     def once() -> Any:
         if model_calls_disabled():
             raise disabled_service(service)
+        from .request_budget import remaining
+        left = remaining()
+        request_kwargs = {}
+        if left is not None:
+            if left <= 0:
+                raise ServiceUnavailable(service, "本次查证时间预算已用尽")
+            configured = getattr(http, "timeout", None)
+            limits = [getattr(configured, name, None) for name in ("connect", "read", "write", "pool")]
+            request_kwargs["timeout"] = httpx.Timeout(**{
+                name: min(left, value) if isinstance(value, (float, int)) else left
+                for name, value in zip(("connect", "read", "write", "pool"), limits)
+            })
         try:
-            response = http.post(url, json=payload, headers=headers)
+            response = http.post(url, json=payload, headers=headers, **request_kwargs)
         except httpx.TimeoutException as exc:
             raise RetryableHttpError(f"请求超时：{exc}") from exc
         except httpx.HTTPError as exc:
@@ -686,7 +699,9 @@ def call_with_resilience(
     breaker: CircuitBreaker,
     max_attempts: int = 3,
     base_delay_seconds: float = 0.5,
+    max_delay_seconds: float = 30.0,
     sleep: Callable[[float], None] = time.sleep,
+    uniform: Callable[[float, float], float] | None = None,
 ) -> Any:
     """按"熔断 → 调用 → 分类失败 → 退避重试"执行一次外呼。
 
@@ -695,6 +710,14 @@ def call_with_resilience(
     - :class:`ServiceUnavailable`（熔断中）直接往外抛，不再叠加重试；
     - 可重试（``retryable=True`` 标记的异常，或 HTTP 5xx/429）→ 退避后重试；
     - 不可重试（4xx、维度不匹配、解析失败）→ 立刻抛，不浪费重试次数。
+
+    **退避带随机抖动（full jitter，规则 §4"退避和随机抖动"）**：第 n 次失败后睡
+    ``uniform(0, min(max_delay_seconds, base_delay_seconds * 2 ** (n-1)))``。
+    为什么必须抖动：web/worker 多进程往往在同一时刻遇到同一次模型服务抖动，
+    确定性退避（0.5s/1.0s/2.0s）会让它们在同一时刻重试，服务恢复瞬间被同一批
+    请求再打垮一次。抖动把重试时刻打散，``max_delay_seconds`` 是上限（防止长序列
+    退避无限增长）。随机源通过 ``uniform`` 注入：测试给确定值时**不依赖真实随机**，
+    也不 sleep 真实时间（``sleep`` 同样可注入）。
 
     注意（曾被 ruff F811 抓到）：这里原本还有一个**只有 docstring、没有函数体**的
     同名定义，被这一个静默覆盖。运行时行为是对的（后者生效），但死代码会让
@@ -731,14 +754,35 @@ def call_with_resilience(
                 ) from exc
             if not retryable:
                 raise
-            delay = base_delay_seconds * (2 ** (attempt - 1))
+            # full jitter：上限随尝试次数指数增长，但单次延迟取 [0, 上限] 的随机值。
+            # 指数部分仍保留"失败越多越慢"的语义；随机部分负责把多进程打散。
+            ceiling = max(
+                0.0,
+                min(
+                    float(max_delay_seconds),
+                    base_delay_seconds * (2 ** (attempt - 1)),
+                ),
+            )
+            jitter = random.uniform if uniform is None else uniform
+            delay = max(0.0, float(jitter(0.0, ceiling)))
+            from .request_budget import remaining
+            left = remaining()
+            if left is not None:
+                if left <= 0:
+                    raise ServiceUnavailable(
+                        service, "本次查证时间预算不足，已停止重试"
+                    ) from exc
+                # 预算不够睡满时**夹到剩余预算**：宁可最后一次尽快发出，也不要
+                # 睡过头把整个请求拖过总预算。
+                delay = min(delay, max(0.0, left))
             logger.warning(
-                "%s.%s 第 %d/%d 次失败（可重试），%.1fs 后重试：%s",
+                "%s.%s 第 %d/%d 次失败（可重试），%.2fs 后重试（抖动上限 %.2fs）：%s",
                 service,
                 operation,
                 attempt,
                 attempts,
                 delay,
+                ceiling,
                 exc,
             )
             sleep(delay)

@@ -41,7 +41,6 @@ from typing import Iterable
 from django.db import models
 
 from .immutable import (
-    APPEND_ONLY_ACTIONS,
     PARTIAL_DELETE_ACTIONS,
     ImmutableRecordError,
     GuardedOperationError,

@@ -48,6 +48,9 @@ def test_compose_document_is_registered_as_a_low_risk_writable_action():
     assert spec.permission == "library:read"
     assert spec.risk == operations.RISK_LOW
     assert spec.requires_destructive_flow is False
+    # 现行策略：只有删除保留人工确认；生成文档参数完整后直接执行
+    assert spec.requires_confirmation is False
+    assert spec.auto_execute is True
     # `template_id` 是这次新增的**可选**参数：不选就不用模板（用户明确要求的默认行为）
     assert set(spec.params) == {"title", "topic", "sources", "template_id"}
 
@@ -63,17 +66,24 @@ def test_compose_document_is_offered_to_the_model_as_a_tool():
     assert "title" in props and "topic" in props
 
 
-def test_compose_document_proposal_asks_for_one_confirmation(admin_user):
-    """从会话里提出来的是**一张待确认卡**（不写库、不直接生成）。"""
-    proposal = services.propose_operation(
-        admin_user,
-        intent="compose_document",
-        params={"title": "出行报告", "topic": "陶鑫宇 出差 陵水 海口东 车次"},
-    )
-    assert proposal["status"] == "proposed"
-    assert proposal["required_confirmations"] == 1
-    assert proposal["requires_destructive_flow"] is False
-    assert proposal["label"]
+def test_compose_document_requires_sources_and_leaves_no_confirmation_card(admin_user):
+    """现行协议：`sources` 为空 → 明确要求补齐、不落待确认卡；选好参考文件后直接生成。
+
+    ``docs/compose-document-reference-files-2026-10-19.md`` +
+    ``docs/delete-only-confirmation-2026-10-27.md``：指定参考文件后直接生成，
+    不再有"一次确认"这一步。
+    """
+    with pytest.raises(services.PlannerError) as exc:
+        services.propose_operation(
+            admin_user,
+            intent="compose_document",
+            params={"title": "出行报告", "topic": "陶鑫宇 出差 陵水 海口东 车次"},
+        )
+    assert "参考文件" in str(exc.value)
+    assert not OperationRecord.objects.exists(), "缺参考文件不应留下待确认卡"
+    spec = operations.get("compose_document")
+    assert spec.requires_confirmation is False
+    assert spec.auto_execute is True
 
 
 # ------------------------------------------------- 2) 搜索页不再渲染小字摘要 ----
@@ -106,10 +116,17 @@ def test_prototype_file_itself_is_untouched():
     """去掉的是**实现**里的渲染；原型文件一个字节都不许改（只读基线）。"""
     proto = _read("knowledge-base-prototype.html")
     assert '<div class="chunk">' in proto, "原型被改了（它应当保持只读）"
-    # 这次新增的样式只进实现自己的样式表，不写进原型 CSS
-    proto_css = _read("apps/webui/static/webui/kb-proto.css")
-    assert ".doc-list-row" not in proto_css
-    assert ".doc-del" not in proto_css
+    # 死代码清理（2026-11-11 全栈复审 P1）：`kb-proto.css`（29 KB）没有任何页面
+    # 或脚本引用，属于死文件，已删除。反向守卫：它不能复活，也不能再被模板/JS 引入
+    # —— 引入一个不存在的样式表会让页面裸奔，而且这种回归不会有人报错。
+    root = Path(__file__).resolve().parent.parent
+    proto_css = root / "apps/webui/static/webui/kb-proto.css"
+    assert not proto_css.exists(), "kb-proto.css 是无引用的死文件，已删除，不能复活"
+    webui_root = root / "apps/webui"
+    for pattern in ("static/webui/*.js", "templates/**/*.html"):
+        for path in webui_root.glob(pattern):
+            text = path.read_text(encoding="utf-8")
+            assert "kb-proto.css" not in text, f"{path} 仍在引用已删除的 kb-proto.css"
 
 
 # --------------------------------- 3) 空正文的助手消息不再只剩一个空白气泡 ----
@@ -156,15 +173,25 @@ def test_assistant_message_call_site_passes_payload():
 
 
 def _compose_via_controlled(user, params: dict):
+    """提案即生成（现行策略：非删除动作零人工确认），返回执行结果体。"""
     proposal = services.propose_operation(user, intent="compose_document", params=params)
+    assert proposal["auto_executed"] is True, proposal
+    assert proposal["confirm_token"] == ""
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    return services.execute_operation(user, operation)["result"]
+    assert operation.status == OperationRecord.Status.EXECUTED, operation.status
+    return proposal["result"]
 
 
-def test_propose_accepts_a_file_name_in_sources(admin_user, library, make_file):
+def test_propose_accepts_a_file_name_in_sources(admin_user, library, make_file, monkeypatch):
     record = make_file(library, "陶鑫宇提交的出差申请202610132300000331266.pdf")
+    captured: dict = {}
+
+    def fake_compose(user, *, title, topic, conversation=None, library_codes=None,
+                     source_file_ids=None, template_id=None, client=None):
+        captured.update(source_file_ids=source_file_ids, library_codes=library_codes)
+        return {"document_id": 4241, "title": title}
+
+    monkeypatch.setattr(services, "compose_document", fake_compose)
     proposal = services.propose_operation(
         admin_user,
         intent="compose_document",
@@ -174,7 +201,9 @@ def test_propose_accepts_a_file_name_in_sources(admin_user, library, make_file):
             "sources": [record.original_name],
         },
     )
-    assert proposal["status"] == "proposed", "文件名来源又把整张待办卡弄废了"
+    assert proposal["status"] == OperationRecord.Status.EXECUTED, "文件名来源又把提案弄废了"
+    assert proposal["auto_executed"] is True
+    assert captured["source_file_ids"] == [record.pk]
 
 
 def test_target_library_ids_resolves_file_name_to_its_library(admin_user, library, make_file):
@@ -256,9 +285,15 @@ def test_execute_reports_sources_it_could_not_resolve(admin_user, monkeypatch, l
 # 认资料 id），拒绝它属于把合法输入枪毙。
 
 
-def test_propose_accepts_integer_file_ids_in_sources(admin_user, library, make_file):
+def test_propose_accepts_integer_file_ids_in_sources(admin_user, library, make_file, monkeypatch):
     first = make_file(library, "海口东-陵水.pdf")
     second = make_file(library, "陵水-海口东.pdf")
+
+    def fake_compose(user, *, title, topic, conversation=None, library_codes=None,
+                     source_file_ids=None, template_id=None, client=None):
+        return {"document_id": 4242, "title": title}
+
+    monkeypatch.setattr(services, "compose_document", fake_compose)
     proposal = services.propose_operation(
         admin_user,
         intent="compose_document",
@@ -268,7 +303,8 @@ def test_propose_accepts_integer_file_ids_in_sources(admin_user, library, make_f
             "sources": [first.pk, second.pk],
         },
     )
-    assert proposal["status"] == "proposed", "数字 id 来源又把待办卡弄废了"
+    assert proposal["status"] == OperationRecord.Status.EXECUTED, "数字 id 来源又把提案弄废了"
+    assert proposal["auto_executed"] is True
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
     assert operation.params["sources"] == [str(first.pk), str(second.pk)], (
         "数字 id 应当归一成字符串存库，避免同一份资料有两种写法"
