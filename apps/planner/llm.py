@@ -343,6 +343,9 @@ class LlmClient:
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = tool_choice
+        thinking = getattr(settings, "KB_LLM_ENABLE_THINKING", None)
+        if thinking is not None:
+            payload["chat_template_kwargs"] = {"enable_thinking": bool(thinking)}
         if message_size(messages, tools) > input_budget(self.profile):
             raise LLMError("本次资料超出模型的安全上下文预算；请分批整理资料后再生成，未发送超长请求")
         headers = {"Content-Type": "application/json"}

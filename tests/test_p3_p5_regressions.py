@@ -220,7 +220,7 @@ def test_assistant_unavailable_does_not_fabricate_answer(user):
 
 
 def test_single_system_message_with_context(
-    library, make_file, user, grant_member, monkeypatch
+    library, make_file, user, grant_member, monkeypatch, settings
 ):
     """带检索上下文时，发出去的载荷**只有一条 system 且在最前**。
 
@@ -231,13 +231,16 @@ def test_single_system_message_with_context(
     """
     grant_member(library, user)
     record = _chunked(library, make_file, name="合同.md", count=2)
+    from apps.planner.rag.contracts import Evidence
+    evidence = Evidence.from_chunk(record.chunks.select_related("file__library").first()).to_dict()
+    settings.KB_RAG_VERIFY_SEMANTIC = False
     conversation = Conversation.objects.create(user=user)
 
     captured: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["payload"] = json.loads(request.content.decode("utf-8"))
-        return _text_reply("已根据资料回答。")
+        return _text_reply(f"已根据资料回答。[{evidence['evidence_id']}]")
 
     # 让检索**一定**返回片段，确保走的是"带上下文"那条分支。
     # 注意：reply_to_message 现在调用的是**结构化入口** build_context_report
@@ -248,6 +251,7 @@ def test_single_system_message_with_context(
         "build_context_report",
         lambda _user, _q, **kw: {
             "context": f"《{record.original_name}》\n质保期 12 个月。",
+            "evidence": [evidence],
             # 健康：不降级，因此不会额外插入"检索范围说明"
             "degraded": False,
             "degraded_reason": "",
@@ -258,14 +262,14 @@ def test_single_system_message_with_context(
     payload = services.reply_to_message(
         user, conversation, "质保期多久？", client=_fake_llm(handler)
     )
-    assert payload["content"] == "已根据资料回答。"
+    assert payload["content"].startswith("已根据资料回答。")
     sent = captured["payload"]["messages"]
     roles = [message["role"] for message in sent]
     assert roles.count("system") == 1, roles
     assert roles[0] == "system", roles
     # 资料并进了这一条 system，并标注为不可信引用数据
     system_content = sent[0]["content"]
-    assert "质保期 12 个月" in system_content
+    assert evidence["text"] in system_content
     assert services.UNTRUSTED_CONTEXT_HEADER.split("\n")[0] in system_content
     # 指令部分仍在最前面
     assert system_content.startswith(services.SYSTEM_PROMPT)
@@ -851,7 +855,6 @@ def test_lease_conflict_blocks_deletion(admin_user, library, make_file):
 
 def test_search_drops_residual_vectors_of_deleted_file(db, library):
     """删除后残留向量**不得**出现在检索结果里（tombstone + fail-closed）。"""
-    from apps.knowledge import vectorindex
     from apps.knowledge.pipeline import _drop_tombstoned
 
     class _Candidate:
@@ -991,7 +994,7 @@ def test_delete_grant_is_required_and_consumed(admin_user, library, make_file):
     assert grant.consumed_at is None
 
     # 没有授权时删除应被触发器拒绝
-    from django.db import IntegrityError, transaction
+    from django.db import transaction
 
     other = _chunked(library, make_file, name="没有授权.md")
     with pytest.raises(Exception):

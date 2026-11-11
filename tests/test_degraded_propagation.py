@@ -40,7 +40,7 @@ def setup_env():
     return user, Conversation.objects.create(user=user, title="会话")
 
 
-def test_scope_note_is_delivered_and_degraded_is_retained(monkeypatch, setup_env):
+def test_scope_note_is_delivered_and_degraded_is_retained(monkeypatch, setup_env, settings):
     """有上下文**且**降级时：模型必须收到范围说明；API/历史消息都要保留 degraded。
 
     这条回归针对两个真实缺陷：
@@ -49,12 +49,16 @@ def test_scope_note_is_delivered_and_degraded_is_retained(monkeypatch, setup_env
     - 只在前端插一条 DOM 提示，重渲染就丢；必须写进消息 payload。
     """
     user, conversation = setup_env
+    from apps.planner.rag.contracts import Evidence
+    evidence = Evidence.from_chunk(DocumentChunk.objects.select_related("file__library").first()).to_dict()
+    settings.KB_RAG_VERIFY_SEMANTIC = False
 
     monkeypatch.setattr(
         services,
         "build_context_report",
         lambda *a, **k: {
             "context": "[质保期.txt] 质保期 36 个月。",
+            "evidence": [evidence],
             "degraded": True,
             "degraded_reason": "部分信息库的向量检索不可用；结果可能不完整",
             "failed_collections": [{"collection": "kb-9-g1", "reason": "OutputTooSmall"}],
@@ -67,7 +71,7 @@ def test_scope_note_is_delivered_and_degraded_is_retained(monkeypatch, setup_env
     class FakeClient:
         def chat(self, messages, tools=None):
             seen["messages"] = messages
-            return LlmReply(content="质保期为 36 个月。", model="fake", finish_reason="stop")
+            return LlmReply(content=f"质保期为 36 个月。[{evidence['evidence_id']}]", model="fake", finish_reason="stop")
 
     payload = services.reply_to_message(user, conversation, "质保期多久", client=FakeClient())
 

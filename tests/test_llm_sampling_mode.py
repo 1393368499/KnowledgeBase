@@ -99,3 +99,14 @@ def test_sampling_settings_exist_so_env_vars_actually_work():
     """回归：原先 ``KB_LLM_TEMPERATURE`` 只在 getattr 兜底里出现，写环境变量也不生效。"""
     assert hasattr(django_settings, "KB_LLM_GREEDY_ONLY")
     assert hasattr(django_settings, "KB_LLM_TEMPERATURE")
+
+
+@pytest.mark.parametrize("value", [None, False, True])
+def test_vendor_thinking_extension_is_explicit_and_optional(value, captured_payloads):
+    with override_settings(KB_LLM_ENABLE_THINKING=value):
+        _chat(llm_module.LlmProfile(base_url="http://llm.example/v1", model="test"))
+    if value is None:
+        assert "chat_template_kwargs" not in captured_payloads[0]
+    else:
+        assert captured_payloads[0]["chat_template_kwargs"] == {"enable_thinking": value}
+    assert captured_payloads[0]["temperature"] == 0.0

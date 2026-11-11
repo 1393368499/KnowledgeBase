@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from apps.knowledge import preview, storage
+from apps.knowledge import parsers, preview, storage
 
 PDF_URL = "/api/v1/knowledge/files/{pk}/preview/"
 PAGE_URL = "/api/v1/knowledge/files/{pk}/preview/pages/{page}/"
@@ -113,6 +113,17 @@ def test_ooxml_entry_count_guard(monkeypatch, tmp_path):
     with pytest.raises(ValueError) as exc:
         preview._guard_ooxml(target)
     assert "条目过多" in str(exc.value)
+
+
+def test_xlsx_ingestion_rejects_oversized_expanded_package(monkeypatch):
+    import zipfile
+
+    raw = io.BytesIO()
+    with zipfile.ZipFile(raw, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("xl/worksheets/sheet1.xml", b" " * 2_000)
+    monkeypatch.setattr(parsers, "MAX_ZIP_UNCOMPRESSED", 1_000)
+    with pytest.raises(parsers.ParseError, match="解压后过大"):
+        parsers.parse_bytes(raw.getvalue(), "oversized.xlsx")
 
 
 def test_pdf_scale_nan_or_inf_is_rejected(db, user, auth_api, make_library, make_file, grant_member):

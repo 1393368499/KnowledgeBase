@@ -18,7 +18,7 @@ from __future__ import annotations
 import pytest
 
 from apps.planner import services
-from apps.planner.operations import DESTRUCTIVE_SCOPES, all_specs, is_mutation
+from apps.planner.operations import DESTRUCTIVE_SCOPES, all_specs
 
 pytestmark = pytest.mark.django_db
 
@@ -54,7 +54,7 @@ def test_param_kinds_are_supported():
     改成直接枚举：既挡住没实现的 kind（会静默落到 str 分支），也挡住"某个 kind
     已经没有任何操作在用"（说明校验器里留了死分支）。
     """
-    supported = {"int", "str", "refs"}
+    supported = {"int", "uint", "str", "refs"}
     used: set[str] = set()
     for spec in all_specs():
         for name, declared in spec.params.items():

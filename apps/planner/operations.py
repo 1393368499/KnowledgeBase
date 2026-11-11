@@ -82,11 +82,13 @@ def is_mutation(intent: str) -> bool:
 
 
 # ------------------------------------------------------------------ 只读类 ----
-register(OperationSpec("list_files", "列出资料", {"status": "str?", "library": "str?"},
-                       permission="library:read", summary="按状态/信息库列出已入库资料"))
+register(OperationSpec("list_files", "列出资料",
+                       {"status": "str?", "library": "str?", "after_id": "uint?", "limit": "int?",
+                        "customer": "str?", "department": "str?"},
+                       permission="library:read", summary="分页枚举资料清单；has_more=true 时用 next_after_id 继续，不能把首批当全部"))
 register(OperationSpec(
     "search_knowledge", "搜索知识库",
-    {"query": "str", "library": "str?", "customer": "str?", "department": "str?", "amount": "str?"},
+    {"query": "str", "library": "str?", "customer": "str?", "department": "str?", "amount": "str?", "strategy": "str?"},
     permission="library:read",
     # 与其它非删除意图一样，校验通过后直接执行。
     auto_execute=True,
@@ -135,6 +137,27 @@ register(OperationSpec("test_model_services", "测试模型服务连通", {"prob
                        summary="检查 AS711 四个模型服务的**配置状态**（默认不发探测请求）"))
 register(OperationSpec("read_file", "查看资料详情", {"file_id": "int"},
                        permission="library:read"))
+register(OperationSpec(
+    "read_passages", "读取资料原文",
+    {"file_id": "int", "start_ordinal": "uint?", "limit": "int?", "page": "int?",
+     "char_offset": "uint?", "expected_version": "str?"},
+    summary="按段号或页码读取正文及证据ID；有 next_cursor 时可继续读取，char_offset 用于长段续读",
+))
+register(OperationSpec(
+    "find_related_files", "查找关联资料",
+    {"file_id": "int", "relation_query": "str"},
+    summary="在原资料所在库搜索主合同、补充协议或附件候选；关系必须再读原文核实，不能仅凭文件名确定",
+))
+register(OperationSpec(
+    "research_plan", "记录查证任务",
+    {"tasks": "refs", "missing": "refs?"},
+    summary="记录本次查证的简短子问题与缺失证据；tasks/missing 为文字数组，不是文件ID，不记录内部思考",
+))
+register(OperationSpec(
+    "calculate_evidence", "根据原文精确计算",
+    {"operation": "str", "items": "str", "unit": "str"},
+    summary='精确十进制计算 sum/difference/average/min/max/count；items 为JSON数组，每项含 file_id、ordinal、version、value、quote；quote必须为含该数值及相邻单位的逐字原文。unit须统一，不自动换算，不代表全库统计',
+))
 register(OperationSpec("list_audit", "查看审计事件", {"action": "str?", "limit": "int?"},
                        permission="audit:read"))
 register(OperationSpec("guide", "系统使用说明", {}, permission="library:read"))

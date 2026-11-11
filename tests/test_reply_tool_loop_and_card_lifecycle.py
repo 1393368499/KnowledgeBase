@@ -123,7 +123,7 @@ def test_search_result_is_fed_back_and_answer_is_plain_text(
     second = seen[1]["messages"]
     tool_messages = [item for item in second if item.get("role") == "tool"]
     assert tool_messages, "第二轮必须把检索结果作为 tool 消息喂回模型"
-    assert "陶鑫宇" in tool_messages[0]["content"]
+    assert "没有可核对的原文证据" in tool_messages[0]["content"]
     assert "出差申请.pdf" in tool_messages[0]["content"]
     assistant_turns = [
         item for item in second
@@ -168,25 +168,26 @@ def test_loop_is_capped_and_does_not_spin_forever(user, library, grant_member, s
     assert len(seen) == rounds + 1
     assert "tools" not in seen[-1], "最后一轮必须关掉工具，避免模型再调工具"
     # 背景检索 1 次（回复前的上下文检索）+ 每轮工具调用各 1 次
-    assert len(search_calls) == 1 + rounds, "每一轮都只执行一次检索"
-    assert payload["content"] == "根据资料，出差的是陶鑫宇。"
+    assert len(search_calls) == 2, "背景检索一次，相同工具查询只执行一次，其余轮次回填重复提示"
+    assert payload["content"].startswith("根据资料，出差的是陶鑫宇。")
+    assert payload["research"]["stop_reason"] == "round_limit"
 
 
-def test_write_operation_still_stops_at_pending_card(admin_user, library, make_file):
-    """写操作不代用户执行：只提案一次、只问模型一次。"""
+def test_delete_operation_still_stops_at_pending_card(admin_user, library, make_file):
+    """Only deletion still waits for confirmation under the current policy."""
     record = make_file(library=library, name="要归档.md")
     seen: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(json.loads(request.content))
-        return _response(_call_payload("classify_file", {"file_id": record.pk, "classification": "合同"}))
+        return _response(_call_payload("delete_file", {"file_id": record.pk}))
 
     conversation = _conversation(admin_user)
     payload = services.reply_to_message(
-        admin_user, conversation, "归档这份资料", client=_fake_llm(handler)
+        admin_user, conversation, "删除这份资料", client=_fake_llm(handler)
     )
 
-    assert len(seen) == 1, "写操作没有可回填的结果，不该再多问模型一轮"
+    assert len(seen) == 1, "删除尚未执行，没有可回填的结果"
     assert payload["proposals"][0]["status"] == OperationRecord.Status.PROPOSED
     assert payload["proposals"][0]["confirm_token"]
 
@@ -223,9 +224,9 @@ def test_conversation_hides_finished_cards_but_keeps_pending(
         conversation=conversation,
     )
     assert executed["status"] == OperationRecord.Status.EXECUTED
-    # 写操作：待确认 → 卡片必须出现
+    # 删除：待确认 → 卡片必须出现
     pending = services.propose_operation(
-        admin_user, intent="classify_file", params={"file_id": record.pk, "classification": "合同"},
+        admin_user, intent="delete_file", params={"file_id": record.pk},
         conversation=conversation,
     )
     assert pending["status"] == OperationRecord.Status.PROPOSED
@@ -248,8 +249,8 @@ def test_executed_card_disappears_after_execution(admin_user, library, make_file
         conversation=conversation,
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(admin_user, operation, token=proposal["confirm_token"])
-    services.execute_operation(admin_user, operation)
+    assert operation.status == OperationRecord.Status.EXECUTED
+    assert not proposal.get("confirm_token")
 
     api.force_authenticate(user=admin_user)
     response = api.get(reverse("planner:conversation", args=[conversation.pk]))
@@ -263,7 +264,7 @@ def test_abandoned_and_expired_cards_are_hidden(admin_user, library, make_file, 
     record = make_file(library=library, name="要归档.md")
     conversation = _conversation(admin_user)
     proposal = services.propose_operation(
-        admin_user, intent="classify_file", params={"file_id": record.pk, "classification": "合同"},
+        admin_user, intent="delete_file", params={"file_id": record.pk},
         conversation=conversation,
     )
     operation = OperationRecord.objects.get(pk=proposal["operation_id"])
@@ -320,5 +321,6 @@ def test_round_budget_override_keeps_the_forced_answer(
         )
 
     assert len(seen) == budget + 1
-    assert payload["content"] == "出差的是陶鑫宇。"
-    assert len(search_calls) == 1 + budget
+    assert payload["content"].startswith("出差的是陶鑫宇。")
+    assert payload["research"]["stop_reason"] == "round_limit"
+    assert len(search_calls) == 2

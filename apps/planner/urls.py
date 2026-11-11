@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.urls import path
+from .rag.views import EvidenceView, ResearchRecordView
 
 from .views import (
     ChatView,
@@ -27,6 +28,8 @@ from .views import (
 app_name = "planner"
 
 urlpatterns = [
+    path("planner/evidence/<int:pk>/", EvidenceView.as_view(), name="evidence"),
+    path("planner/research-record/<int:pk>/", ResearchRecordView.as_view(), name="research-record"),
     path('planner/operations/progress/', OperationProgressView.as_view(), name='operation-progress'),
     # 能力目录（静态登记表，与"我的操作记录"是两件事，路径必须分开）
     path("planner/catalog/", OperationCatalogView.as_view(), name="operation-catalog"),

@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -40,7 +41,7 @@ from .embedding import EmbeddingError, embed_for_indexing, embed_texts
 from .models import DocumentChunk, IngestedFile, ParseStatus, VectorCollection
 from governance.immutable import ImmutableRecordError
 from .ocr import OcrClient
-from .parsers import ParsedBlock, ParseError
+from .parsers import ParsedBlock
 from .rerank import RerankClient
 from .resilience import ServiceUnavailable
 from .vectorindex import VectorPoint
@@ -2246,6 +2247,19 @@ def search(
 
         report["dense_hits"] = len(dense)
         report["sparse_hits"] = len(sparse)
+        # 如实说明稀疏这一路是怎么走到 0 条的，别让"0 命中"看起来像"库里没有"：
+        # 中文在 Qdrant 全文索引里会被当成整串（无空格分词），MatchText 基本命不中，
+        # 真正的关键词保底由下面的 DB 关键词兜底承担。
+        if sparse:
+            report["sparse_mode"] = "match_text"
+        elif query.strip() and re.search(r"[\u4e00-\u9fff]", query):
+            report["sparse_mode"] = "cjk_whole_token"
+            report["sparse_note"] = (
+                "中文查询在 Qdrant 全文索引上是整串 token，MatchText 难以命中；"
+                "关键词保底已由数据库二元组匹配承担"
+            )
+        else:
+            report["sparse_mode"] = "empty"
         from . import filename_search
         filename_hits = filename_search.recall(
             query=query, library_ids=keyword_library_ids, limit=max(limit, sparse_top_k),
@@ -2309,10 +2323,27 @@ def search(
                             payload=payload,
                         )
                     )
-                if reordered:
-                    fused = reordered
-                report["rerank"]["applied"] = True
-                report["rerank"]["model"] = reranker.profile.model
+                min_spread = float(getattr(settings, "KB_RERANK_MIN_SPREAD", 0.05))
+                apply_rerank, spread = _should_apply_rerank(
+                    [hit.score for hit in hits], min_spread
+                )
+                report["rerank"]["score_spread"] = round(spread, 6)
+                report["rerank"]["min_spread"] = min_spread
+                if not apply_rerank:
+                    # 分数饱和：重排没有提供可用的区分度，保留 RRF 顺序。
+                    # 见 _rerank_spread 的说明与 evals/BASELINE.md 的实测数字。
+                    report["rerank"]["applied"] = False
+                    report["rerank"]["skipped"] = "saturated"
+                    report["rerank"]["model"] = reranker.profile.model
+                    report["rerank"]["reason"] = (
+                        f"重排分数饱和（max-min={spread:.4f} < {min_spread}），"
+                        "已保留融合排序，未采用重排顺序"
+                    )
+                else:
+                    if reordered:
+                        fused = reordered
+                    report["rerank"]["applied"] = bool(reordered)
+                    report["rerank"]["model"] = reranker.profile.model
             except Exception as exc:  # noqa: BLE001 - 重排失败不该让检索整体失败
                 # **任何**重排异常都必须标"降级"，不只是"服务不可用"。
                 #
@@ -2374,6 +2405,34 @@ def search(
 MIN_KEYWORD_LEN = 2
 
 
+def _rerank_spread(scores: list[float]) -> float:
+    """重排分数的区分度（max-min）。
+
+    为什么需要它（实测基线 ``evals/BASELINE.md``）：合同模板高度重复时，
+    ``bge-reranker-large`` 对"正确段 / 错误兄弟段"的分数会饱和在 0.98~0.99——
+    实测 0.9844（正确）vs 0.9922（错误），只差 0.008 的噪声，却足以把 RRF 排好的
+    顺序整个掀翻：Recall@5 0.90 → 0.50，P50 延迟 1543ms → 2992ms。
+
+    分数挤在一起说明重排没有提供可用区分度，此时应当保留融合顺序，
+    而不是让 0.008 的抖动决定用户看到什么。
+    """
+    if len(scores) < 2:
+        return 0.0
+    return max(scores) - min(scores)
+
+
+def _should_apply_rerank(scores: list[float], min_spread: float) -> tuple[bool, float]:
+    """重排是否值得采用：返回 ``(是否采用, 本次区分度)``。
+
+    少于两条候选时没有"排序"可谈，直接采用（保持旧行为）；
+    其余情况按 ``_rerank_spread`` 的门槛判断，饱和就保留融合顺序。
+    """
+    if len(scores) < 2:
+        return True, 0.0
+    spread = _rerank_spread(scores)
+    return spread >= min_spread, spread
+
+
 def _db_keyword_search(
     *,
     query: str,
@@ -2389,17 +2448,19 @@ def _db_keyword_search(
     - AS711 掉线时语义那一路根本不可用。
 
     这些情况下"关键字能搜到"是系统的基本可用性，不能退化成空结果。
-    做法是按词切分查询串，对 ``DocumentChunk.text`` 做 icontains 匹配
-    （SQLite 与 PostgreSQL 都支持，行为一致、可解释），命中越多的排序越前。
+    做法是用 :mod:`apps.knowledge.textquery` 切词（拉丁词 + 中文二元组），
+    对 ``DocumentChunk.text`` 做 icontains 匹配（SQLite 与 PostgreSQL 都支持，
+    行为一致、可解释），**覆盖查询词越多**的片段排得越前。
+
+    中文为什么必须走二元组：按空白切词时"预付款比例"整串只是一个词，去掉空格的
+    连续中文查询几乎全灭（实测离线词法 Recall@5 88% → 12%，纯中文问句 0 命中）。
     权限用 ``permission_code`` 在数据库层过滤——与向量检索同一套权限码。
     """
-    import re
-
     from django.db.models import Q
 
-    terms = [term for term in re.split(r"[\s\W_]+", query) if len(term) >= MIN_KEYWORD_LEN]
-    if re.fullmatch(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+", query.strip()):
-        terms = [query.strip()]
+    from .textquery import coverage, terms as query_terms
+
+    terms = query_terms(query)
     if not terms:
         return []
     if not library_ids:
@@ -2418,8 +2479,9 @@ def _db_keyword_search(
 
     scored: list[tuple[int, DocumentChunk]] = []
     for chunk in queryset.order_by("file_id", "ordinal")[: limit * 5]:
-        hits = sum(1 for term in terms if term.lower() in chunk.text.lower())
-        scored.append((hits, chunk))
+        hits = coverage(chunk.text, terms)
+        if hits:
+            scored.append((hits, chunk))
     scored.sort(key=lambda item: (-item[0], item[1].file_id, item[1].ordinal))
 
     candidates = []

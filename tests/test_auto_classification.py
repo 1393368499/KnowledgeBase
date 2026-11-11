@@ -146,14 +146,12 @@ def ai_library(library, isolated_paths, qdrant_client):
 
 
 def _run_classify(user, file_id: int, value: str) -> dict:
-    """人工纠正走**真实受控路径**：提案 → 确认 → 执行。"""
+    """人工纠正走当前受控路径，获准后直接执行。"""
     proposal = services.propose_operation(
         user, intent="classify_file", params={"file_id": file_id, "classification": value}
     )
-    operation = OperationRecord.objects.get(pk=proposal["operation_id"])
-    services.confirm_operation(user, operation, token=proposal["confirm_token"])
-    operation.refresh_from_db()
-    return services.execute_operation(user, operation)["result"]
+    assert proposal["status"] == OperationRecord.Status.EXECUTED
+    return proposal["result"]
 
 
 #: 与「性质」相关的审计事件：值变化（`file_classified`）与

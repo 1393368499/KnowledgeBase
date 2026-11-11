@@ -28,9 +28,10 @@ import math
 import os
 import re
 import threading
-import zipfile
 from pathlib import Path
 from typing import Any
+
+from .parsers import MAX_ZIP_ENTRIES, MAX_ZIP_UNCOMPRESSED, guard_ooxml_size
 
 #: 文本类预览的最大字节数（超出即截断，并如实标注 truncated）
 MAX_TEXT_BYTES = 200_000
@@ -51,9 +52,6 @@ MAX_PDF_BYTES = 200 * 1024 * 1024
 #: 但仍然强制"路径 == 本记录的内容寻址路径"（因此不可能指向他人 blob），
 #: 并在元数据里如实报告 `hash_verified=False`。
 MAX_VERIFY_BYTES = 64 * 1024 * 1024
-#: OOXML（docx/xlsx）压缩包防护：条目数与**解压后总量**上限（防 zip bomb）
-MAX_ZIP_ENTRIES = 2_000
-MAX_ZIP_UNCOMPRESSED = 200 * 1024 * 1024
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -289,20 +287,7 @@ def _read_text_preview(path: Path) -> tuple[str, bool]:
 
 
 def _guard_ooxml(path: Path) -> None:
-    """OOXML 压缩包防护：条目数与**解压后总量**上限（防 zip bomb）。
-
-    注意：`ZipInfo.file_size` 是压缩包头里声明的值，理论上可伪造；
-    因此这里还额外限制**单个成员**的解压上限，解析库自身也会按需读取。
-    """
-    with zipfile.ZipFile(path) as archive:
-        infos = archive.infolist()
-        if len(infos) > MAX_ZIP_ENTRIES:
-            raise ValueError(f"压缩包条目过多（{len(infos)} > {MAX_ZIP_ENTRIES}）")
-        total = sum(info.file_size for info in infos)
-        if total > MAX_ZIP_UNCOMPRESSED:
-            raise ValueError(
-                f"压缩包解压后过大（{total} > {MAX_ZIP_UNCOMPRESSED} 字节）"
-            )
+    guard_ooxml_size(path, max_entries=MAX_ZIP_ENTRIES, max_bytes=MAX_ZIP_UNCOMPRESSED)
 
 
 def _docx_blocks(path: Path) -> tuple[list[dict[str, Any]], bool]:
