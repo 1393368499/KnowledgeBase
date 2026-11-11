@@ -1,4 +1,4 @@
-# 智库 · 全栈开发规则对照检查
+﻿# 智库 · 全栈开发规则对照检查
 
 日期 2026-11-11（Asia/Shanghai）。检查对象：`D:\AProjectScript\KnowledgeBase`，Git HEAD `e77cbd9`（2026-10-27）+ 工作区未提交候选（审查开始时 `git status` 138 项，其中 77 个修改文件 +2470/−1160，147 个未跟踪新文件；本轮新增的报告与证据目录使其变为 139 项）。规则基线：`D:\WorkSpace\_study\全栈开发规则.md`（2026-11-09 共享定稿）。运行环境：本机 11 个容器在运行（web/worker/scheduler/postgres/redis/qdrant/office/voice-*），`knowledgebase:app` = `sha256:f4412ae9…4044`。
 
@@ -108,3 +108,18 @@
 
 - 分线报告：`artifacts/review/fullstack-rules-20261111/01-selection-licenses.md`、`03-frontend.md`、`04-backend-security.md`、`05-delivery.md`
 - 证据：同目录 `logs/`（测试、冒烟、Django 检查、镜像与快照、失败清单对比）、`shots/`（59 张浏览器截图）、`browser-evidence*.json`、`visual-structure.json`、`test-quality-scan.txt`
+
+## 八、整改后状态（2026-11-11 12:00–13:15）
+
+用户当日要求：删掉 LibreOffice（宿主弹窗干扰）、处理复审问题、升级 Django。整改记录见 `docs/remediation-2026-11-11.md`，延期项见 `docs/deferral-register-2026-11-11.md`。
+
+- **LibreOffice 依赖已彻底移除**：应用镜像与宿主路径都不再调用 soffice（容器内 `command -v soffice` = ABSENT，测试/复验期间 `Get-Process soffice` = 0）；旧版 Office 与 DOCX→PDF 全部由隔离 office 服务完成，容器内合成 DOCX 转换返回真实 `%PDF-`（9,896 字节）。
+- **Django 已升级 6.1.3**（psycopg 3.3.8 同步）；容器内实测版本 6.1.3 / 3.3.8。
+- **两轮全量回归 0 失败**：SQLite 1745 项（1694 通过 / 51 跳过 / 0 失败），PostgreSQL 1745 项（1717 通过 / 28 跳过 / 0 失败）——原 38 项常红清零，且两库失败集为空。
+- **静态检查/自检**：ruff All checks passed；`manage.py check` 0 issues；`makemigrations --check` 无变更。
+- **供应链**：基础镜像钉 digest、compose 钉 postgres/redis digest、构建记录写入 digest、worker 补 `--no-deps`+`pip check`、CI 工作流与 ruff 配置入库。
+- **安全与可靠性**：错误详情收敛、重试抖动、停用库不可读、登录限速、密码校验器、设备协议版本校验、Qdrant 版本可见性；新增 4 组安全回归用例。
+- **前端无障碍**：3 项 P1 已修并用真实 Chromium 复验（弹窗 dialog 语义/背景 inert/焦点 12 次 Tab 零逃逸、10/10 复选框可访问名、搜索 aria-live、控件边框 3.17:1、四档视口零溢出零 console 错误）。
+- **交付与恢复**：PG 备份恢复演练 0.84 秒、完整性计数与在线库一致；RPO ≤24h / RTO ≤4h 已写入 `docs/backup-restore-policy.md`；候选已整理为 12 个逻辑提交，构建记录 `snapshots/builds/20261111-130007-build.json`，最终镜像 `sha256:59a7ce71…39850`。
+
+仍保留为**已登记延期**：管理入口 MFA、HTTPS 强制、voice-asr/qdrant 非 root、解析沙箱、OpenAPI、pypdf/celery 大版本、真实屏读器、真实 CWV、滚动发布共存、字体商用授权、Redis/psycopg 许可评估、向量冷备 SHA 清单、页面层字面色值收敛、Python 依赖 hash 锁定、宽泛异常逐项审查。这些项已记录影响、替代控制、责任人与期限（批准人待项目负责人签字）。

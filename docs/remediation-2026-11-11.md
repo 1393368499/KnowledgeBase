@@ -1,4 +1,4 @@
-# 2026-11-11 复审整改记录
+﻿# 2026-11-11 复审整改记录
 
 依据：[全栈规则复审报告](fullstack-rules-check-2026-11-11.md)、四条分线证据（`artifacts/review/fullstack-rules-20261111/`）。
 本轮目标：删掉 LibreOffice（用户明确要求，宿主会拉起 soffice 弹窗）、修复复审可修项、升级 Django、重建并重部署、两轮回归全绿。
@@ -44,7 +44,7 @@
 
 - **Django 检查**：`manage.py check` 0 issues；`makemigrations --check --dry-run` No changes detected。
 - **静态检查**：`ruff check apps config governance tests scripts` → All checks passed。
-- **回归**：SQLite 全量、PostgreSQL 全量见下方"验证日志"；两轮 0 失败（原 38 项常红已清零）。
+- **回归（最终两轮）**：SQLite 1745 项（1694 通过 / 51 跳过 / 0 失败）、PostgreSQL 1745 项（1717 通过 / 28 跳过 / 0 失败），两轮 pytest 退出码 0；原 38 项常红清零。junit 见 logs/junit-{sqlite,postgres}-final.xml。
 - **构建**：`knowledgebase:app` = `sha256:761aabb9c789a4d5bab89e9580a61c83f825a0d4ca27e0db76ea65b90d9a6c21`（Django 6.1.3 / psycopg 3.3.8 / 无 soffice），构建记录 `snapshots/builds/20261111-125138-build.json`。
 - **重部署冒烟**（`logs/smoke-after-redeploy.txt`）：live/ready 200（migrations ok）、登录页 200、受保护页 302、未认证 API 401、无 CSRF POST 403、404 无堆栈；容器内 `LoginThrottleMiddleware` 已加载、`KB_OFFICE_SOCKET` 已配置。
 - **Office 转换端到端**：容器内用合成 DOCX 走隔离服务转换，返回真实 `%PDF-`（9,896 字节），证明删除 LibreOffice 后能力未丢。
