@@ -82,7 +82,7 @@ def test_missing_original_is_labelled_as_index_text_only():
 def test_preview_css_is_loaded_without_touching_prototype_css():
     base = Path("apps/webui/templates/webui/base.html").read_text(encoding="utf-8")
     assert "kb-preview.css" in base, "预览样式未加载（滚动/换行会失效）"
-    # 原型样式文件不得被预览改动
-    proto = _read("kb-proto.css")
-    for marker in ("preview-scroll", "preview-img", "preview-text"):
-        assert marker not in proto, f"原型 CSS 被改动了：{marker}"
+    # 无引用的原型样式表已删除：不允许复活（复活即重新引入旧世界视觉）
+    assert not Path("apps/webui/static/webui/kb-proto.css").exists(), (
+        "kb-proto.css 是无引用的死文件，已删除，不能复活"
+    )

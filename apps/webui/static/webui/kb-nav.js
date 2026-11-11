@@ -1,105 +1,31 @@
-/* 左侧导航 + 顶部徽标 + 重置入口 —— 对应原型 renderSidebar() 与启动段。
- *
- * 原型用 hash 路由（#/files）；本项目用**真实路径路由**（/app/files/），
- * 这样保留服务端会话认证、深链和登录跳转。导航项、图标、顺序与原型 NAV 一致。
- */
+/* 工作区环境状态、最近会话与离开页面的确认。 */
 (function () {
   "use strict";
 
   const KB = window.KB;
 
-  // 与原型 NAV 完全一致（顺序、图标、文案）
-  const NAV = [
-    ["/app/", "首页", "◆"],
-    ["/app/files/", "文件管理", "▤"],
-    ["/app/templates/", "模板管理", "▧"],
-    ["/app/search/", "搜索", "◎"],
-    ["/app/agent/", "Agent 控制台", "◈"],
-    ["/app/settings/", "系统配置", "⚙︎"],
-    ["/app/devices/", "设备管理", "◉"],
-    ["/app/knowledge/", "信息库", "▥"],
-    ["/app/tasks/", "添加记录", "≡"],
-    ["/app/docs/", "使用说明", "▫"],
-  ];
+  let sessionRequest = 0;
 
-  function normalize(path) {
-    if (!path.endsWith("/")) return path + "/";
-    return path;
-  }
-
-  /** 最近一次渲染时已知的"当前会话"（供不带参的骨架渲染复用，避免高亮被冲掉）。 */
-  let lastActiveSession = null;
-
-  /**
-   * 当前页在导航里的**归属路径**：`/app/assistant/` 是首页会话页的另一个入口
-   * （`apps/webui/urls.py` 同时挂了 `""` 与 `"assistant/"`），NAV 里只有 `/app/`。
-   * 不做归一的话，从 `/app/assistant/` 进来时导航**一个都不高亮**（Codex 审计 OP-16）。
-   */
-  function navHome(path) {
-    const normalized = normalize(path);
-    if (normalized === "/app/assistant/") return "/app/";
-    return normalized;
-  }
-
-  /** 渲染左侧导航（结构同原型：sidebar-menu + session-block + sidebar-foot）。 */
-  function renderSidebar(options) {
-    const box = document.getElementById("sidebar");
-    if (!box) return;
-    const current = navHome(location.pathname);
-    const opts = options || {};
-    const sessions = opts.sessions || [];
-    // **记住最近一次带 active 的渲染**：初始骨架渲染（DOMContentLoaded 里不传参）
-    // 之后可能被首页的二次渲染覆盖成"无高亮"（Codex 审计 AF-18）。
-    if (opts.activeSession !== undefined) lastActiveSession = opts.activeSession;
-    const activeSession = opts.activeSession !== undefined
-      ? opts.activeSession
-      : lastActiveSession;
-
-    const nav = NAV.map(function ([href, label, icon]) {
-      const on = normalize(href) === current;
-      return (
-        '<a class="nav-item' + (on ? " on" : "") + '" href="' + href + '"' +
-        ' style="text-decoration:none">' +
-        '<span class="nav-icon">' + icon + "</span>" +
-        '<span class="nav-label">' + KB.esc(label) + "</span></a>"
-      );
+  function renderSessionList(sessions, activeSession, error) {
+    const list = document.getElementById("session-list");
+    document.getElementById("session-count").textContent = error ? "" : String(sessions.length);
+    if (error || !sessions.length) {
+      list.innerHTML = '<p class="session-note">' +
+        (error ? "会话列表加载失败：" + KB.esc(error) : "还没有会话") + "</p>";
+      return;
+    }
+    list.innerHTML = sessions.map(function (session) {
+      const active = session.id === activeSession;
+      const title = KB.esc(session.title);
+      return '<div class="session-item' + (active ? " active" : "") + '" data-session="' + session.id + '">' +
+        '<a class="session-link" href="/app/?conversation=' + session.id + '"' +
+        (active ? ' aria-current="true"' : "") + ' title="' + title + '">' +
+        '<span class="session-item-title">' + title + "</span>" +
+        '<span class="session-item-meta">' + (session.count || 0) + " 条消息</span></a>" +
+        '<button class="session-del" type="button" data-session-del="' + session.id +
+        '" title="删除这个会话" aria-label="删除会话">' +
+        '<svg class="icon" aria-hidden="true"><use href="#kb-close"></use></svg></button></div>';
     }).join("");
-
-    const sessionHtml = sessions.length
-      ? sessions
-          .map(function (s) {
-            const on = s.id === activeSession;
-            return (
-              '<div class="session-item' + (on ? " active" : "") + '" data-session="' + s.id + '">' +
-              '<div class="session-item-title">' + KB.esc(s.title) + "</div>" +
-              '<div class="session-item-meta">' + (s.count || 0) + " 条消息</div>" +
-              // 删除会话：走 planner 受控操作（提案 → 确认 → 执行），
-              // **没有**直连 DELETE；点击必须 stopPropagation，否则会先跳转到该会话。
-              '<button class="session-del" data-session-del="' + s.id +
-                '" title="删除这个会话" aria-label="删除会话">×</button>' +
-              "</div>"
-            );
-          })
-          .join("")
-      : (opts.sessionError
-        // 接口失败时**不能**说"还没有会话"：用户会以为会话被删光了
-        ? '<div class="tiny muted" style="padding:10px 16px">会话列表加载失败：' +
-          KB.esc(opts.sessionError) + "</div>"
-        : '<div class="tiny muted" style="padding:10px 16px">还没有会话</div>');
-
-    box.innerHTML =
-      '<ul class="sidebar-menu">' + nav + "</ul>" +
-      '<div class="session-block">' +
-        '<div class="session-block-head">' +
-          '<span class="session-block-title">会话 · ' + sessions.length + "</span>" +
-          '<button class="btn ghost sm" id="new-session" title="新建会话">＋</button>' +
-        "</div>" +
-        '<div class="session-list" id="session-list">' + sessionHtml + "</div>" +
-      "</div>" +
-      '<div class="sidebar-foot">' +
-        "<span>会话保存在服务端</span>" +
-        '<a class="btn ghost sm" href="/app/docs/" title="使用说明" style="text-decoration:none">≡</a>' +
-      "</div>";
   }
 
   /** 顶部徽标显示**真实**状态（来自 /planner/guide/ 的 environment）。 */
@@ -109,9 +35,11 @@
     const result = await KB.api("/api/v1/planner/guide/");
     if (!result.ok) {
       badge.textContent = "后端不可用";
+      badge.dataset.state = "error";
       badge.title = (result.body && result.body.detail) || "";
       return;
     }
+    delete badge.dataset.state;
     const environment = (result.body && result.body.environment) || {};
     const assistant = (result.body && result.body.assistant) || {};
     const parts = [];
@@ -142,12 +70,7 @@
   // 文件管理/信息库页的受控删除（三次独立确认 + 末次输入目标名称）。
   // 这里不再保留任何绑定，避免"模板去掉了、JS 还在找元素"的死代码。
 
-  KB.nav = {
-    renderSidebar: renderSidebar,
-    renderEnvBadge: renderEnvBadge,
-    renderSessions: renderSessions,
-    NAV: NAV,
-  };
+  KB.nav = { renderEnvBadge, renderSessions };
 
   /** 当前 URL 上的会话 id（`?conversation=…`），没有则 null。 */
   function currentActiveSession() {
@@ -206,58 +129,30 @@
    * 都从同一个真实接口取，左侧栏在任何页面都能正确显示会话。
    */
   async function renderSessions(activeSession) {
+    const ticket = ++sessionRequest;
     const result = await KB.api("/api/v1/planner/conversations/");
     const rows = (result.ok && result.body && result.body.results) || [];
     const sessions = rows.map(function (row) {
       return { id: row.id, title: row.title || "未命名会话", count: row.count || 0 };
     });
-    // **按真实 active 高亮**：调用方（首页）传入当前会话 id；
-    // 其它页面没有"当前会话"概念时不强行高亮一个，避免误导。
-    const active = activeSession === undefined ? null : activeSession;
-    renderSidebar({
-      sessions: sessions,
-      activeSession: active,
-      sessionError: result.ok
-        ? ""
-        : ((result.body && result.body.detail) || "无法读取会话列表"),
-    });
-
-    const list = document.getElementById("session-list");
-    if (list) {
-      list.querySelectorAll("[data-session]").forEach(function (item) {
-        item.addEventListener("click", async function () {
-          // 离开当前会话前先问文档面板：有未保存改动就走确认（否则编辑被静默丢掉）
-          if (!(await leaveOkay("切换会话"))) return;
-          location.href = "/app/?conversation=" + item.getAttribute("data-session");
-        });
-      });
-      // 删除按钮：**先阻止冒泡**，否则点击会触发上面的跳转（跳走后再弹确认框）
-      list.querySelectorAll("[data-session-del]").forEach(function (button) {
-        button.addEventListener("click", async function (event) {
-          event.stopPropagation();
-          event.preventDefault();
-          if (button.disabled) return;   // 防重复点击（会走两次受控流程）
-          // 删掉的如果是当前会话，页面会跳走 —— 未保存的编辑同样要先问
-          if (!(await leaveOkay("删除会话"))) return;
-          button.disabled = true;
-          try {
-            await deleteConversation(button.getAttribute("data-session-del"), button);
-          } finally {
-            button.disabled = false;
-          }
-        });
-      });
-    }
-    const button = document.getElementById("new-session");
-    if (button) {
-      button.addEventListener("click", async function () {
-        if (!(await leaveOkay("新建会话"))) return;
-        // 清掉 ?conversation=…，否则会立刻又被拉回旧会话
-        location.href = "/app/";
-      });
+    if (ticket === sessionRequest) {
+      renderSessionList(sessions, activeSession, result.ok ? "" : KB.errorText(result, "无法读取会话列表"));
     }
     return sessions;
-  };
+  }
+
+  async function onSessionDelete(event) {
+    const button = event.target.closest("[data-session-del]");
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      if (await leaveOkay("删除会话")) {
+        await deleteConversation(button.getAttribute("data-session-del"), button);
+      }
+    } finally {
+      button.disabled = false;
+    }
+  }
 
   /**
    * 离开前的统一守卫：首页的文档面板（kb-assistant.js）会注册
@@ -296,7 +191,7 @@
     if (!target) return;
     if (target.getAttribute("target") === "_blank" || target.hasAttribute("download")) return;
     const href = target.getAttribute("href") || target.getAttribute("data-nav");
-    if (!href) return;
+    if (!href || href.startsWith("#")) return;
     let url;
     try {
       url = new URL(href, location.href);
@@ -329,8 +224,8 @@
   }, true);
 
   document.addEventListener("DOMContentLoaded", function () {
-    renderSidebar();               // 先出骨架，避免左侧栏空白闪烁
+    document.getElementById("session-list").addEventListener("click", onSessionDelete);
     renderEnvBadge();
-      renderSessions();              // 再用真实会话数据补上
+    renderSessions(currentActiveSession());
   });
 })();

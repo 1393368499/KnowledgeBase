@@ -24,7 +24,6 @@
     executed: "已执行", expired: "已过期", rejected: "已放弃", proposed: "待确认",
     armed: "待执行", executing: "执行中",
   };
-  const TYPE_ICON = { pdf: "▬", docx: "▭", pptx: "▮", xlsx: "▯", image: "◪", txt: "▫" };
 
   /** 资料状态 → 原型 status-dot 的 class。 */
   function dotClass(status) {
@@ -40,11 +39,17 @@
 
   function shell(title, sub, body) {
     return (
-      '<div class="content fade-in">' +
-      '<div class="page-header"><h2>' + esc(title) + "</h2><p>" + esc(sub) + "</p></div>" +
+      '<div class="content">' +
+      '<header class="page-header"><div><h1>' + esc(title) + "</h1><p>" + esc(sub) + "</p></div></header>" +
       body +
       "</div>"
     );
+  }
+
+  function tableRegion(label, table) {
+    return '<p class="table-scroll-hint" aria-hidden="true">可横向滚动查看全部列</p>' +
+      '<div class="table-region" role="region" tabindex="0" aria-label="' +
+      esc(label + "，可横向滚动") + '">' + table + "</div>";
   }
 
   /** 原型 .stat-card（指标卡）。 */
@@ -204,9 +209,9 @@ async function loadAgent() {
           "）· 分段 " + esc(String(fileCounts.chunks || 0)) + " 条</div>"
         : "") +
       (generationRows
-        ? '<table class="table"><thead><tr><th>集合</th><th>库</th><th>维度</th>' +
+        ? tableRegion("索引与代次", '<table class="table"><thead><tr><th>集合</th><th>库</th><th>维度</th>' +
           "<th>Qdrant</th><th>状态</th><th>操作</th></tr></thead><tbody>" + generationRows +
-          "</tbody></table>"
+          "</tbody></table>")
         : '<div class="hint">还没有登记任何向量集合。</div>') +
       (libraryCodes.length
         ? '<div class="row" style="margin-top:8px">' +
@@ -459,9 +464,9 @@ async function loadAgent() {
       '<div class="card"><div class="card-title">事件时间线</div><div class="timeline">' +
         timeline + "</div></div>" +
       '<div class="card"><div class="card-title">检索反馈（批注）</div>' +
-        '<table class="table"><thead><tr><th>资料</th><th>问题</th><th>状态</th>' +
+        tableRegion("检索反馈", '<table class="table"><thead><tr><th>资料</th><th>问题</th><th>状态</th>' +
         "<th>处理结果</th><th>分诊</th></tr></thead>" +
-        feedbackBody + "</table>" +
+        feedbackBody + "</table>") +
       "</div>" +
     "</div>" +
     '<div class="grid-2" style="margin-top:14px">' + indexCard + auditCard + "</div>"
@@ -726,8 +731,8 @@ async function loadSettings() {
         // 已按用户要求**整条删除**（含各自的 title 指引）：本系统不管理 AS711
         // 服务的启停与推理位置，留着禁用按钮只会让人以为"功能被藏起来了"。
       "</div>" +
-      '<table class="table"><thead><tr><th>服务</th><th>模型</th><th>端点</th>' +
-      "<th>状态</th><th>延迟</th><th></th></tr></thead><tbody>" + body + "</tbody></table>" +
+      tableRegion("远程模型服务", '<table class="table"><thead><tr><th>服务</th><th>模型</th><th>端点</th>' +
+      "<th>状态</th><th>延迟</th><th>操作</th></tr></thead><tbody>" + body + "</tbody></table>") +
     "</div>" +
     '<div class="card" style="padding:0;margin-top:14px">' +
       '<div style="padding:12px 14px;border-bottom:1px solid var(--color-divider)" class="row">' +
@@ -735,9 +740,9 @@ async function loadSettings() {
         '<span class="grow"></span>' +
         '<span class="hint">「预检」按需发起一次真实调用并回报<strong>实测维度</strong>；未配置的 profile 不能预检</span>' +
       "</div>" +
-      '<table class="table"><thead><tr><th>profile</th><th>模型</th><th>声明维度</th>' +
-      "<th>端点</th><th>状态</th><th>预检结果</th><th></th></tr></thead><tbody>" +
-      profileRows + "</tbody></table>" +
+      tableRegion("嵌入模型配置", '<table class="table"><thead><tr><th>profile</th><th>模型</th><th>声明维度</th>' +
+      "<th>端点</th><th>状态</th><th>预检结果</th><th>操作</th></tr></thead><tbody>" +
+      profileRows + "</tbody></table>") +
     "</div>" +
     '<div class="grid-2" style="margin-top:14px">' +
       '<div class="card"><div class="card-title">模型</div>' +
@@ -992,7 +997,7 @@ async function loadKnowledge() {
           ? found.body.count
           : (library.file_count || files.length);
         return (
-          '<div class="card"><div class="card-title"><span class="ic-lib">▤</span> ' +
+          '<div class="card"><div class="card-title">' + KB.icon("library") +
             esc(library.name) +
             // tag 用服务端给的真实总数
             ' <span class="tag">' + total + " 份资料</span>" +
@@ -1361,8 +1366,7 @@ async function loadTasks(page) {
     const tbody = rows.length
       ? "<tbody>" + rows.map(function (file) {
           return (
-            "<tr><td><div class='name'><span class='ic-file t-" + esc(file.file_type || "txt") +
-              "'>" + esc(TYPE_ICON[file.file_type] || "▫") + "</span><b>" +
+            "<tr><td><div class='name'>" + KB.fileIcon(file.file_type) + "<b>" +
               esc(file.original_name) + "</b></div></td>" +
             "<td class='tiny'>" + esc(file.library_name || file.library_code || "—") + "</td>" +
             // 性质：与文件管理/搜索页**同一口径**（空值显示「待识别」，不显示「—」；
@@ -1396,7 +1400,7 @@ async function loadTasks(page) {
       '<div class="notice-bar" style="margin-bottom:12px">这里只记录<b>已经入库</b>的会话来源资料；' +
         "助手的提案在确认并执行成功之前不会出现在这里。</div>" +
       '<div class="card" style="padding:0">' +
-        '<table class="table">' + head + tbody + "</table>" +
+        tableRegion("添加记录", '<table class="table">' + head + tbody + "</table>") +
         '<div style="padding:12px 14px" class="row">' +
           '<span class="hint">共 ' + total + " 条会话来源资料 · 第 " +
             shownPage + " / " + pages + " 页</span>" +
@@ -1463,7 +1467,7 @@ async function loadDocs() {
         '<div class="notice-bar danger">使用说明的<b>服务端步骤</b>没能读取：' +
           esc((result.body && result.body.detail) || ("HTTP " + result.status)) +
           "。下面显示的是本页内置的固定说明，不代表后端当前配置。</div>") +
-    '<div class="card paper">' +
+    '<article class="card paper guide-article">' +
       "<h3>能用一句话做什么</h3><ul>" +
         "<li>找资料：<code>搜一下「质保期」</code>、<code>列出失败的资料</code></li>" +
         "<li>看资料：<code>列出资料库里的全部文件</code>、<code>看看运行状态</code></li>" +
@@ -1476,18 +1480,18 @@ async function loadDocs() {
           "</p>";
       }).join("") +
       "<h3>安全边界</h3><ul>" +
-        "<li>删除、写入这类不可撤销动作<b>先出确认卡</b>；删除需要<b>三次独立确认</b>，" +
+        "<li>删除操作<b>先出确认卡</b>，需要<b>三次独立确认</b>，" +
           "最后一次必须准确输入目标名称，并使用一次性凭证。</li>" +
         "<li>确认有<b>执行窗口</b>；过期后必须重新发起提案。</li>" +
         "<li>已入库的<b>源资料只读</b>，不可编辑或覆盖。</li>" +
         "<li>删除会移除资料记录、关联分段与向量；<b>原件按内容寻址只读保留</b>（可能被其它资料共享）。</li>" +
-        "<li>助手<b>只提案，不执行</b>；模型不可用时如实返回 503，不编造答案。</li>" +
+        "<li>其他操作通过权限和参数校验后可直接执行。模型不可用时，会显示服务端返回的原因。</li>" +
       "</ul>" +
       "<h3>当前环境</h3><ul>" +
         "<li>模型服务：" + (environment.model_calls_disabled ? "当前不可调用" : "已启用") + "</li>" +
         "<li>任务派发：" + (environment.dispatch_disabled ? "已禁用" : "启用") + "</li>" +
       "</ul>" +
-    "</div>"
+    "</article>"
   );
 }
 
@@ -1501,6 +1505,5 @@ KB.pages = {
   statusText: statusText,
   statCard: statCard,
   shell: shell,
-  TYPE_ICON: TYPE_ICON,
 };
 })();

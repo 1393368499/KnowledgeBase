@@ -2,43 +2,52 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>登录 · 智库</title>
-{# 登录页**不套应用外壳**（没有导航栏与左侧导航），只复用原型设计系统 #}
-<link rel="stylesheet" href="{% static 'webui/kb-proto.css' %}?v={{ KB_ASSET_VERSION }}">
-<style>
-  .login-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px}
-  .login-card{background:var(--color-surface); border:1px solid var(--color-border); border-radius:2px;
-    padding:26px 28px; width:min(380px,96vw)}
-  .login-card h1{margin:0 0 4px; font-size:18px; font-weight:700}
-  .login-card p.sub{margin:0 0 18px; font-size:12px; color:var(--color-text-secondary)}
-  .login-card .field{display:block; margin-bottom:12px}
-  .login-card label{display:block; font-size:12px; color:var(--color-text-secondary); margin-bottom:4px}
-  .login-card input{width:100%}
-  .login-card button{width:100%; margin-top:6px}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#133b39">
+  <title>登录 · 智库</title>
+  <link rel="stylesheet" href="{% static 'webui/kb-workspace.css' %}?v={{ KB_ASSET_VERSION }}">
 </head>
 <body>
-<div class="login-wrap">
-  <form class="login-card" method="post" action="{% url 'webui:login' %}">
-    {% csrf_token %}
-    <h1>智库</h1>
-    <p class="sub">请用你的账号登录（服务端会话认证，浏览器不保存口令）；没有账号请联系管理员开通。</p>
-    {% if form.errors %}
-      <div class="notice-bar" style="margin-bottom:12px">账号或口令不正确，请重试。</div>
-    {% endif %}
-    <div class="field">
-      <label for="id_username">账号</label>
-      <input type="text" name="username" id="id_username" autocomplete="username" autofocus required>
+  {% include "webui/_icons.html" %}
+  <main class="login-wrap">
+    <div class="login-intro">
+      <div class="brand">
+        <svg class="icon brand-mark" aria-hidden="true"><use href="#kb-brand"></use></svg>
+        <span>智库<small>知识工作区</small></span>
+      </div>
+      <div>
+        {# 介绍语是宣传文案，不是页面标题：用 <p> 而不是 <h2>，
+           保证本页唯一标题是表单里的 <h1>（2.4.6 顺序不倒置）。 #}
+        <p class="login-lead">让资料成为依据</p>
+        <p>在同一个工作区里查阅内部资料、核对来源和整理文档。</p>
+        <ul class="login-path">
+          <li><svg class="icon" aria-hidden="true"><use href="#kb-search"></use></svg>检索资料</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#kb-chat"></use></svg>回查来源</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#kb-template"></use></svg>撰写文档</li>
+        </ul>
+      </div>
     </div>
-    <div class="field">
-      <label for="id_password">口令</label>
-      <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+    <div class="login-entry">
+      <form class="login-card" method="post" action="{% url 'webui:login' %}">
+        {% csrf_token %}
+        <h1>登录工作区</h1>
+        <p>使用智库账号登录。需要账号时，请联系管理员。</p>
+        {% if form.errors %}
+          <div class="notice-bar danger" id="login-error" role="alert">账号或口令不正确，请重试。</div>
+        {% endif %}
+        <label class="field" for="id_username">账号
+          <input class="input" type="text" name="username" id="id_username" autocomplete="username" required
+                 {% if form.errors %}aria-describedby="login-error" value="{{ form.username.value|default_if_none:'' }}"{% endif %}>
+        </label>
+        <label class="field" for="id_password">口令
+          <input class="input" type="password" name="password" id="id_password" autocomplete="current-password" required
+                 {% if form.errors %}aria-describedby="login-error"{% endif %}>
+        </label>
+        {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+        <button class="btn primary" type="submit">登录</button>
+      </form>
     </div>
-    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-    <button class="btn primary" type="submit">登录</button>
-  </form>
-</div>
+  </main>
 </body>
 </html>

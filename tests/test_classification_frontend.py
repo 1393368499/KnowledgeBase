@@ -301,13 +301,12 @@ def test_search_page_renders_the_nature_note_area(client, admin):
 
 
 def test_nature_css_targets_the_shared_classes():
-    """两项新样式（显示 + 行内下拉）在共享样式表里，且原型 CSS 不被改动。"""
+    """两项新样式（显示 + 行内下拉）在共享样式表里；原型 CSS 已删除，不得复活。"""
     css = _read(HOME_CSS)
     assert ".nature-label" in css, "缺少性质显示样式"
     assert ".nature-select" in css, "缺少行内纠正下拉样式"
-    proto = _read(ROOT / "apps" / "webui" / "static" / "webui" / "kb-proto.css")
-    for marker in (".nature-label", ".nature-select"):
-        assert marker not in proto, f"原型 CSS 被改动了：{marker}"
+    proto = ROOT / "apps" / "webui" / "static" / "webui" / "kb-proto.css"
+    assert not proto.exists(), "kb-proto.css 是无引用的死文件，已删除，不能复活"
 
 
 def _list_names(client, library, **params):

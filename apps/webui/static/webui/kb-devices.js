@@ -3,6 +3,19 @@
   const KB = window.KB, $ = (id) => document.getElementById(id), esc = KB.esc;
   let devices = [], editing = null;
   function notice(text) { $("device-notice").textContent = text; }
+  async function loadEndpoint() {
+    try { const data = await api("endpoint/");
+      $("remote-endpoint").value = data.server || "";
+      $("remote-endpoint-state").textContent = data.server ? "保存时间：" + new Date(data.updated_at).toLocaleString() : data.detail;
+    } catch (e) { $("remote-endpoint-state").textContent = "地址暂时无法读取，请刷新重试"; }
+  }
+  $("remote-endpoint-refresh").onclick = loadEndpoint;
+  $("remote-endpoint-copy").onclick = async function () {
+    const field = $("remote-endpoint"); if (!field.value) return;
+    try { await navigator.clipboard.writeText(field.value); $("remote-endpoint-state").textContent = "已复制，可粘贴到手机 App"; }
+    catch (e) { field.focus(); field.select(); $("remote-endpoint-state").textContent = "请复制已选中的地址"; }
+  };
+  loadEndpoint();
   async function api(path, options) {
     const result = await KB.api("/api/v1/voice/" + path, options);
     if (!result.ok) throw new Error(KB.errorText(result, "请求失败"));
@@ -18,7 +31,7 @@
     $("device-list").innerHTML = devices.length ? devices.map(d =>
       '<article class="card" style="padding:20px;margin:14px 0" data-device="' + esc(d.id) + '">' +
       '<div class="row"><h2 style="margin:0">' + esc(d.name) + '</h2><span class="badge">' + (d.enabled ? (d.online ? "在线" : "离线") : "已停用") + '</span></div>' +
-      '<p class="muted">' + esc(d.device_type) + ' · ' + esc(d.scope_mode === "selected" ? "指定知识库" : "全部可读知识库") + '</p>' +
+      '<p class="muted">' + esc(d.device_type) + ' · ' + esc(d.scope_mode === "selected" ? "指定知识库" : "全部可读知识库") + ' · ' + (d.conversation_mode === 'tasks' ? '按任务选择会话 · 最多 4 项并行' : d.conversation_mode === 'per_turn' ? '每条语音一个会话' : '同一会话') + '</p>' +
       '<div class="row"><a class="btn sm" href="/app/?conversation=' + encodeURIComponent(d.conversation_id || "") + '">打开会话</a>' +
       '<button class="btn sm" data-action="edit">设置</button><button class="btn sm" data-action="toggle">' + (d.enabled ? "停用" : "启用") + '</button>' +
       '<button class="btn sm" data-action="rotate">重新发放凭据</button><button class="btn sm" data-action="remove">移除设备</button></div></article>'
@@ -33,6 +46,8 @@
     $("device-name").value = editing ? editing.name : "";
     $("device-type").disabled = !!editing;
     $("device-scope").value = editing ? editing.scope_mode : "all_authorized";
+    $("device-mode").value = editing ? (editing.conversation_mode || "fixed") : "tasks";
+    $("device-conversation-row").hidden = $("device-mode").value !== "fixed";
     const conversations = await KB.api("/api/v1/planner/conversations/");
     if (!conversations.ok) throw new Error("读取会话失败");
     const rows = conversations.body.results || [];
@@ -56,12 +71,13 @@
     $("add-device").addEventListener("click", () => openEditor().catch(fail));
     $("device-cancel").addEventListener("click", () => { $("device-editor").hidden = true; });
     $("device-scope").addEventListener("change", () => { $("device-libraries").hidden = $("device-scope").value !== "selected"; });
+    $("device-mode").addEventListener("change", () => { $("device-conversation-row").hidden = $("device-mode").value !== "fixed"; });
     $("device-secret-close").addEventListener("click", () => { $("device-token").value = ""; $("device-secret").hidden = true; });
     $("device-form").addEventListener("submit", async function (event) {
       event.preventDefault();
       const button = $("device-save"); button.disabled = true;
       try {
-        const payload = {name: $("device-name").value, conversation_id: $("device-conversation").value || null,
+        const payload = {name: $("device-name").value, conversation_mode: $("device-mode").value, conversation_id: $("device-mode").value === "fixed" ? ($("device-conversation").value || null) : null,
           scope_mode: $("device-scope").value, library_codes: Array.from($("device-library-options").querySelectorAll("input:checked")).map(n => n.value)};
         if (!editing) payload.device_type = $("device-type").value;
         const result = await api(editing ? "devices/" + editing.id + "/" : "devices/", {method: editing ? "PATCH" : "POST", json: payload});

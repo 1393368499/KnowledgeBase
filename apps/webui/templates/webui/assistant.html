@@ -8,30 +8,21 @@
 
 {% block main %}
 {% comment %}
-  首页 = 原型 viewHome() 的结构，原样照搬：
-    <section class="chat-main">
-      <header class="chat-header">…</header>
-      <div class="chat-scroll"><div class="chat-inner">…</div></div>
-      composerHtml()
-    </section>
-  唯一新增：把这三段包进 .chat-col，右侧挂**默认收起**的文档栏。
-  收起时几何与原型完全一致（见 kb-home.css 说明）。
-
-  注意：Django 的 {# #} **只支持单行**；多行必须用 comment / endcomment 标签包裹，
-  否则整段会被当成普通 HTML 渲染到页面上（实测踩到：顶端出现注释文字，
-  且注释里的 section.chat-main 造出第二个 chat-main，把真正的首页挤到首屏下面）。
-  另注：本文本里**不能**写出 endcomment 的字面标签，否则注释会被提前结束。
+  会话与文档共用主内容区，窄屏展开文档时切换到独立工作区。
 {% endcomment %}
 <section class="chat-main" id="chat-main">
-  <div class="chat-col">
+  <div class="chat-col" id="chat-column">
 
     <header class="chat-header">
-      <span class="chat-title" id="chat-title">智库</span>
-      <div class="chat-header-meta" id="chat-meta">首页 · 一句话完成知识库的事</div>
-      <span class="grow"></span>
-      <button class="btn sm" id="btn-new-session">＋ 新会话</button>
-      <button class="btn sm" id="btn-docs" title="展开/收起文档栏">文档 ▸</button>
-      <button class="btn sm" id="btn-tools">待办操作</button>
+      <div class="chat-heading">
+        <span class="chat-title" id="chat-title">智能助手</span>
+        <div class="chat-header-meta" id="chat-meta"></div>
+      </div>
+      <div class="chat-header-actions">
+        <button class="btn sm" id="btn-new-session"><svg class="icon" aria-hidden="true"><use href="#kb-plus"></use></svg>新会话</button>
+        <button class="btn sm" id="btn-docs" aria-controls="doc-pane" aria-expanded="false">文档</button>
+        <button class="btn sm" id="btn-tools">待办操作</button>
+      </div>
     </header>
 
     <div id="chat-action-progress" aria-live="polite"></div>
@@ -41,15 +32,11 @@
     </div>
 
     {# composerHtml()：输入器固定在底部 #}
-    <div class="composer">
+    <div class="composer" id="workspace-composer">
       <div class="composer-inner">
-        <div class="composer-hint">
-          <span class="composer-hint-main">普通提问不会把资料加进信息库；只有删除操作需要确认，其他操作在权限和参数校验通过后直接执行</span>
-          <span class="composer-hint-keys">Enter 发送 · Shift+Enter 换行</span>
-        </div>
         <div class="composer-box" id="composer-box">
-          <textarea class="composer-input" id="composer" rows="2"
-            placeholder="说一句话就行，例如：列出失败的资料 / 搜一下「质保期」/ 看看运行状态"></textarea>
+          <textarea class="composer-input" id="composer" rows="2" aria-label="向智库提问"
+            aria-describedby="composer-shortcuts" placeholder="例如：合同里的质保期是多久？"></textarea>
           {% comment %}
           「知识库调用选择」的**回显条**：只在用户真的限定了检索范围时显示（默认隐藏）。
           为什么必须回显而不是只留一个按钮：勾选之后如果界面上看不出"这一问只查了哪几个库"，
@@ -65,10 +52,16 @@
           <div class="composer-actions">
             <div class="composer-left">
               <input type="file" id="file-input" multiple hidden>
-              <button class="btn sm" id="btn-upload" title="选择本地文件上传到信息库"><span class="ic-file">▤</span> 文件</button>
+              <button class="btn sm" id="btn-upload" title="选择本地文件上传到信息库">文件</button>
               <button class="btn sm" id="btn-kb-scope"
-                      title="选择这次提问要检索的信息库（不选 = 检索全部有权查看的库）"><span class="ic-kb">◎</span> 知识库</button>
-              <span class="muted tiny">回车发送，Shift+回车换行</span>
+                      title="选择这次提问要检索的信息库（默认检索全部有权查看的库）">全部知识库</button>
+              <select id="research-mode" class="btn sm" aria-label="查证方式" title="选择回答的查证方式">
+                <option value="auto">自动查证</option>
+                <option value="fast">快速问答</option>
+                <option value="deep">深入查证</option>
+                <option value="statistics">完整统计</option>
+              </select>
+              <span class="composer-shortcuts" id="composer-shortcuts">Enter 发送 · Shift+Enter 换行</span>
             </div>
             <div class="composer-right">
               <button class="btn primary sm" id="btn-send">发送</button>
@@ -81,11 +74,11 @@
   </div>
 
   {# 右侧文档栏：默认收起（不含 .open 时 display:none） #}
-  <aside class="doc-pane" id="doc-pane">
+  <aside class="doc-pane" id="doc-pane" aria-labelledby="doc-pane-title">
     <div class="doc-pane-head">
-      <span class="doc-pane-title">文档</span>
+      <h2 class="doc-pane-title" id="doc-pane-title">文档</h2>
       <span class="grow"></span>
-      <button class="btn ghost sm" id="btn-doc-close" title="收起">✕</button>
+      <button class="btn sm" id="btn-doc-close">返回会话</button>
     </div>
     {% comment %}
     状态条放在**头部之下、滚动区之外**（不在 .doc-pane-body 里）。
@@ -114,7 +107,7 @@
           <input type="file" id="tpl-input" hidden
                  accept=".docx,.dotx,.doc,.pdf,.txt,.md,.pptx,.potx,.ppt,.xlsx,.csv">
           <button class="btn sm" id="btn-tpl-upload"
-                  title="上传一份文档模板（套用它的格式撰写新文档）"><span class="ic-file">▤</span> 上传模板</button>
+                  title="上传一份文档模板（套用它的格式撰写新文档）"><svg class="icon" aria-hidden="true"><use href="#kb-template"></use></svg>上传模板</button>
           <span class="muted tiny">支持 Word / PPT / Excel / PDF / 文本，单个 ≤ 10MB</span>
         </div>
         <a class="tiny" href="{% url 'webui:templates' %}">打开模板管理 →</a>
@@ -136,7 +129,7 @@
       <div class="field">
         <label>指定来源（勾选后只依据这些资料撰写）</label>
         <div class="row">
-          <input id="src-query" type="text" placeholder="按文件名搜索资料" style="flex:1;min-width:120px">
+          <input id="src-query" type="text" aria-label="按文件名搜索资料" placeholder="按文件名搜索资料" style="flex:1;min-width:120px">
           <button class="btn sm" id="src-search">搜索</button>
         </div>
         <div id="src-results" class="src-results tiny"></div>
@@ -156,13 +149,13 @@
         <button class="doc-tab on" id="doc-tab-edit" role="tab" aria-selected="true"
                 aria-controls="doc-edit-panel">编辑</button>
         <button class="doc-tab" id="doc-tab-preview" role="tab" aria-selected="false"
-                aria-controls="doc-preview-panel">预览</button>
+                aria-controls="doc-preview-panel" tabindex="-1">预览</button>
       </div>
       <div class="field" id="doc-edit-panel" role="tabpanel" aria-labelledby="doc-tab-edit">
         <label for="doc-body">正文（Markdown）</label>
         <textarea id="doc-body" placeholder="打开一份草稿后可在此编辑；也可以先在上面点「新建草稿」"></textarea>
       </div>
-      <div class="field" id="doc-preview-panel" role="tabpanel" aria-labelledby="doc-tab-preview" hidden>
+      <div class="field" id="doc-preview-panel" role="tabpanel" aria-labelledby="doc-tab-preview" tabindex="0" hidden>
         <label>预览（按当前编辑器内容渲染）</label>
         <div id="doc-render" class="paper"
              style="border:1px solid var(--color-divider);border-radius:2px;padding:10px;min-height:60px"></div>
@@ -190,17 +183,17 @@
       <button class="btn sm primary" id="doc-create">生成草稿</button>
       <button class="btn sm" id="doc-new" hidden>新建草稿</button>
       <button class="btn sm" id="doc-save">保存</button>
-      <button class="btn sm" id="doc-download">下载 .md</button>
-      <button class="btn sm" id="doc-download-html">导出 .html</button>
-      {% comment %}
-      导出 Word / PDF（用户第 5 项）：DOCX 保留中文、表格与列表结构。
-      注意：Django 的 `{# … #}` 只能写单行，跨行注释必须用 comment 标签，
-      否则整段注释会**原样渲染到页面**（独立审查在页面上直接看到了这段文字）。
-      {% endcomment %}
-      <button class="btn sm" id="doc-download-docx" title="导出 Word 文档（.docx）">导出 .docx</button>
-      <button class="btn sm" id="doc-download-pptx" title="导出 PPT 演示文稿">导出 .pptx</button>
-      <button class="btn sm" id="doc-download-pdf" title="导出 PDF 文件">导出 .pdf</button>
-      <button class="btn sm" id="doc-delete" title="删除这份派生草稿（不影响来源资料与原件）">删除草稿</button>
+      <details class="doc-export">
+        <summary class="btn sm">导出文档</summary>
+        <div class="doc-export-actions">
+          <button class="btn sm" id="doc-download">下载 .md</button>
+          <button class="btn sm" id="doc-download-html">导出 .html</button>
+          <button class="btn sm" id="doc-download-docx" title="导出 Word 文档（.docx）">导出 .docx</button>
+          <button class="btn sm" id="doc-download-pptx" title="导出 PPT 演示文稿">导出 .pptx</button>
+          <button class="btn sm" id="doc-download-pdf" title="导出 PDF 文件">导出 .pdf</button>
+        </div>
+      </details>
+      <button class="btn danger sm" id="doc-delete" title="删除这份派生草稿（不影响来源资料与原件）">删除草稿</button>
       <div class="doc-hint" id="doc-hint"></div>
     </div>
   </aside>

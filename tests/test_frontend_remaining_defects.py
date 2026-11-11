@@ -23,12 +23,8 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from apps.knowledge.models import (
-    IngestedFile,
-    KnowledgeLibrary,
-    LibraryMember,
     MemberRole,
     ParseStatus,
-    VectorCollection,
 )
 
 pytestmark = pytest.mark.django_db
@@ -95,7 +91,7 @@ def test_send_failure_retry_reuses_the_original_text():
     # 重试按钮 + 原文存在条目上（不是靠 DOM 里的气泡反查）
     assert 'node.dataset.retryText = content;' in js
     assert "kb-send-retry" in js
-    handler = _slice(js, "inner.addEventListener(\"click\"", "const nav = event.target.closest")
+    handler = _slice(js, "inner.addEventListener(\"click\"", "const say = event.target.closest")
     assert 'closest("#kb-send-retry, [data-retry-send]")' in handler
     assert 'area.value = text;' in handler          # 原文放回输入框
     assert "send(text);" in handler                  # 用原文重发

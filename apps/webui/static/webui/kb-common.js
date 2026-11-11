@@ -10,6 +10,15 @@
 
   const KB = (window.KB = {});
 
+  KB.icon = function (name) {
+    return '<svg class="icon" aria-hidden="true"><use href="#kb-' + KB.esc(name) + '"></use></svg>';
+  };
+
+  KB.fileIcon = function (type) {
+    const icons = { pptx: "slides", xlsx: "sheet", csv: "sheet", image: "image" };
+    return KB.icon(Object.hasOwn(icons, type) ? icons[type] : "template");
+  };
+
   /** 读 Django 的 CSRF cookie。
    *
    * 为什么必须有：DRF 的 SessionAuthentication 对**写请求**强制 CSRF 校验，
@@ -859,6 +868,124 @@
     'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), ' +
     'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+  /* 背景 inert 的**引用计数**。
+   *
+   * 为什么不能直接 `main.inert = true/false`：
+   *   * 弹窗可以叠（上传选库 → 上传性质）：关掉上层时，下层弹窗仍在，背景必须
+   *     继续 inert；布尔值会在关上层时把背景提前放出来，焦点再次逃逸；
+   *   * 抽屉（`KB.initSidebar`）本来就会把 `#main` 置 inert：弹窗关闭时要恢复成
+   *     "打开弹窗之前的样子"（抽屉开着就还是 inert），不能一律置 false。
+   * 计数到 0 时恢复 prev，才是正确的叠加语义。
+   */
+  const inertRefs = new WeakMap();
+
+  function setInert(node, on) {
+    let record = inertRefs.get(node);
+    if (on) {
+      if (!record) {
+        record = {
+          count: 0,
+          inert: !!node.inert,
+          hidden: node.getAttribute("aria-hidden"),
+        };
+        inertRefs.set(node, record);
+      }
+      record.count += 1;
+      if (record.count === 1) {
+        // `inert` 同时挡键盘焦点与辅助技术；不支持它的旧内核退到 aria-hidden
+        node.inert = true;
+        if (!("inert" in node)) node.setAttribute("aria-hidden", "true");
+      }
+      return;
+    }
+    if (!record) return;
+    record.count -= 1;
+    if (record.count > 0) return;
+    node.inert = record.inert;
+    if (record.hidden === null) node.removeAttribute("aria-hidden");
+    else node.setAttribute("aria-hidden", record.hidden);
+    inertRefs.delete(node);
+  }
+
+  /** 弹窗打开期间把**除本遮罩外**的所有 body 顶层节点设为 inert（含下层的遮罩）。 */
+  function setBackgroundInert(mask, on) {
+    Array.prototype.forEach.call(document.body.children, function (node) {
+      if (node === mask) return;
+      // <script>/<style>/<link>/图标定义 <svg> 没有交互可言，不动
+      if (!(node instanceof HTMLElement)) return;
+      if (node.tagName === "SCRIPT" || node.tagName === "STYLE" || node.tagName === "LINK") return;
+      // toast 是 live region：弹窗里的操作失败提示仍要能被朗读出来
+      if (node.id === "toast") return;
+      setInert(node, on);
+    });
+  }
+
+  /** 弹窗内可聚焦元素（按 DOM 顺序，排除 disabled / tabindex=-1 / 不可见节点）。 */
+  function modalFocusables(modal) {
+    const list = [];
+    Array.prototype.forEach.call(modal.querySelectorAll(MODAL_FOCUSABLE), function (node) {
+      if (node.disabled) return;
+      if (node.getAttribute("tabindex") === "-1") return;
+      if (!node.getClientRects().length) return;
+      list.push(node);
+    });
+    return list;
+  }
+
+  /* 对话框语义：`role=dialog` + `aria-modal` + 可访问名称。
+   *
+   * 标题来源按优先级：`.modal-head` 里的标题元素（本站 15 处调用几乎都用
+   * `<div class="modal-head"><b>标题</b>…`）→ 弹窗内第一个 h1–h6 → `aria-label` 兜底。
+   * 复用已有 id，没有就生成一个稳定 id，不复制文本、不重复造 DOM。
+   */
+  let modalTitleSeq = 0;
+
+  function applyDialogSemantics(modal, opts) {
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    const title =
+      modal.querySelector(
+        ".modal-head h1, .modal-head h2, .modal-head h3, .modal-head h4, .modal-head h5, " +
+          ".modal-head h6, .modal-head b, .modal-head strong, .modal-head .card-title"
+      ) || modal.querySelector("h1, h2, h3, h4, h5, h6");
+    if (title) {
+      if (!title.id) title.id = "kb-modal-title-" + (++modalTitleSeq);
+      modal.setAttribute("aria-labelledby", title.id);
+      modal.removeAttribute("aria-label");
+    } else {
+      modal.removeAttribute("aria-labelledby");
+      modal.setAttribute("aria-label", opts.label || "对话框");
+    }
+  }
+
+  /** Tab / Shift+Tab 在弹窗内首尾环绕；背景已 inert，正常 Tab 走不出弹层。 */
+  function trapModalFocus(event, mask) {
+    if (event.key !== "Tab") return;
+    const modal = mask.querySelector(".modal");
+    if (!modal) return;
+    const list = modalFocusables(modal);
+    const active = document.activeElement;
+    const inside = mask.contains(active);
+    if (!list.length) {
+      event.preventDefault();
+      modal.focus();
+      return;
+    }
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (event.shiftKey) {
+      if (!inside || active === first || active === modal) {
+        event.preventDefault();
+        last.focus();
+      }
+      return;
+    }
+    if (!inside || active === last || active === modal) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   /** 结算式移除：关闭回调 + 焦点归还只做一次（remove/closeModal 双路径共用）。 */
   function closeModal(mask) {
     if (!mask || mask.dataset.kbClosed === "1") return;
@@ -868,6 +995,9 @@
     const onClose = mask._kbOnClose;
     mask._kbOnClose = null;
     if (mask.parentNode) mask.parentNode.removeChild(mask);
+    // **先恢复背景、再归还焦点**：焦点目标要落在已恢复可交互的节点上
+    // （叠层弹窗时这一步还会解除下层遮罩的 inert）。
+    setBackgroundInert(mask, false);
     // **焦点归还触发元素**（还可见时才给，避免把焦点丢到已隐藏的节点上）
     const restore = mask._kbRestoreFocus;
     mask._kbRestoreFocus = null;
@@ -894,7 +1024,8 @@
    *
    * `options` 可选：
    *   * `onClose`  —— 任何关闭路径都会调用（Esc / 遮罩 / ✕ / 程序化关闭）；
-   *   * `initialFocus` —— 打开后要聚焦的元素选择器（默认第一个可聚焦元素）。
+   *   * `initialFocus` —— 打开后要聚焦的元素选择器（默认第一个可聚焦元素）；
+   *   * `label` —— 弹窗内没有标题时用作 `aria-label`（有标题时不生效）。
    */
   KB.modal = function (html, width, options) {
     // 允许 `KB.modal(html, {onClose: …})`：第二参数是对象时按 options 处理
@@ -906,6 +1037,11 @@
     const mask = KB.el("div", "mask");
     mask.innerHTML =
       '<div class="modal"' + (width ? ' style="width:' + width + '"' : "") + ">" + html + "</div>";
+    const modal = mask.querySelector(".modal");
+    if (modal) {
+      // 对话框语义必须在焦点进入**之前**就位：读屏在焦点落下时就会读角色与名称
+      applyDialogSemantics(modal, opts);
+    }
     const startedFrom = document.activeElement;
     const requestClose = function () { closeModal(mask); };
     // 记录"打开时的焦点"，关闭时还回去（Esc 关闭同样生效）
@@ -918,11 +1054,16 @@
     mask.addEventListener("click", function (event) {
       if (event.target === mask || event.target.closest("[data-close]")) requestClose();
     });
+    // Tab / Shift+Tab 只在弹层内首尾环绕（背景已 inert，正常 Tab 也到不了）
+    mask.addEventListener("keydown", function (event) {
+      trapModalFocus(event, mask);
+    });
     document.body.appendChild(mask);
     modalStack.push(mask);
+    // 背景 inert（#main / 侧栏 / header …），焦点与读屏都留在弹窗里
+    setBackgroundInert(mask, true);
     // 焦点进入弹窗：优先 `[autofocus]`（有无障碍语义），否则第一个可聚焦元素，
     // 最后兜底弹层本身（需要 tabindex 才可聚焦）。
-    const modal = mask.querySelector(".modal");
     const preferred = (opts.initialFocus && mask.querySelector(opts.initialFocus)) ||
       mask.querySelector("[autofocus]") ||
       (modal && modal.querySelector(MODAL_FOCUSABLE));
@@ -946,39 +1087,42 @@
     return node;
   };
 
-  /** 移动端侧栏抽屉：点 ☰ 展开，点遮罩/导航项/Esc 关闭。
-   *
-   * 桌面端不启用（CSS 里 .sidebar 常驻固定侧栏，按钮 display:none）。
-   *
-   * 为什么必须有：原型的 @media (max-width:960px){ .sidebar{display:none} } 让
-   * 窄屏上**没有任何导航入口**（base.html 的 sidebar 是唯一导航容器），
-   * 手机/窄窗口只能手输 URL 才能换页。抽屉本身在桌面端完全不生效。
-   */
+  /** 移动端导航展开时暂停主内容区的交互。 */
   KB.initSidebar = function () {
     const button = document.getElementById("sidebar-toggle");
     const sidebar = document.getElementById("sidebar");
     const mask = document.getElementById("sidebar-mask");
+    const main = document.getElementById("main");
     if (!button || !sidebar) return;
 
-    function setOpen(open) {
+    function setOpen(open, restoreFocus) {
       sidebar.classList.toggle("open", open);
       if (mask) mask.classList.toggle("on", open);
-      button.setAttribute("aria-expanded", open ? "true" : "false");
-      button.title = open ? "收起导航" : "展开导航";
+      if (main) main.inert = open;
+      button.setAttribute("aria-expanded", String(open));
+      button.setAttribute("aria-label", open ? "收起导航" : "展开导航");
+      if (open) {
+        const item = sidebar.querySelector('[aria-current="page"]') || sidebar.querySelector(".nav-item");
+        if (item) item.focus();
+      }
+      else if (restoreFocus) button.focus();
     }
 
     button.addEventListener("click", function () {
       setOpen(!sidebar.classList.contains("open"));
     });
     if (mask) {
-      mask.addEventListener("click", function () { setOpen(false); });
+      mask.addEventListener("click", function () { setOpen(false, true); });
     }
     // 点了导航项/会话就关闭：窄屏下抽屉不能继续盖住刚打开的内容
     sidebar.addEventListener("click", function (event) {
-      if (event.target.closest(".nav-item, [data-session]")) setOpen(false);
+      if (sidebar.classList.contains("open") && event.target.closest("a[href]") &&
+          !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) setOpen(false, true);
     });
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") setOpen(false);
+      if (!event.defaultPrevented && event.key === "Escape" && sidebar.classList.contains("open")) {
+        setOpen(false, true);
+      }
     });
     // 视口回到桌面宽度时复位，避免从抽屉状态切回来后残留遮罩
     window.addEventListener("resize", function () {

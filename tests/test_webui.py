@@ -10,7 +10,6 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from apps.knowledge.models import LibraryMember
 
 pytestmark = pytest.mark.django_db
 
@@ -33,6 +32,20 @@ def test_login_page_renders_without_basic_auth():
     assert "session" not in body.lower()
     assert "Basic" not in body
     assert "csrfmiddlewaretoken" in body  # 有 CSRF，说明是真实表单登录
+
+
+def test_login_retry_keeps_original_page(admin_user):
+    client = Client()
+    login = reverse("webui:login")
+    target = reverse("webui:files")
+    response = client.post(login, {"username": "admin", "password": "wrong", "next": target})
+    assert response.context["next"] == target
+    assert 'name="next" value="/app/files/"' in response.content.decode("utf-8")
+
+    response = client.post(
+        login, {"username": "admin", "password": "pw-not-a-secret-123", "next": target}
+    )
+    assert response["Location"] == target
 
 
 def test_login_with_session_then_pages_render(admin_user):

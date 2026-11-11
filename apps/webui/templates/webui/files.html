@@ -3,22 +3,16 @@
 {% block title %}文件管理 · 智库{% endblock %}
 
 {% block main %}
-{% comment %}
-  文件管理 —— 结构照搬原型 viewFiles()：
-    .content > .page-header
-    .grid-3        5 张统计卡（全部资料 / 已完成 / 处理中 / 待处理 / 失败）
-    .card(padding:0)
-      筛选行：关键词 / 信息库 / 文件类型 / **资料性质** / 处理状态 / 来自 AI 会话 / 上传资料 / 扫描目录 / 全部解析
-      table.table  10 列（勾选 / 文件名 / 信息库 / 类型 / 性质 / 大小 / 状态 / 段落 / 更新时间 / 操作）
-        「性质」列 = 如实显示（五项之一，**空值显示「待识别」**）+ 行内人工纠正下拉
-      分页行：共 N 份 · 第 X / Y 页 + 上一页 / 下一页
-  统计与行数据由 kb-files.js 用真实接口填充；没有数据就显示空态，不伪造。
-{% endcomment %}
-<div class="content fade-in">
-  <div class="page-header">
-    <h2>文件管理</h2>
-    <p>管理资料来源：上传、解析与检索预处理</p>
-  </div>
+<div class="content files-page">
+  <header class="page-header">
+    <div><h1>文件管理</h1><p>上传、整理与解析资料。原件可预览，处理状态可追踪。</p></div>
+    <div class="page-header-actions">
+      <input type="file" id="files-input" multiple hidden>
+      <input type="file" id="files-folder" webkitdirectory directory multiple hidden>
+      <button class="btn" id="files-folder-button" type="button">扫描目录</button>
+      <button class="btn primary" id="files-upload" type="button">上传资料</button>
+    </div>
+  </header>
 
   <div class="grid-3">
     <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">全部资料</div></div>
@@ -29,27 +23,19 @@
   </div>
 
   <div class="card" style="padding:0;margin-top:14px">
-    <div style="padding:12px 14px;border-bottom:1px solid var(--color-divider)" class="row">
-      <span class="hint">资料列表</span>
-      <input id="files-kw" class="tiny" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px;width:190px" placeholder="按文件名搜索">
-      <select id="files-lib" title="按信息库筛选" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px;max-width:190px;text-overflow:ellipsis">
+    <div class="files-controls row">
+      <input class="input" id="files-kw" type="search" placeholder="按文件名搜索" aria-label="按文件名搜索">
+      <select class="input" id="files-lib" aria-label="信息库">
         <option value="all">全部信息库</option>
       </select>
-      <select id="files-type" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px">
+      <select class="input" id="files-type" aria-label="文件类型">
         <option value="all">文件类型</option>
       </select>
-      {% comment %}
-        「性质」筛选：五项词表值由 kb-files.js 从 /files/facets/ 的 `classifications`
-        填充（前端不自己抄一份词表），另加「待识别」= 性质还为空的那些资料。
-        「待识别」用 KB.NATURE_UNIDENTIFIED 取值（空串与"不带这个筛选"等价，表达不了它）。
-        0 条时页面只说"没有待识别（未识别性质）的资料"；接口失败时显示服务端 detail，
-        **不**把失败渲染成 0 条。
-      {% endcomment %}
-      <select id="files-nature" title="按资料性质筛选（性质来自正文自动识别或人工指定）" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px">
+      <select class="input" id="files-nature" aria-label="资料性质" title="按自动识别或人工指定的资料性质筛选">
         <option value="all">资料性质</option>
         <option value="__unidentified__">待识别</option>
       </select>
-      <select id="files-status" style="border:1px solid var(--color-border);border-radius:2px;padding:5px 8px;font-size:12.5px">
+      <select class="input" id="files-status" aria-label="处理状态">
         <option value="all">处理状态</option>
         <option value="pending">待处理</option>
         <option value="running">处理中</option>
@@ -58,61 +44,29 @@
       </select>
       <button class="btn sm" id="files-session">来自 AI 会话</button>
       <span class="grow"></span>
-      <input type="file" id="files-input" multiple hidden>
-      <button class="btn sm" id="files-upload">上传资料</button>
-      <label class="btn sm" style="display:inline-flex;align-items:center">扫描目录
-        <input type="file" id="files-folder" webkitdirectory directory multiple hidden>
-      </label>
-      <button class="btn sm" id="files-parse-all">全部解析</button>
-      {% comment %}
-        「重置数据库」控件已按用户要求**整条删除**（按钮 + click 事件 + 说明弹窗一起删）。
-        原因：它没有任何真实动作，只弹一段"本按钮不清库"的说明 —— 属于"看起来有功能、
-        点开只是说明"的误导入口。真正可用的替代入口都在，且都是受控流程：
-          * 只想重建索引（不删资料、不擦原件）→ 信息库页每个库的「重置索引」（reset_library_index）；
-          * 真要删资料 → 文件管理页逐份受控删除（三次独立确认 + 末次准确输入文件名）；
-          * 真要删库 → 信息库页「删除信息库」（受控流程）。
-      {% endcomment %}
+      <button class="btn sm" id="files-parse-all" type="button">全部解析</button>
     </div>
 
-    {% comment %}
-      上传结果提示区：**部分失败必须留在页面上**，不能只用一条 toast 就过去
-      （kb-files.js 的 uploadFiles 会把每一份失败的服务端原因写到这里）。
-    {% endcomment %}
     <div id="files-upload-note"></div>
-
-    {% comment %}
-      「性质」筛选的独立提示区：由 kb-files.js 的 showNatureNote 填写。
-      与上传结果提示**分开**两个容器，谁都不覆盖谁。
-      代价最高的一种谎是"筛选选了没反应却不说"——所以「待识别」不生效时
-      这里会明确写出"当前仍是全部资料，接口还不支持按空性质过滤"。
-    {% endcomment %}
     <div id="files-nature-note"></div>
-
-    {% comment %}
-      行内动作的**权限说明区**：由 kb-files.js 的 updatePermissionNote 填写。
-      后端对这些动作有真实的库级校验（删除/改性质 = 库管理员；解析 = 可写入成员），
-      普通账号点下去只会拿到 403。这里与上传/性质提示**分容器**，写明"哪些按钮为什么
-      被置灰"，而不是留一个注定失败的按钮在页面上。
-    {% endcomment %}
     <div id="files-perm-note"></div>
 
-    <table class="table">
-      <thead><tr>
-        <th style="width:30px"><input type="checkbox" id="check-all"></th>
-        <th>文件名</th><th>信息库</th><th>类型</th><th>性质</th><th>大小</th>
-        <th>状态</th><th>段落</th><th>更新时间</th><th style="width:150px">操作</th>
-      </tr></thead>
-      <tbody id="files-body">
-        <tr><td colspan="10"><div class="empty-state" style="text-align:center;padding:26px 0"><p class="muted">加载中…</p></div></td></tr>
-      </tbody>
-    </table>
+    <p class="table-scroll-hint" aria-hidden="true">可横向滚动查看全部列</p>
+    <div class="table-region" tabindex="0" role="region" aria-label="资料列表，可横向滚动">
+      <table class="table files-table">
+        <thead><tr>
+          <th><input type="checkbox" id="check-all" aria-label="选择本页所有资料"></th>
+          <th>文件名</th><th>信息库</th><th>类型</th><th>性质</th><th>大小</th>
+          <th>状态</th><th>段落</th><th>更新时间</th><th>操作</th>
+        </tr></thead>
+        <tbody id="files-body">
+          <tr><td colspan="10"><p class="empty-state">加载中…</p></td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <div style="padding:12px 14px" class="row">
+    <div class="page-controls row">
       <span class="hint" id="files-page-info">—</span>
-      {% comment %}
-        勾选说明：文案由 kb-files.js 按**真实选中的复选框**填写；
-        每次重新渲染行时归零 —— 它和 #check-all 的状态必须同源，否则就是骗人。
-      {% endcomment %}
       <span class="hint" id="files-select-note" data-count="0"></span>
       <span class="grow"></span>
       <button class="btn sm" id="files-prev" disabled>上一页</button>

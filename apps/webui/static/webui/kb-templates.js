@@ -15,17 +15,17 @@
     if (!result.ok) { list.textContent = "读取失败：" + KB.errorText(result, "请重试"); return; }
     const rows = result.body.results || [];
     document.getElementById("template-count").textContent = rows.length + " 份";
-    list.innerHTML = rows.length ? '<div class="template-grid">' + rows.map(function (row) {
-      return '<article class="template-card"><div class="row"><b class="grow">' + esc(row.name) +
+    list.innerHTML = rows.length ? '<ul class="template-index">' + rows.map(function (row) {
+      return '<li class="template-entry"><div class="template-entry-meta"><div class="row"><b>' + esc(row.name) +
         '</b><span class="tag">' + esc(row.category_label) + '</span></div><p class="muted small">' +
         esc(row.description || "暂无用途说明") + '</p><div class="tiny muted">' + esc(row.original_name) +
-        ' · ' + Math.ceil(row.size_bytes / 1024) + ' KB · ' + row.text_chars + ' 字</div>' +
-        '<div class="tiny muted">添加于 ' + esc(new Date(row.created_at).toLocaleString()) + '</div>' +
-        '<div class="row" style="gap:8px;margin-top:14px"><button class="btn sm" data-preview="' + row.id +
+        ' · ' + Math.ceil(row.size_bytes / 1024) + ' KB · ' + row.text_chars + ' 字' +
+        ' · 添加于 ' + esc(new Date(row.created_at).toLocaleString()) + '</div></div>' +
+        '<div class="row"><button class="btn sm" data-preview="' + row.id +
         '">查看详情</button><a class="btn sm" href="/api/v1/planner/templates/' + row.id +
         '/download/">下载原件</a>' + (row.can_delete ? '<button class="btn sm danger" data-delete="' + row.id +
-        '" data-name="' + esc(row.name) + '">删除</button>' : '') + '</div></article>';
-    }).join("") + '</div>' : '<p class="hint">没有符合条件的模板。可在上方添加模板。</p>';
+        '" data-name="' + esc(row.name) + '">删除</button>' : '') + '</div></li>';
+    }).join("") + '</ul>' : '<p class="hint">没有符合条件的模板。可在上方添加模板。</p>';
   }
   form.elements.file.addEventListener("change", function () {
     const file = form.elements.file.files[0];

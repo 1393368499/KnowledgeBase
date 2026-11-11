@@ -18,7 +18,6 @@
   const $ = function (id) { return document.getElementById(id); };
 
   const PAGE_SIZE = 10;
-  const TYPE_ICON = { pdf: "▬", docx: "▭", pptx: "▮", xlsx: "▯", image: "◪", txt: "▫" };
   const HOT_WORDS = ["合同", "质保期", "验收", "结算", "采购", "方案"];
   const HISTORY_KEY = "kb-search-history";
 
@@ -139,7 +138,6 @@
   // 「准确 / 不准确」反馈仍按真实分片序号落库。
 
   function resultCard(item) {
-    const icon = TYPE_ICON[item.file_type] || "▫";
     const filenameLabels = {exact_filename: "文件名精确匹配", exact_stem: "文件名精确匹配",
       filename_token: "文件名匹配", filename_contains: "文件名包含关键词"};
     const filenameBadge = filenameLabels[item.filename_match]
@@ -179,8 +177,8 @@
     const canFeedback = Boolean(state.q);
     return '<div class="result" data-file="' + fileId + '"' +
       (hasOrdinal ? ' data-chunk="' + rawOrdinal + '"' : "") + ">" +
-      '<div class="name"><span class="ic-file t-' + esc(item.file_type || "txt") + '">' +
-        esc(icon) + "</span> <b>" + esc(item.original_name || item.name || "") + "</b> " +
+      '<div class="name">' + KB.fileIcon(item.file_type) +
+        "<b>" + esc(item.original_name || item.name || "") + "</b> " +
         filenameBadge + score + feedback +
       "</div>" +
       '<div class="meta">' +

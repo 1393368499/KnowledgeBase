@@ -1,0 +1,6 @@
+<li>
+  <a class="nav-item{% if page == key %} on{% endif %}" href="{% url route %}"{% if page == key %} aria-current="page"{% endif %}>
+    <svg class="icon" aria-hidden="true"><use href="#kb-{{ icon }}"></use></svg>
+    <span>{{ label }}</span>
+  </a>
+</li>

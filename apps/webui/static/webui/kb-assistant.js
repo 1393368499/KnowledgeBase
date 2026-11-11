@@ -142,6 +142,7 @@ let currentDocTemplateCategory = "";
     const bar = $("kb-scope-bar");
     const chips = $("kb-scope-chips");
     if (!bar || !chips) return;
+    $("btn-kb-scope").textContent = scopeCodes.length ? "已选 " + scopeCodes.length + " 个库" : "全部知识库";
     if (!scopeCodes.length) {
       bar.hidden = true;
       chips.innerHTML = "";
@@ -649,106 +650,113 @@ let currentDocTemplateCategory = "";
 
   // ------------------------------------------------------------ 欢迎态 ----
 
-  function greeting() {
-    const hour = new Date().getHours();
-    if (hour < 5) return "这么晚还在整理资料";
-    if (hour < 11) return "早上好";
-    if (hour < 13) return "中午好";
-    if (hour < 18) return "下午好";
-    return "晚上好";
-  }
-
-  /** 原型 welcomeHtml()：问候 + 标题 + 5 统计 + 6 快捷句 + 4 能力卡 + 资料库区 + 底部说明。 */
-  function welcomeHtml(counts, statsFailed) {
+  function welcomeHtml(counts, statsError) {
     // 统计读取失败时**不显示 0**：0 会被读成"库里什么都没有"，而事实是"这次没读到"。
-    const dash = function (value) { return statsFailed ? "—" : value; };
+    const dash = function (value) { return statsError ? "—" : value; };
     const stats = {
       total: dash(counts.files || 0),
       done: dash(counts.done || 0),
       session: dash(counts.session_files || 0),
-      pending: dash((counts.pending || 0) + (counts.processing || 0)),
+      pending: dash(counts.pending || 0),
+      processing: dash(counts.processing || 0),
       kbs: dash(counts.libraries || 0),
     };
     const quick = [
       "列出资料库里的全部文件", "列出失败的资料", "搜一下「合同」",
       "看看运行状态", "测试向量服务连通", "你能做什么",
     ];
-    const caps = [
-      ["/app/files/", "文件管理", "上传、解析、删除、目录索引与预览，都在文件管理里完成"],
-      ["/app/search/", "搜索", "按关键词、部门、金额或性质过滤，结果可预览可反馈"],
-      ["/app/agent/", "Agent 控制台", "看门狗运行状态、事件时间线，以及各条检索反馈的处理"],
-      ["/app/settings/", "系统配置", "远程模型服务、模型与基础设施配置"],
+    const links = [
+      ["/app/files/", "文件管理", "上传、解析、预览与目录索引"],
+      ["/app/search/", "搜索", "按关键词、部门、金额或性质过滤"],
+      ["/app/agent/", "Agent 控制台", "查看运行状态、事件与检索反馈"],
+      ["/app/settings/", "系统配置", "查看模型与基础设施配置"],
+      ["/app/docs/", "使用说明", "查看上传、检索和操作确认规则"],
     ];
     const stat = function (value, label, href) {
-      return '<button class="home-stat" data-nav="' + href + '"><b>' + mono(value) +
-        "</b><i>" + esc(label) + "</i></button>";
+      return '<a class="home-stat" href="' + href + '"><span>' + esc(label) +
+        "</span><b>" + mono(value) + "</b></a>";
     };
     return '<div class="home-wrap">' +
+      '<div class="home-start">' +
       '<header class="home-head">' +
-        '<div class="home-hello">' + esc(greeting()) + "</div>" +
-        '<h1 class="home-title">知识库里的事，说一句话就行</h1>' +
-        '<p class="home-sub">每个动作都能在这里用日常说法完成：上传、搜索、目录收录、' +
-          "看运行状态、查看模型服务配置。" +
-          "不可撤销的动作（比如删除资料）会先出一张卡，等你确认才动。</p>" +
+        '<h1 class="home-title">向知识库提问</h1>' +
+        '<p class="home-sub">按资料查证问题，也可以核对条款或查询处理进度。删除资料前会请你确认。</p>' +
       "</header>" +
-      '<section class="home-stats">' +
-        stat(stats.total, "文件库资料", "/app/files/") +
-        stat(stats.done, "已处理", "/app/files/") +
-        stat(stats.session, "会话资料", "/app/files/?session=1") +
-        stat(stats.kbs, "信息库", "/app/knowledge/") +
-        stat(stats.pending, "待处理", "/app/files/?status=pending") +
-      "</section>" +
+      '<div class="home-composer" id="home-composer"></div>' +
       '<section class="home-block">' +
-        '<div class="home-block-head"><span class="ic-spark">◆</span> 一开口就能做 ' +
-          "<em>点一下 = 把这句话发给我</em></div>" +
+        '<h2 class="home-block-head">快捷提问 <em>点击即发送</em></h2>' +
         '<div class="home-ops">' +
           quick.map(function (text) {
-            return '<button class="home-op" data-say="' + esc(text) + '">' + esc(text) + "</button>";
-          }).join("") +
-        "</div>" +
-        '<div class="home-op-note">也可以直接打字，例如「删除失败的那个 xxx.pdf」' +
-          "「看看产品部都有哪些资料」。</div>" +
-      "</section>" +
-      '<section class="home-block">' +
-        '<div class="home-block-head"><span class="ic-spark">◆</span> 要去页面里细看的事 ' +
-          "<em>都是真实页面，没有死链接</em></div>" +
-        '<div class="home-cards">' +
-          caps.map(function (item) {
-            return '<button class="home-card" data-nav="' + item[0] + '">' +
-              '<span class="home-card-icon">▪</span>' +
-              '<span class="home-card-body"><b>' + esc(item[1]) + "</b><i>" + esc(item[2]) +
-              "</i></span></button>";
+            return '<button class="home-op" type="button" data-say="' + esc(text) + '">' + esc(text) +
+              '<svg class="icon" aria-hidden="true"><use href="#kb-arrow"></use></svg></button>';
           }).join("") +
         "</div>" +
       "</section>" +
-      '<section class="home-block">' +
-        '<div class="home-block-head"><span class="ic-lib">▤</span> 当前资料库</div>' +
-        '<div class="home-tags">' +
-          '<span class="tag">共 ' + mono(stats.total) + " 份</span>" +
-          '<span class="tag warn">待处理 ' + mono(stats.pending) + "</span>" +
-          '<span class="tag ok">已处理 ' + mono(stats.done) + "</span>" +
-          '<span class="tag">会话来源 ' + mono(stats.session) + "</span>" +
-        "</div>" +
-        '<div class="home-links">' +
-          '<button class="btn sm" data-nav="/app/files/">文件管理</button>' +
-          '<button class="btn sm" data-nav="/app/search/">搜索</button>' +
-          '<button class="btn sm" data-nav="/app/agent/">Agent 控制台</button>' +
-          '<button class="btn sm" data-nav="/app/settings/">系统配置</button>' +
-          '<button class="btn sm" data-nav="/app/docs/">使用说明</button>' +
-        "</div>" +
-      "</section>" +
-      '<div class="home-foot">' +
-        "资料都是真实入库的：上传会真的落盘并建立索引，删除需要三次确认。" +
-        '<a href="/app/docs/">看使用说明 →</a>' +
       "</div>" +
+      '<aside class="home-index" aria-label="资料与工作区入口">' +
+      '<section class="home-block">' +
+        '<h2 class="home-block-head">资料概览</h2>' +
+        (statsError ? '<p class="home-stats-note" role="status">统计读取失败：' + esc(statsError) +
+          "。仍可打开列表查看资料。</p>" : "") +
+        '<div class="home-stats">' +
+          stat(stats.total, "全部资料", "/app/files/") +
+          stat(stats.done, "已处理", "/app/files/?status=done") +
+          stat(stats.session, "会话资料", "/app/files/?session=1") +
+          stat(stats.kbs, "信息库", "/app/knowledge/") +
+          stat(stats.pending, "待处理", "/app/files/?status=pending") +
+          stat(stats.processing, "处理中", "/app/files/?status=running") +
+        "</div>" +
+      "</section>" +
+      '<section class="home-block">' +
+        '<h2 class="home-block-head">工作区入口</h2>' +
+        '<ul class="home-destinations">' +
+          links.map(function (item) {
+            return '<li><a href="' + item[0] + '"><b>' + esc(item[1]) +
+              "</b><span>" + esc(item[2]) + "</span></a></li>";
+          }).join("") +
+        "</ul>" +
+      "</section></aside>" +
     "</div>";
+  }
+
+  function moveComposer(target) {
+    const composer = $("workspace-composer");
+    if (composer.parentElement === target) return;
+    const active = document.activeElement;
+    target.appendChild(composer);
+    if (composer.contains(active)) active.focus({ preventScroll: true });
   }
 
   // -------------------------------------------------------------- 消息 ----
 
   /** 原型 renderBold()：先转义，再把 **粗体** 渲染成 <b>。 */
   function renderBold(text) {
-    return esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    return esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\[([^\]\n]+)\]\((\/api\/v1\/planner\/(?:evidence|research-record)\/\d+\/\?[^\s<>)]*)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  }
+
+  function researchHtml(payload) {
+    const run = payload && payload.research;
+    if (!run || !run.enabled || !(run.steps || []).length) return "";
+    const sources = run.sources || [];
+    const mode = { fast: "快速问答", deep: "深入查证", statistics: "完整统计" }[run.mode] || "资料查证";
+    const labels = { initial_search: "查找相关资料", research_plan: "整理查证任务", search_knowledge: "搜索资料",
+      read_passages: "读取原文", list_files: "获取文件清单", find_related_files: "查找关联文件", calculate_evidence: "核算数字" };
+    const steps = (run.steps || []).map(function (step) {
+      return esc(labels[step.action] || "处理请求") + (step.status === "duplicate_skipped" ? "（跳过重复查询）" : "");
+    }).join(" → ");
+    const verification = run.verification || {};
+    const check = verification.semantic === "supported" || verification.semantic === "deterministic_tool_fact" ? "证据核验通过" :
+      (verification.semantic === "unsupported" ? "存在待核实结论" : "语义核验未完成");
+    const links = sources.map(function (source) {
+      if (!/^\/api\/v1\/planner\/(?:evidence|research-record)\/\d+\//.test(source.url || "")) return "";
+      return '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(source.url) + '">' +
+        esc(source.name) + " · " + (source.kind === "operation" ? "工具执行结果" : (source.page ? "第 " + esc(source.page) + " 页" : "第 " + esc(source.ordinal) + " 段")) + "</a></li>";
+    }).join("");
+    return '<details class="research-receipt" style="margin:8px 0"><summary>' + esc(mode) + " · " +
+      sources.length + " 处来源 · " + esc(check) + '</summary><p class="muted tiny">' + steps + "</p>" +
+      (links ? "<ul>" + links + "</ul>" : '<p class="muted tiny">本次没有可定位的正文证据。</p>') + "</details>";
   }
 
   /** 原型 renderMessage() 的结构。 */
@@ -818,6 +826,7 @@ let currentDocTemplateCategory = "";
         '<div class="msg-bubble">' + bubble + "</div>" +
         (message.degradedHtml || "") +
         (message.scopeHtml || "") +
+        (mine ? "" : researchHtml(message.payload)) +
         (message.rejectedHtml || "") +
         (message.operationHtml || "") +
         '<div class="msg-meta">' + esc(KB.fmtTime(message.created_at)) +
@@ -988,31 +997,14 @@ let currentDocTemplateCategory = "";
     const inner = $("chat-inner");
     const stats = await assistantApi("/api/v1/knowledge/stats/");
     const counts = (stats.ok && stats.body) || {};
-    // 统计读不到时**不能**显示成 0（那看起来像"库里什么都没有"）：
-    // 首页会顶一条可见提示，数字位显示 "—"。
-    const statsFailed = !stats.ok;
 
     if (!conversationId || forceWelcome) {
       conversationId = null;
-      $("chat-title").textContent = "智库";
-      $("chat-meta").textContent = "首页 · 一句话完成知识库的事";
-      inner.innerHTML = welcomeHtml(counts, statsFailed);
-      if (statsFailed) {
-        // 用**独立提示条**而不是 KB.notice（后者会清空容器内容，可能连带抹掉别的节点）
-        const host = $("composer-box");
-        if (host && host.parentNode) {
-          let note = document.getElementById("kb-stats-warning");
-          if (!note) {
-            note = document.createElement("div");
-            note.id = "kb-stats-warning";
-            note.className = "notice warn";
-            note.style.margin = "6px 0";
-            host.parentNode.insertBefore(note, host);
-          }
-          note.textContent = "统计读取失败：" + KB.errorText(stats, "请求失败") +
-            "（上方数字显示为「—」，不代表库里是 0）";
-        }
-      }
+      $("chat-title").textContent = "智能助手";
+      $("chat-meta").textContent = "";
+      moveComposer($("chat-column"));
+      inner.innerHTML = welcomeHtml(counts, stats.ok ? "" : KB.errorText(stats, "请求失败"));
+      moveComposer($("home-composer"));
       $("chat-scroll").scrollTop = 0;   // 空会话停在顶部
     } else {
       const result = await assistantApi("/api/v1/planner/conversations/" + conversationId + "/");
@@ -1023,6 +1015,7 @@ let currentDocTemplateCategory = "";
         return op.requires_confirmation === true ||
         (op.requires_confirmation === undefined && (String(op.intent).startsWith("delete_") || op.intent === "reset_demo_data"));
       });
+      moveComposer($("chat-column"));
       inner.innerHTML = messages.map(function (message) {
         const payload = message.payload || {};
         // **system 消息不是 AI 回答**：它是系统留痕（例如"助手不可用：…"）。
@@ -1101,11 +1094,6 @@ let currentDocTemplateCategory = "";
         const area = $("composer");
         if (area) area.value = text;
         send(text);
-        return;
-      }
-      const nav = event.target.closest("[data-nav]");
-      if (nav) {
-        location.href = nav.getAttribute("data-nav");
         return;
       }
       const say = event.target.closest("[data-say]");
@@ -1475,6 +1463,7 @@ let currentDocTemplateCategory = "";
     const inner = $("chat-inner");
 
     if (!conversationId) {
+      moveComposer($("chat-column"));
       inner.innerHTML = "";
       $("chat-title").textContent = "新会话";
       $("chat-meta").textContent = "1 条消息";
@@ -1492,8 +1481,8 @@ let currentDocTemplateCategory = "";
       json: scopeCodes.length
         // 「知识库调用选择」：只在这些库里检索。**为空时省略字段**（= 全部可读库）——
         // 后端把显式空数组判成 400，因为"空数组"与"没选"必须能被区分开。
-        ? { message: content, conversation_id: conversationId, library_codes: scopeCodes.slice() }
-        : { message: content, conversation_id: conversationId },
+        ? { message: content, conversation_id: conversationId, library_codes: scopeCodes.slice(), research_mode: (document.getElementById("research-mode") || {}).value || "auto" }
+        : { message: content, conversation_id: conversationId, research_mode: (document.getElementById("research-mode") || {}).value || "auto" },
     });
 
     if (result.status === 503) {
@@ -1723,8 +1712,6 @@ let currentDocTemplateCategory = "";
 
   function toggleDocs(open) {
     const pane = $("doc-pane");
-    const main = $("chat-main");
-    const button = $("btn-docs");
     const shouldOpen = open === undefined ? !pane.classList.contains("open") : open;
     // 收起面板时若有未保存改动：先确认（否则正文就那样消失了，用户以为"白写了"）
     if (!shouldOpen && pane.classList.contains("open") && isDocDirty()) {
@@ -1740,16 +1727,21 @@ let currentDocTemplateCategory = "";
     const pane = $("doc-pane");
     const main = $("chat-main");
     const button = $("btn-docs");
+    const wasOpen = pane.classList.contains("open");
     pane.classList.toggle("open", shouldOpen);
     main.classList.toggle("doc-open", shouldOpen);
-    button.textContent = shouldOpen ? "文档 ◂" : "文档 ▸";
+    button.setAttribute("aria-expanded", String(shouldOpen));
     if (shouldOpen) {
+      if (!wasOpen) $("btn-doc-close").focus();
       refreshDocPane();
       renderPreview();
       updateDocUI();
       // 每次都重读模板列表（一次很小的 GET）：既能看到别人新传的模板，
       // 也给了"上次读取失败"一个天然的**重试**入口 —— 否则失败态会一直挂在那里。
       loadTemplates(true);
+    } else if (wasOpen) {
+      pane.querySelector(".doc-export").open = false;
+      button.focus();
     }
   }
 
@@ -1970,6 +1962,8 @@ let currentDocTemplateCategory = "";
     $("doc-tab-preview").classList.toggle("on", !edit);
     $("doc-tab-edit").setAttribute("aria-selected", edit ? "true" : "false");
     $("doc-tab-preview").setAttribute("aria-selected", edit ? "false" : "true");
+    $("doc-tab-edit").tabIndex = edit ? 0 : -1;
+    $("doc-tab-preview").tabIndex = edit ? -1 : 0;
     $("doc-edit-panel").hidden = !edit;
     $("doc-preview-panel").hidden = edit;
     if (!edit) renderPreview();
@@ -2920,6 +2914,17 @@ let currentDocTemplateCategory = "";
     $("btn-tools").addEventListener("click", openTools);
     $("btn-docs").addEventListener("click", function () { toggleDocs(); });
     $("btn-doc-close").addEventListener("click", function () { toggleDocs(false); });
+    $("doc-pane").addEventListener("keydown", function (event) {
+      if (event.key !== "Escape" || event.isComposing) return;
+      event.preventDefault();
+      const exportOptions = event.target.closest(".doc-export[open]");
+      if (exportOptions) {
+        exportOptions.open = false;
+        exportOptions.querySelector("summary").focus();
+        return;
+      }
+      toggleDocs(false);
+    });
     $("btn-upload").addEventListener("click", function () { $("file-input").click(); });
     $("file-input").addEventListener("change", function (event) { uploadFiles(event.target.files); });
     // 「知识库调用选择」：多选要检索的信息库（空 = 全部有权查看的库）
@@ -2949,6 +2954,17 @@ let currentDocTemplateCategory = "";
     $("doc-save").addEventListener("click", function () { saveDocument(); });
     $("doc-tab-edit").addEventListener("click", function () { switchDocTab("edit"); });
     $("doc-tab-preview").addEventListener("click", function () { switchDocTab("preview"); });
+    $("doc-tab-edit").parentElement.addEventListener("keydown", function (event) {
+      let tab;
+      if (event.key === "Home") tab = "edit";
+      else if (event.key === "End") tab = "preview";
+      else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        tab = event.target.id === "doc-tab-edit" ? "preview" : "edit";
+      } else return;
+      event.preventDefault();
+      switchDocTab(tab);
+      $("doc-tab-" + tab).focus();
+    });
     // 导出：交给 downloadDoc（会先保存当前版本；失败原因显示在状态条 + toast，
     // 不再 `location.href` 导航到 JSON 错误页）
     document.querySelectorAll(
@@ -3045,7 +3061,17 @@ let currentDocTemplateCategory = "";
         if (!result.ok) return;
         let refresh = false;
         for (const event of result.body.results || []) {
+          if (["task.renamed", "task.deleted"].includes(event.kind)) {
+            if (event.kind === "task.deleted" && Number(event.conversation_id) === conversationId) {
+              conversationId = 0;
+              clearConversationFromUrl();
+              await renderHome(true);
+            } else if (Number(event.conversation_id) === conversationId) refresh = true;
+            if (KB.nav && KB.nav.renderSessions) await KB.nav.renderSessions(conversationId);
+            continue;
+          }
           if (Number(event.conversation_id) !== conversationId) {
+            if (["turn.submitted", "answer.ready"].includes(event.kind) && KB.nav && KB.nav.renderSessions) await KB.nav.renderSessions(conversationId);
             if (event.kind === "answer.ready") KB.toast(event.device_name + " 的语音回复已到达其他会话");
             continue;
           }

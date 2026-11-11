@@ -23,11 +23,6 @@ class KbLoginView(LoginView):
         # 默认落到「首页」（AI 会话页 /app/）；只有带 ?next= 时才回到用户原本要去的页面。
         return self.get_redirect_url() or str(reverse_lazy("webui:home"))
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["next"] = self.request.GET.get("next", "")
-        return context
-
 
 class KbLogoutView(LogoutView):
     next_page = reverse_lazy("webui:login")

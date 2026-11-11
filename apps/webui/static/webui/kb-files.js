@@ -22,7 +22,6 @@
     pending: "待处理", running: "处理中", done: "已完成", failed: "失败",
     archived: "已归档",
   };
-  const TYPE_ICON = { pdf: "▬", docx: "▭", pptx: "▮", xlsx: "▯", image: "◪", txt: "▫" };
 
   const state = {
     page: 1, q: "", status: "all", library: "all", fileType: "all", session: false,
@@ -455,7 +454,7 @@
   function updateUploadGate() {
     if (isSystemAdmin()) { clearUploadGate(); return; }
     if (noLibraryMembership) {
-      ["files-upload", "files-folder"].forEach(function (elementId) {
+      ["files-upload", "files-folder-button"].forEach(function (elementId) {
         denyControl($(elementId),
           "上传 / 扫描目录：你当前在**任何信息库**里都没有成员权限，所以不可用；" +
           "请联系信息库的库管理员把你加入（写入权限才能上传），加入后即可使用。");
@@ -471,7 +470,7 @@
     if (!denied) { clearUploadGate(); return; }
     const name = ($("files-lib") && $("files-lib").selectedOptions[0]
       ? $("files-lib").selectedOptions[0].textContent : state.library);
-    ["files-upload", "files-folder"].forEach(function (elementId) {
+    ["files-upload", "files-folder-button"].forEach(function (elementId) {
       denyControl($(elementId), "上传：需要你在「" + name +
         "」有写入权限；你当前在该库没有写入权限。可把「信息库」筛选切到你有写入权限的库，" +
         "或联系该库管理员把你加为可写入成员。");
@@ -480,7 +479,7 @@
 
   /** 撤掉上传控件上的权限置灰（换成别的库 / 权限恢复时不能留一个假的禁用态）。 */
   function clearUploadGate() {
-    ["files-upload", "files-folder"].forEach(function (elementId) {
+    ["files-upload", "files-folder-button"].forEach(function (elementId) {
       const element = $(elementId);
       if (!element) return;
       if (element.getAttribute("data-perm-denied") !== "1") return;
@@ -583,7 +582,6 @@
       return;
     }
     bodyEl.innerHTML = rows.map(function (file) {
-      const icon = TYPE_ICON[file.file_type] || "▫";
       // 显示**完整** directory_path：slice(1) 会把顶层目录名吃掉
       const dir = file.directory_path || "—";
       // 原型每行都有"解析"位；已完成/处理中/**已归档**的保留但禁用，并说明原因。
@@ -623,10 +621,13 @@
         (natureTitle ? ' title="' + esc(natureTitle) + '"' : "") + ">" +
         esc(KB.natureLabel(file)) + "</span>" + natureSelect(file);
       return '<tr data-file-row="' + file.id + '">' +
+        // 行复选框必须有自己的可访问名（4.1.2）：文件名是唯一的识别依据，
+        // 直接复用 data-name（同一条数据，视觉与读屏不会各说各话）。
         '<td><input type="checkbox" class="file-check" value="' + file.id +
-          '" data-name="' + esc(file.original_name) + '"></td>' +
-        '<td><div class="name"><span class="ic-file t-' + esc(file.file_type || "txt") + '">' +
-          esc(icon) + '</span><b title="' + esc(file.original_name) + '">' +
+          '" data-name="' + esc(file.original_name) +
+          '" aria-label="选择《' + esc(file.original_name) + '》"></td>' +
+        '<td><div class="name">' + KB.fileIcon(file.file_type) +
+          '<b title="' + esc(file.original_name) + '">' +
           esc(file.original_name) + "</b></div></td>" +
         '<td class="tiny"><span class="lib-chip">' +
           esc(file.library_name || file.library_code || "—") +
@@ -898,10 +899,10 @@
       "正在上传 " + list.length + " 份到「" + chosen + "」…结果会写在这里。", "info");
     const uploadButton = $("files-upload");
     const inputButton = $("files-input");
-    const folderInput = $("files-folder");
+    const folderButton = $("files-folder-button");
     if (uploadButton) uploadButton.disabled = true;
     if (inputButton) inputButton.disabled = true;
-    if (folderInput) folderInput.disabled = true;
+    if (folderButton) folderButton.disabled = true;
     try {
       for (let index = 0; index < list.length; index += 1) {
         const file = list[index];
@@ -945,7 +946,7 @@
       uploadBusy = false;
       if (uploadButton) uploadButton.disabled = false;
       if (inputButton) inputButton.disabled = false;
-      if (folderInput) folderInput.disabled = false;
+      if (folderButton) folderButton.disabled = false;
     }
     const ok = list.length - failures.length - duplicates.length;
     if (failures.length || duplicates.length) {
@@ -1386,6 +1387,7 @@
       uploadFiles(event.target.files);
       event.target.value = "";
     });
+    $("files-folder-button").addEventListener("click", function () { $("files-folder").click(); });
     $("files-folder").addEventListener("change", function (event) {
       uploadFiles(event.target.files);
       event.target.value = "";

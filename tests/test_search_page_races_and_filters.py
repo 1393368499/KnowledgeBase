@@ -260,11 +260,9 @@ def test_empty_query_feedback_is_really_rejected_with_400(client, admin, library
 
 
 def test_prototype_files_untouched():
-    """只允许改 kb-search.js；原型 HTML 与原型 CSS 是只读红线。"""
-    for name in ("apps/webui/static/webui/kb-proto.css",):
-        text = Path(name).read_text(encoding="utf-8")
-        for marker in ("data-chunk", "searchTicket", "searchTotalPages"):
-            assert marker not in text, f"{name} 被改动了（出现 {marker}）"
+    """只允许改 kb-search.js；无引用的原型 CSS 已删除，不得复活。"""
+    proto = Path("apps/webui/static/webui/kb-proto.css")
+    assert not proto.exists(), "kb-proto.css 是无引用的死文件，已删除，不能复活"
 
 
 # =========================================================================

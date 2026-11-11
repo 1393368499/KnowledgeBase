@@ -64,11 +64,10 @@ def test_abandon_is_not_a_raw_delete():
 
 
 def test_abandoned_card_is_visually_distinct():
-    """已放弃的卡在 `kb-preview.css` 里有独立样式（`kb-proto.css` 只读，不能改）。"""
+    """已放弃的卡在 `kb-preview.css` 里有独立样式；无引用的原型样式表已删除，不得复活。"""
     preview = _read("kb-preview.css")
     assert ".op-card.state-rejected" in preview, "已放弃的卡没有独立视觉，用户看不出它不再等待操作"
-    proto = _read("kb-proto.css")
-    assert ".op-card.state-rejected" not in proto, "改到了只读的原型样式表 kb-proto.css"
+    assert not (WEBUI / "kb-proto.css").exists(), "kb-proto.css 是无引用的死文件，已删除，不能复活"
 
 
 def test_pending_toolbar_refreshes_after_abandon():
@@ -110,13 +109,14 @@ def test_doc_pane_width_change_is_documented_and_scoped():
     pane = home[home.index(".doc-pane{") : home.index(".doc-pane{") + 700]
     assert "1.5" in pane, "宽度改动没有留下依据注释"
     assert "display:none" in pane, "文档栏默认收起的前提被改掉了（会影响与原型的一致性）"
-    # 窄屏走的是纵向堆叠，宽度值在那里必须是 auto
-    narrow = home[home.index("@media (max-width:960px)") :]
-    assert ".doc-pane.open{flex:0 0 auto" in narrow, "窄屏布局被宽度改动影响"
+    # 窄屏一次只展示一个工作区，文档不受桌面侧栏的宽度上限约束。
+    narrow = home[home.index("@media (width < 1200px)") :]
+    assert ".chat-main.doc-open > .chat-col{display:none}" in narrow
+    assert ".doc-pane.open{flex:1; max-width:none" in narrow
 
 
 def test_doc_pane_still_toggled_by_docs_button():
-    """侧边栏仍由「文档 ▸」按钮切换（宽度改动不应动到交互）。"""
+    """侧边栏仍由「文档」按钮切换（宽度改动不应动到交互）。"""
     template = (TEMPLATES / "assistant.html").read_text(encoding="utf-8")
     assert 'id="doc-pane"' in template
     assert 'id="btn-docs"' in template

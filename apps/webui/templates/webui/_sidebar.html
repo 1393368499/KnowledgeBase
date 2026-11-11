@@ -1,27 +1,44 @@
-<nav class="sidebar" id="kb-sidebar" aria-label="主导航">
-  <ul class="sidebar-menu">
-    <li>
-      <a class="nav-item {% if page == 'assistant' %}on{% endif %}" href="{% url 'webui:assistant' %}">
-        <span class="nav-icon">✦</span><span>助手首页</span>
+<aside class="sidebar" id="sidebar" aria-label="智库侧栏">
+  <a class="brand" href="{% url 'webui:home' %}">
+    <svg class="icon brand-mark" aria-hidden="true"><use href="#kb-brand"></use></svg>
+    <span>智库<small>知识工作区</small></span>
+  </a>
+  <nav aria-label="主导航">
+    <div class="nav-group">
+      <p>工作台</p>
+      <ul class="sidebar-menu">
+        {% include "webui/_nav_item.html" with route="webui:home" key="assistant" label="智能助手" icon="chat" %}
+        {% include "webui/_nav_item.html" with route="webui:search" key="search" label="资料搜索" icon="search" %}
+        {% include "webui/_nav_item.html" with route="webui:tasks" key="tasks" label="添加记录" icon="tasks" %}
+      </ul>
+    </div>
+    <div class="nav-group">
+      <p>资料与文档</p>
+      <ul class="sidebar-menu">
+        {% include "webui/_nav_item.html" with route="webui:files" key="files" label="文件管理" icon="files" %}
+        {% include "webui/_nav_item.html" with route="webui:knowledge" key="knowledge" label="信息库" icon="library" %}
+        {% include "webui/_nav_item.html" with route="webui:templates" key="templates" label="模板管理" icon="template" %}
+      </ul>
+    </div>
+    <div class="nav-group">
+      <p>系统</p>
+      <ul class="sidebar-menu">
+        {% include "webui/_nav_item.html" with route="webui:devices" key="devices" label="设备管理" icon="devices" %}
+        {% include "webui/_nav_item.html" with route="webui:agent" key="agent" label="Agent 控制台" icon="activity" %}
+        {% include "webui/_nav_item.html" with route="webui:settings" key="settings" label="系统配置" icon="settings" %}
+        {% include "webui/_nav_item.html" with route="webui:docs" key="docs" label="使用说明" icon="help" %}
+      </ul>
+    </div>
+  </nav>
+  <section class="session-block" aria-labelledby="session-heading">
+    <div class="session-block-head">
+      {# 「最近会话」是导航分组的标签，不是页面标题：用 <p> 而不是 <h2>，
+         否则它会先于各页唯一的 <h1> 出现在 DOM 里（2.4.6 标题顺序倒置）。 #}
+      <p class="session-heading" id="session-heading">最近会话 <span id="session-count"></span></p>
+      <a class="sidebar-action" id="new-session" href="{% url 'webui:home' %}" aria-label="新建会话">
+        <svg class="icon" aria-hidden="true"><use href="#kb-plus"></use></svg>
       </a>
-    </li>
-    <li>
-      <a class="nav-item {% if page == 'files' %}on{% endif %}" href="{% url 'webui:files' %}">
-        <span class="nav-icon">▦</span><span>文件管理</span>
-      </a>
-    </li>
-    <li>
-      <a class="nav-item {% if page == 'search' %}on{% endif %}" href="{% url 'webui:search' %}">
-        <span class="nav-icon">◎</span><span>检索</span>
-      </a>
-    </li>
-    {% if request.user.is_staff %}
-    <li class="nav-group"><span>管理员</span></li>
-    <li>
-      <a class="nav-item" href="/admin/" target="_blank" rel="noopener">
-        <span class="nav-icon">⚙︎</span><span>系统管理</span>
-      </a>
-    </li>
-    {% endif %}
-  </ul>
-</nav>
+    </div>
+    <div class="session-list" id="session-list"><p class="session-note">正在读取会话…</p></div>
+  </section>
+</aside>
