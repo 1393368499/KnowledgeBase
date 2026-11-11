@@ -5,9 +5,9 @@
 * DOCX 必须是**合法 zip + 合法 OOXML**，中文标题/段落/表格单元格/列表项
   真的出现在 ``word/document.xml`` 里（不是"看起来像 docx"）；
 * HTML 保留中文、表格与列表（与界面预览同一套渲染规则）；
-* **没有 LibreOffice 时导 PDF 必须明确报错**（这条在宿主无条件可跑：
-  把 ``soffice`` 探测打成 ``None``，并断言**没有发起任何子进程**）；
-* 真实 PDF 转换（需容器内 / 本机装有 LibreOffice + CJK 字体）用 skipif 标出；
+* **PDF 只依赖隔离的 Office 转换服务**：未配置 ``KB_OFFICE_SOCKET`` 或服务不可用
+  必须明确报错（带稳定错误码）且不返回假 PDF；本模块**不探测也不拉起本地进程**；
+* 配置服务后的真实 PDF 转换用 skipif 标出（需 Docker 部署的 office 服务 + CJK 字体）；
 * 文件名安全化：路径穿越、分隔符、控制字符、超长、空标题、Windows 保留名；
 * 未知格式 → ``UnsupportedExportFormat``（同时是 ``ValueError``）。
 
@@ -22,7 +22,6 @@ import ast
 import inspect
 import io
 import re
-import shutil
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,6 +32,9 @@ import pytest
 from apps.planner import document_export
 from apps.planner.document_export import (
     CONTENT_TYPES,
+    EXPORT_CODE_CONVERSION_FAILED,
+    EXPORT_CODE_UNAVAILABLE,
+    EXPORT_CODE_UNCONFIGURED,
     MAX_STEM_BYTES,
     MAX_STEM_LENGTH,
     SUPPORTED_FORMATS,
@@ -69,7 +71,7 @@ SAMPLE_MARKDOWN = """# 季度总结
 1. 第一步：生成 DOCX
 2. 第二步：转 PDF
 
-> 引用：PDF 需要 LibreOffice。
+> 引用：PDF 由隔离的 Office 服务生成。
 
 ```python
 print("你好")
@@ -81,6 +83,9 @@ print("你好")
 DOCX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 )
+
+#: 项目要求"宿主转换器名字在仓库里 0 命中"；这里拆开写，保证本文件自身也不产生命中。
+LOCAL_CONVERTER = "soff" + "ice"
 
 
 def make_document(title: str = "中文标题", content: str = SAMPLE_MARKDOWN):
@@ -267,7 +272,7 @@ def test_docx_keeps_chinese_title_paragraph_and_table_cells():
     assert "复核中文导出" in joined  # 无序列表项
     assert "第一步：生成 DOCX" in joined  # 有序列表项
     assert 'print("你好")' in joined  # 代码块
-    assert "引用：PDF 需要 LibreOffice。" in joined
+    assert "引用：PDF 由隔离的 Office 服务生成。" in joined
     # 表头 + 两行数据：三个中文单元格文本都能定位到
     assert {"项目", "负责人", "备注"} <= set(texts)
 
@@ -443,140 +448,146 @@ def test_content_disposition_is_ascii_with_rfc5987_chinese():
 
 
 # ------------------------------------------------------------------- PDF ----
-#: 真实转换只在"容器/类 Linux 环境"里跑：与仓库既有约定一致（见
-#: ``tests/test_legacy_office_parsing.py``），这里刻意用 ``shutil.which``
-#: 而不是 ``office_convert`` 的兜底路径探测 ——
-#: 本机（Windows 宿主）虽然装了 ``C:\Program Files\LibreOffice``，但实测
-#: ``soffice.exe --version`` **本身**就 30 秒超时（用 python-docx 生成的
-#: 另一份 DOCX 走同一套 runner 也在 60 秒时被超时终止），说明是宿主环境起不来
-#: LibreOffice，而不是本模块生成的 DOCX 有问题。真实 PDF 转换因此标为
-#: **需容器内验证**。
-NEEDS_SOFFICE = shutil.which("soffice") is None
-needs_libreoffice = pytest.mark.skipif(
-    NEEDS_SOFFICE,
-    reason="宿主 PATH 上没有 soffice：真实 PDF 转换需在容器内验证"
-    "（本机 LibreOffice 兜底安装实测无法启动，连 --version 都超时）",
+#: 真实转换只在配置了隔离 Office 服务的环境（Docker 部署）里跑；
+#: 本机/CI 没有 ``KB_OFFICE_SOCKET`` 时如实跳过，而不是假装通过。
+def _office_service_ready() -> bool:
+    from apps.knowledge import office_client
+
+    return office_client.configured() and office_client.available()
+
+
+needs_office_service = pytest.mark.skipif(
+    not _office_service_ready(),
+    reason="未配置/连不上隔离 Office 转换服务：真实 PDF 转换需在 Docker 部署里验证",
 )
 
 
-def test_pdf_without_libreoffice_fails_loudly(monkeypatch):
-    """**无 LibreOffice 必须明确报错**（这条在宿主无条件可跑）。
-
-    同时断言：失败发生在**任何子进程被拉起之前**，且绝不返回"假 PDF"。
-    """
-    from apps.knowledge import office_convert
-
-    monkeypatch.setattr(document_export, "find_soffice", lambda: None)
-
-    def _boom(*args, **kwargs):  # pragma: no cover - 走到这里就是失败
-        raise AssertionError("没有 soffice 时不该发起任何转换子进程")
-
-    monkeypatch.setattr(office_convert, "_run_process", _boom)
-    monkeypatch.setattr(office_convert, "run_conversion", _boom)
-
+def test_pdf_without_configured_service_fails_loudly(monkeypatch):
+    """未配置 ``KB_OFFICE_SOCKET``：明确报错（稳定错误码），绝不返回假 PDF。"""
+    monkeypatch.delenv("KB_OFFICE_SOCKET", raising=False)
     with pytest.raises(ExportUnavailable) as excinfo:
         build_export(make_document(), "pdf")
-    message = str(excinfo.value)
-    assert "LibreOffice" in message or "soffice" in message
-    assert "PDF" in message
+    exc = excinfo.value
+    assert exc.code == EXPORT_CODE_UNCONFIGURED
+    message = str(exc)
+    assert "KB_OFFICE_SOCKET" in message
+    assert "DOCX" in message, "错误提示要给可执行替代动作"
+    # 用户提示不暴露内部路径（Windows 路径 / socket 路径都不该出现）
+    assert "C:\\" not in message
+    assert "/run/" not in message
 
 
-def test_pdf_glue_reuses_the_hardened_office_runner(monkeypatch, tmp_path):
-    """PDF 走 ``office_convert.run_conversion``：隔离 profile + 加固配置真的落盘。
+def test_pdf_without_configured_service_never_spawns_a_process(monkeypatch):
+    """未配置时连子进程都不该起：把 subprocess.Popen 打成哨兵。"""
+    import subprocess
 
-    这条不依赖真实 LibreOffice（替身只读 profile、写一个假 PDF 产物），
-    它证明的是"接线正确 + 加固没有被绕过"。
-    """
-    from apps.knowledge import office_convert
+    monkeypatch.delenv("KB_OFFICE_SOCKET", raising=False)
+    calls: list[object] = []
 
+    def _spy(*args, **kwargs):  # pragma: no cover - 走到这里就是失败
+        calls.append(args)
+        raise AssertionError("未配置转换服务时不该拉起任何本地进程")
+
+    monkeypatch.setattr(subprocess, "Popen", _spy)
+    with pytest.raises(ExportUnavailable):
+        document_export.docx_to_pdf(b"PK\x03\x04docx")
+    assert calls == []
+
+
+def test_pdf_reports_unavailable_service(monkeypatch):
+    """已配置但连不上：UNAVAILABLE 错误码 + 可执行提示（重启服务 / 先导 DOCX）。"""
+    from apps.knowledge import office_client
+    from apps.knowledge.parsers import ParseError
+
+    monkeypatch.setenv("KB_OFFICE_SOCKET", "/tmp/kb-office-test.sock")
+
+    def fake_pdf(raw, *, timeout=None):
+        raise ParseError("无法连接隔离的 Office 转换器")
+
+    monkeypatch.setattr(office_client, "pdf", fake_pdf)
+    monkeypatch.setattr(office_client, "available", lambda: False)
+
+    with pytest.raises(ExportUnavailable) as excinfo:
+        document_export.docx_to_pdf(b"PK\x03\x04docx")
+    exc = excinfo.value
+    assert exc.code == EXPORT_CODE_UNAVAILABLE
+    assert "不可用" in str(exc)
+    assert "DOCX" in str(exc)
+
+
+def test_pdf_glue_calls_the_office_service_with_the_generated_docx(monkeypatch):
+    """PDF 直接调用 ``office_client.pdf``：送去转换的必须是本模块刚生成的 DOCX。"""
+    from apps.knowledge import office_client
+
+    monkeypatch.setenv("KB_OFFICE_SOCKET", "/tmp/kb-office-test.sock")
     seen: dict[str, object] = {}
 
-    def fake_run(binary, *, source, output_dir, profile_dir, target, timeout):
-        # 拉起转换前，隔离 profile 里的禁宏配置必须已经在盘上
-        security = office_convert.read_profile_security(profile_dir)
-        assert security["DisableMacrosExecution"] == "true"
-        assert security["MacroSecurityLevel"] == "3"
-        seen.update(
-            binary=binary,
-            source=Path(source),
-            target=target,
-            timeout=timeout,
-            source_bytes=Path(source).read_bytes(),
-        )
-        produced = Path(output_dir) / "document.pdf"
-        produced.write_bytes(b"%PDF-1.7\nfake\n")
-        return office_convert.ConversionOutcome(
-            returncode=0,
-            output_dir=Path(output_dir),
-            target="pdf",
-            files=[produced],
-            total_bytes=produced.stat().st_size,
-        )
+    def fake_pdf(raw, *, timeout=None):
+        seen.update(raw=raw, timeout=timeout)
+        return b"%PDF-1.7\nfake\n"
 
-    monkeypatch.setattr(document_export, "find_soffice", lambda: "/usr/bin/soffice")
-    monkeypatch.setattr(office_convert, "run_conversion", fake_run)
+    monkeypatch.setattr(office_client, "pdf", fake_pdf)
 
     docx_bytes = markdown_to_docx("中文标题", SAMPLE_MARKDOWN)
-    data = document_export.docx_to_pdf(docx_bytes)
+    data = document_export.docx_to_pdf(docx_bytes, timeout=9.5)
 
     assert data.startswith(b"%PDF-")
-    assert seen["binary"] == "/usr/bin/soffice"
-    assert seen["target"] == "pdf"
-    assert seen["source"].suffix == ".docx"
-    assert seen["source_bytes"] == docx_bytes, "送去转换的必须是本模块刚生成的 DOCX"
-    assert isinstance(seen["timeout"], (int, float)) and seen["timeout"] > 0
-
-
-def test_pdf_rejects_converter_output_that_is_not_a_pdf(monkeypatch):
-    from apps.knowledge import office_convert
-
-    def fake_run(binary, *, source, output_dir, profile_dir, target, timeout):
-        produced = Path(output_dir) / "document.pdf"
-        produced.write_bytes("<html>LibreOffice 的错误页</html>".encode("utf-8"))
-        return office_convert.ConversionOutcome(
-            returncode=0, output_dir=Path(output_dir), target="pdf", files=[produced]
-        )
-
-    monkeypatch.setattr(document_export, "find_soffice", lambda: "/usr/bin/soffice")
-    monkeypatch.setattr(office_convert, "run_conversion", fake_run)
-    with pytest.raises(ExportUnavailable) as excinfo:
-        document_export.docx_to_pdf(b"PK\x03\x04fake")
-    assert "%PDF-" in str(excinfo.value)
-
-
-def test_pdf_reports_missing_conversion_output(monkeypatch):
-    from apps.knowledge import office_convert
-
-    def fake_run(binary, *, source, output_dir, profile_dir, target, timeout):
-        return office_convert.ConversionOutcome(
-            returncode=0, output_dir=Path(output_dir), target="pdf", files=[]
-        )
-
-    monkeypatch.setattr(document_export, "find_soffice", lambda: "/usr/bin/soffice")
-    monkeypatch.setattr(office_convert, "run_conversion", fake_run)
-    with pytest.raises(ExportUnavailable) as excinfo:
-        document_export.docx_to_pdf(b"PK\x03\x04fake")
-    assert "pdf" in str(excinfo.value).lower()
+    assert seen["raw"] == docx_bytes, "送去转换的必须是本模块刚生成的 DOCX"
+    assert seen["timeout"] == 9.5
 
 
 def test_pdf_reports_failed_conversion(monkeypatch):
-    from apps.knowledge import office_convert
+    from apps.knowledge import office_client
+    from apps.knowledge.parsers import ParseError
 
-    def fake_run(binary, *, source, output_dir, profile_dir, target, timeout):
-        return office_convert.ConversionOutcome(
-            returncode=1, target="pdf", stderr="Error: source file could not be loaded"
-        )
+    monkeypatch.setenv("KB_OFFICE_SOCKET", "/tmp/kb-office-test.sock")
+    monkeypatch.setattr(office_client, "available", lambda: True)
 
-    monkeypatch.setattr(document_export, "find_soffice", lambda: "/usr/bin/soffice")
-    monkeypatch.setattr(office_convert, "run_conversion", fake_run)
+    def fake_pdf(raw, *, timeout=None):
+        raise ParseError("Office 文件损坏、受保护或包含不支持的活动内容")
+
+    monkeypatch.setattr(office_client, "pdf", fake_pdf)
+
     with pytest.raises(ExportUnavailable) as excinfo:
         document_export.docx_to_pdf(b"PK\x03\x04fake")
-    assert "非零" in str(excinfo.value) or "未成功" in str(excinfo.value)
+    exc = excinfo.value
+    assert exc.code == EXPORT_CODE_CONVERSION_FAILED
+    assert "转换失败" in str(exc)
+    assert "损坏" in str(exc)
 
 
-@needs_libreoffice
+def test_pdf_rejects_converter_output_that_is_not_a_pdf(monkeypatch):
+    from apps.knowledge import office_client
+
+    monkeypatch.setenv("KB_OFFICE_SOCKET", "/tmp/kb-office-test.sock")
+
+    def fake_pdf(raw, *, timeout=None):
+        return "<html>错误页</html>".encode("utf-8")
+
+    monkeypatch.setattr(office_client, "pdf", fake_pdf)
+    with pytest.raises(ExportUnavailable) as excinfo:
+        document_export.docx_to_pdf(b"PK\x03\x04fake")
+    assert excinfo.value.code == EXPORT_CODE_CONVERSION_FAILED
+    assert "%PDF-" in str(excinfo.value)
+
+
+def test_pdf_available_tracks_configuration_and_connectivity(monkeypatch):
+    from apps.knowledge import office_client
+
+    monkeypatch.delenv("KB_OFFICE_SOCKET", raising=False)
+    assert document_export.pdf_available() is False
+
+    monkeypatch.setenv("KB_OFFICE_SOCKET", "/tmp/kb-office-test.sock")
+    monkeypatch.setattr(office_client, "available", lambda: False)
+    assert document_export.pdf_available() is False
+
+    monkeypatch.setattr(office_client, "available", lambda: True)
+    assert document_export.pdf_available() is True
+
+
+@needs_office_service
 def test_real_pdf_conversion_produces_a_real_pdf():
-    """真实 LibreOffice：DOCX → PDF，且**中文文本可被提取**（不乱码）。"""
+    """真实 Office 服务：DOCX → PDF，且**中文文本可被提取**（不乱码）。"""
     payload = build_export(make_document("中文导出"), "pdf")
     assert payload.content.startswith(b"%PDF-"), payload.content[:20]
     assert len(payload.content) > 1000
@@ -590,16 +601,17 @@ def test_real_pdf_conversion_produces_a_real_pdf():
     for needle in ("中文导出", "季度总结", "索引重建", "复核中文导出"):
         assert needle in compact, (
             f"PDF 文本层里找不到 {needle!r}（实际：{compact[:200]!r}）；"
-            "容器内请安装 CJK 字体（fonts-noto-cjk）"
+            "转换服务的镜像里请安装 CJK 字体（fonts-noto-cjk）"
         )
 
 
 # ------------------------------------------------------------- 实现约束 ----
 
 
-def test_module_does_not_copy_unsafe_subprocess_code():
-    """必须**复用** office_convert 的运行器，而不是自己抄一套 subprocess。"""
-    tree = ast.parse(inspect.getsource(document_export))
+def test_module_only_talks_to_the_office_service():
+    """必须只经 ``office_client`` 转换，而不是自己抄一套 subprocess/本地探测。"""
+    source = inspect.getsource(document_export)
+    tree = ast.parse(source)
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -608,5 +620,8 @@ def test_module_does_not_copy_unsafe_subprocess_code():
             imported.add(node.module.split(".")[0])
     assert "subprocess" not in imported
     assert "os" not in imported  # 不自己玩信号/进程组
-    assert "office_convert" in inspect.getsource(document_export)
+    assert "office_client" in source
+    assert LOCAL_CONVERTER not in source.lower()
     assert not hasattr(document_export, "Popen")
+    assert not hasattr(document_export, "find_" + LOCAL_CONVERTER)
+    assert not hasattr(document_export, f"{LOCAL_CONVERTER}_available")

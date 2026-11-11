@@ -7,7 +7,7 @@
 | `.pdf` | ``_parse_pdf`` | 先按文本层抽；某页抽不出文本（扫描件）就渲染成图交给 AS711 OCR |
 | `.docx` | ``_parse_docx`` | 段落 + 表格 |
 | `.xlsx` / `.xlsm` | ``_parse_xlsx`` | 每个工作表逐行转成 ``列=值`` 文本 |
-| `.doc` / `.xls` / `.ppt` / `.pptx` | ``office_convert.parse_legacy_office`` | 受限 LibreOffice 转换后复用上面的解析器 |
+| `.doc` / `.xls` / `.ppt` / `.pptx` | ``office_client.parse`` | 交给隔离的 Office 转换服务，再复用上面的解析器 |
 | `.txt` / `.md` | ``_parse_text`` | 按行分段，Markdown 去标记 |
 | `.csv` | ``_parse_csv`` | 按行转文本 |
 | 图片 | ``_parse_image`` | 直接交给 AS711 OCR |
@@ -29,6 +29,7 @@ import io
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from zipfile import ZipFile
 
 from .ocr import OcrClient, OcrError
 from . import progress
@@ -38,6 +39,8 @@ MAX_BLOCK_CHARS = 1200
 
 #: 一次解析最多产出的分段数，防止坏文件把库撑爆。
 MAX_BLOCKS = 20000
+MAX_ZIP_ENTRIES = 2_000
+MAX_ZIP_UNCOMPRESSED = 200 * 1024 * 1024
 
 
 class ParseError(RuntimeError):
@@ -247,11 +250,24 @@ def _parse_docx(raw: bytes, name: str) -> ParseResult:
     return ParseResult(blocks=blocks, parser="docx")
 
 
+def guard_ooxml_size(source, *, max_entries, max_bytes):
+    """Bound expanded OOXML members before a downstream parser reads them."""
+    with ZipFile(source) as archive:
+        entries = archive.infolist()
+        if len(entries) > max_entries:
+            raise ValueError(f"压缩包条目过多（{len(entries)} > {max_entries}）")
+        size = sum(entry.file_size for entry in entries)
+        if size > max_bytes:
+            raise ValueError(f"压缩包解压后过大（{size} > {max_bytes} 字节）")
+
+
 def _parse_xlsx(raw: bytes, name: str) -> ParseResult:
     import openpyxl
 
     try:
-        workbook = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        source = io.BytesIO(raw)
+        guard_ooxml_size(source, max_entries=MAX_ZIP_ENTRIES, max_bytes=MAX_ZIP_UNCOMPRESSED)
+        workbook = openpyxl.load_workbook(source, read_only=True, data_only=True)
     except Exception as exc:  # noqa: BLE001
         raise ParseError(f"XLSX 打开失败：{exc}") from exc
 
@@ -422,7 +438,7 @@ def _unsupported(name: str, hint: str) -> ParseResult:
 TEXT_SUFFIXES = {".txt", ".md", ".markdown"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 
-#: 需要 LibreOffice 转换的旧版 / 二进制 Office 后缀（实现在 ``office_convert``）。
+#: 需要**隔离 Office 转换服务**的旧版 / 二进制 Office 后缀（实现在 ``office_client``）。
 LEGACY_OFFICE_SUFFIXES = {".doc", ".xls", ".ppt", ".pptx"}
 
 #: **宏 / 脚本型** 后缀：直接拒绝（与 ``office_convert.BLOCKED_SUFFIXES`` 一致，
@@ -445,7 +461,7 @@ def parse_bytes(
     """按扩展名分派解析器。识别只看扩展名与内容是否可读，不做过度猜测。"""
     suffix = Path(name).suffix.lower()
     # 宏 / 脚本型文档在**分派之前**就拒绝：它们不该走到任何解析器里，
-    # 也不该被 LibreOffice 打开（那是一份可执行的文档，不是一份资料）。
+    # 也不该交给隔离的 Office 转换服务（那是一份可执行的文档，不是一份资料）。
     # 放在"空文件"检查**之前**：安全判定不能被别的错误抢先遮住。
     if suffix in BLOCKED_MACRO_SUFFIXES:
         raise ParseUnsupported(
@@ -468,10 +484,14 @@ def parse_bytes(
     if suffix in IMAGE_SUFFIXES:
         return _parse_image(raw, name, ocr=ocr)
     if suffix in LEGACY_OFFICE_SUFFIXES:
-        # 旧版 / 需要转换的 Office：受限 LibreOffice 转换后再复用上面的解析器
-        # （.doc→.docx|.txt、.xls→.xlsx|.csv、.ppt→.pptx|.pdf、.pptx→.pdf）。
-        # 实现与全部安全守卫在 ``apps.knowledge.office_convert``。
-        from .office_convert import parse_legacy_office
+        from . import office_client
 
-        return parse_legacy_office(raw, name, ocr=ocr, ocr_pages=ocr_pages)
+        if not office_client.configured():
+            # 不做本地转换兜底：这条路径只会拉起宿主进程并产生弹窗，
+            # 转换能力由 Docker 里的隔离 Office 服务承担。
+            raise ParseUnsupported(
+                "旧版 Office 格式需要隔离 Office 转换服务（Docker 部署）；"
+                "当前环境未配置 KB_OFFICE_SOCKET"
+            )
+        return office_client.parse(raw, name, ocr=ocr, ocr_pages=ocr_pages)
     return _unsupported(name, "暂不支持解析")

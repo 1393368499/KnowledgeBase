@@ -40,7 +40,7 @@ class TemplateStorageError(TemplateError):
 
 
 #: 允许做模板的格式。刻意只放"能稳定抽出文字"的几种：
-#: ``.doc/.pdf`` 走既有的 LibreOffice / pypdf 通道，``.txt/.md`` 直接读。
+#: ``.doc/.pdf`` 走 Office 转换 / pypdf 通道，``.txt/.md`` 直接读。
 #: 图片与表格类不做模板（图片模板=没有可用的格式文字，表格模板=公文很少用）。
 ALLOWED_SUFFIXES = frozenset({".docx", ".dotx", ".doc", ".pdf", ".txt", ".md",
                               ".pptx", ".potx", ".ppt", ".xlsx", ".csv"})
@@ -162,7 +162,7 @@ def extract_text(raw: bytes, original_name: str) -> str:
         # ParseUnsupported 是 ParseError 的子类：格式类终态失败也走这里
         logger.warning("模板解析失败（%s）：%s", original_name, exc)
         raise TemplateError(f"无法解析这个模板：{exc}") from exc
-    except Exception as exc:  # noqa: BLE001 - 解析器的外部依赖（LibreOffice 等）任何异常都不该 500
+    except Exception as exc:  # noqa: BLE001 - 解析器的外部依赖（Office 转换服务等）任何异常都不该 500
         logger.warning("模板解析出现意外错误（%s）：%s", original_name, exc)
         raise TemplateError(f"解析模板时出错（{type(exc).__name__}）：{exc}") from exc
     text = "\n".join(block.text for block in result.blocks).strip()

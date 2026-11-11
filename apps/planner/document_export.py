@@ -33,11 +33,11 @@
   行内 ``**粗体**`` / ``` `行内代码` `` `` 支持。所有 ``w:t`` 都带
   ``xml:space="preserve"``，避免首尾空格被吞。
 
-* **PDF 复用 ``apps.knowledge.office_convert`` 的受限运行器**：先由本模块生成
-  DOCX，再交给镜像里的 LibreOffice（``soffice --headless --convert-to pdf``）。
-  隔离 user profile、禁宏/禁外链、超时杀**整个进程组**、产物符号链接与体积上限
-  这些加固全部来自那套实现 —— 本模块**不复制任何 subprocess 代码**，
-  只做"组装 -> 调用 -> 取字节"，并且**没有 LibreOffice 时明确报错**，
+* **PDF 只走隔离的 Office 转换服务**：先由本模块生成 DOCX，再通过
+  :mod:`apps.knowledge.office_client` 把字节交给 Docker 里的 Office 服务
+  （Unix socket，服务端负责禁宏/禁外链/限时/产物体积上限）。
+  本模块**不探测也不拉起任何本地转换进程**；未配置 ``KB_OFFICE_SOCKET``
+  或服务不可用时返回带稳定错误码的 :class:`ExportUnavailable`，
   绝不返回假 PDF（真正的 PDF 必须以 ``%PDF-`` 开头）。
 
 * **文件名安全化**：``<安全化后的标题>.<ext>``。去掉路径分隔符与控制字符、
@@ -49,7 +49,6 @@ from __future__ import annotations
 
 import io
 import re
-import tempfile
 import unicodedata
 import zipfile
 from dataclasses import dataclass, field
@@ -66,14 +65,16 @@ __all__ = [
     "ExportError",
     "UnsupportedExportFormat",
     "ExportUnavailable",
+    "EXPORT_CODE_UNCONFIGURED",
+    "EXPORT_CODE_UNAVAILABLE",
+    "EXPORT_CODE_CONVERSION_FAILED",
     "normalize_format",
     "safe_filename_stem",
     "export_filename",
     "render_document_html",
     "markdown_to_docx",
     "docx_to_pdf",
-    "find_soffice",
-    "soffice_available",
+    "pdf_available",
     "build_export",
     "content_disposition",
 ]
@@ -130,7 +131,7 @@ _DCTERMS_NS = "http://purl.org/dc/terms/"
 _XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
 
 #: XML 1.0 **不允许**的字符（控制字符与 DEL/C1）；文档正文里可能出现，
-#: 直接写进 XML 会让 LibreOffice/Word 打不开，因此统一剔除。
+#: 直接写进 XML 会让 Word 等 OOXML 阅读器打不开，因此统一剔除。
 _XML_INVALID = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 
 #: 文件名里**必须**替换掉的字符：路径分隔符、Windows 保留字符、控制字符。
@@ -183,11 +184,24 @@ class UnsupportedExportFormat(ExportError, ValueError):
     """
 
 
+#: PDF 导出依赖隔离的 Office 转换服务；下面三个错误码由
+#: :attr:`ExportUnavailable.code` 带出，调用方/监控可以稳定识别失败原因。
+EXPORT_CODE_UNCONFIGURED = "office_service_unconfigured"
+EXPORT_CODE_UNAVAILABLE = "office_service_unavailable"
+EXPORT_CODE_CONVERSION_FAILED = "office_conversion_failed"
+
+
 class ExportUnavailable(ExportError):
-    """环境不具备导出条件（当前只有一种：没有 LibreOffice 转不了 PDF）。
+    """环境不具备导出条件（PDF 需要隔离的 Office 转换服务）。
 
     这是一个**明确的失败**：绝不降级成"返回一个假 PDF"或"返回 Markdown 冒充"。
+    ``code`` 是稳定错误码（见 :data:`EXPORT_CODE_UNCONFIGURED` 等），
+    ``str(exc)`` 是给用户看的可执行提示（不含内部路径）。
     """
+
+    def __init__(self, message: str, *, code: str = EXPORT_CODE_UNAVAILABLE) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 # ----------------------------------------------------------------- 数据载体 ----
@@ -627,7 +641,7 @@ def _table_xml(rows: list[list[str]]) -> str:
     return (
         "<w:tbl><w:tblPr>"
         f'<w:tblW w:w="{TABLE_WIDTH_TWIPS}" w:type="dxa"/>'
-        # fixed：让 Word/LibreOffice 严格按 gridCol 宽度排版（auto 会重新按内容算，
+        # fixed：让 Word 等阅读器严格按 gridCol 宽度排版（auto 会重新按内容算，
         # 于是又回到"表格只占半幅"的现象）
         '<w:tblLayout w:type="fixed"/>'
         f"{borders}"
@@ -721,7 +735,7 @@ def _body_xml(title: str, markdown: str) -> str:
                     spacing='<w:spacing w:before="120" w:after="120"/>',
                 )
             )
-    # 正文至少要有一个段落，否则 Word/LibreOffice 会抱怨空的 body。
+    # 正文至少要有一个段落，否则 Word 等阅读器会抱怨空的 body。
     if not parts:
         parts.append(_paragraph(""))
     sect = (
@@ -795,9 +809,9 @@ def _document_rels_xml() -> str:
 def _styles_xml() -> str:
     """默认字号/行距 + ``Normal``。
 
-    **刻意不指定字体名**：容器里若没有 ``SimSun``/``Calibri`` 这类字体，
-    指定了反而会让 LibreOffice 做一次无意义的替换；中文能不能渲染取决于
-    镜像里装没装 CJK 字体（见交付报告里的 ``fonts-noto-cjk``）。
+    **刻意不指定字体名**：渲染端的镜像里若没有 ``SimSun``/``Calibri`` 这类字体，
+    指定了反而会触发一次无意义的字体替换；中文能不能渲染取决于渲染端装没装
+    CJK 字体（PDF 由隔离的 office 服务渲染，字体装在该服务镜像里）。
     """
     return (
         _XML_DECL
@@ -903,88 +917,67 @@ def markdown_to_docx(
 # ---------------------------------------------------------------------- PDF ----
 
 
-def find_soffice() -> str | None:
-    """定位 LibreOffice（复用 ``apps.knowledge.office_convert`` 的探测）。"""
-    from apps.knowledge import office_convert
+def _office_service_reachable() -> bool:
+    """探测隔离转换服务是否可用；探测本身失败（如平台不提供 Unix socket）也算不可用。"""
+    from apps.knowledge import office_client
 
-    return office_convert.find_soffice()
+    try:
+        return office_client.available()
+    except (AttributeError, OSError):
+        return False
 
 
-def soffice_available() -> bool:
-    return find_soffice() is not None
+def pdf_available() -> bool:
+    """PDF 导出是否可用：转换服务已配置，**并且**当前能连上。"""
+    from apps.knowledge import office_client
+
+    return office_client.configured() and _office_service_reachable()
 
 
 def docx_to_pdf(docx_bytes: bytes, *, timeout: float | None = None) -> bytes:
-    """DOCX 字节 → PDF 字节（由镜像内 LibreOffice 完成）。
+    """DOCX 字节 → PDF 字节（由隔离的 Office 转换服务完成）。
 
-    加固完全沿用 :mod:`apps.knowledge.office_convert`：
-
-    * 每次转换一个**隔离的 user profile**（宏/外链/无脚本按 schema 显式关掉，
-      并在启动前校验真的落盘）；
-    * 超时杀**整个进程组**（``soffice`` 会 fork ``soffice.bin``）；
-    * 产物做符号链接/条数/体积校验。
-
-    没有 ``soffice`` → :class:`ExportUnavailable`（**明确报错，不返回假 PDF**）；
-    转换失败/没产物/产物不是 PDF → 同样是 :class:`ExportUnavailable`。
+    没有配置转换服务 / 服务不可用 / 转换失败 → :class:`ExportUnavailable`
+    （**明确报错，不返回假 PDF**，错误提示可执行且不含内部路径）；
+    成功时保证产物以 ``%PDF-`` 开头。
     """
-    from apps.knowledge import office_convert
-
     if not docx_bytes:
-        raise ExportUnavailable("DOCX 内容为空，无法转换为 PDF")
-
-    binary = find_soffice()
-    if not binary:
         raise ExportUnavailable(
-            "导出 PDF 需要 LibreOffice（soffice），但当前环境找不到该可执行文件；"
-            "容器镜像请安装 libreoffice-writer（或完整 libreoffice），"
-            "并确保容器内安装了中文字体（如 fonts-noto-cjk），否则中文会渲染成方框"
+            "DOCX 内容为空，无法转换为 PDF", code=EXPORT_CODE_CONVERSION_FAILED
         )
 
-    limit = office_convert.conversion_timeout_seconds() if timeout is None else timeout
+    from apps.knowledge import office_client
+    from apps.knowledge.parsers import ParseError
 
-    with tempfile.TemporaryDirectory(prefix="kb-export-pdf-") as tmp:
-        work = Path(tmp)
-        profile_dir = work / "profile"
-        profile_dir.mkdir()
-        # **必须**在拉起 soffice 之前写好并生效（run_conversion 会再校验一次）。
-        office_convert.write_profile_config(profile_dir)
+    if not office_client.configured():
+        raise ExportUnavailable(
+            "导出 PDF 需要隔离的 Office 转换服务，但当前环境未配置 KB_OFFICE_SOCKET；"
+            "请按项目的 Docker 部署方式启用 office 服务，配置该环境变量后重启应用；"
+            "也可以先导出 DOCX",
+            code=EXPORT_CODE_UNCONFIGURED,
+        )
 
-        source_dir = work / "src"
-        source_dir.mkdir()
-        source = source_dir / "document.docx"
-        source.write_bytes(docx_bytes)
-
-        output_dir = work / "out"
-        output_dir.mkdir()
-
-        try:
-            outcome = office_convert.run_conversion(
-                binary,
-                source=source,
-                output_dir=output_dir,
-                profile_dir=profile_dir,
-                target="pdf",
-                timeout=limit,
-            )
-        except office_convert.ParseError as exc:
-            raise ExportUnavailable(f"LibreOffice 转换 PDF 失败：{exc}") from exc
-
-        if not outcome.ok:
-            detail = f"（返回码 {outcome.returncode}）"
-            if outcome.stderr:
-                detail += f"；stderr：{outcome.stderr}"
-            raise ExportUnavailable(f"LibreOffice 转换 PDF 未成功{detail}")
-
-        pdfs = [
-            path for path in outcome.files if path.suffix.lower() == ".pdf"
-        ]
-        if not pdfs:
-            raise ExportUnavailable("LibreOffice 没有产出任何 .pdf 文件")
-        data = pdfs[0].read_bytes()
-
+    try:
+        data = office_client.pdf(docx_bytes, timeout=timeout)
+    except ParseError as exc:
+        # 失败后再探一次：探不通说明是"服务/连接"问题，而不是文档内容问题，
+        # 两者给用户的处置建议不同（重启服务 vs 换文件/先导出 DOCX）。
+        if not _office_service_reachable():
+            raise ExportUnavailable(
+                "隔离的 Office 转换服务当前不可用（KB_OFFICE_SOCKET 已配置但连接失败）；"
+                f"请确认 office 容器在运行且 socket 已挂载，稍后重试（原因：{exc}）；"
+                "也可以先导出 DOCX",
+                code=EXPORT_CODE_UNAVAILABLE,
+            ) from exc
+        raise ExportUnavailable(
+            f"PDF 转换失败：{exc}；请检查文档是否损坏，或先导出 DOCX",
+            code=EXPORT_CODE_CONVERSION_FAILED,
+        ) from exc
     if not data.startswith(b"%PDF-"):
-        # 产物不以 %PDF- 开头 = 不是 PDF（例如 LO 吐了一个错误页）。
-        raise ExportUnavailable("LibreOffice 产物不是合法 PDF（缺少 %PDF- 文件头）")
+        raise ExportUnavailable(
+            "转换服务返回的不是合法 PDF（缺少 %PDF- 文件头）；本次导出失败，不返回假 PDF",
+            code=EXPORT_CODE_CONVERSION_FAILED,
+        )
     return data
 
 
@@ -1281,7 +1274,7 @@ def build_export(document, fmt: str) -> ExportPayload:
     拒绝逻辑，两者不冲突）。
 
     :raises UnsupportedExportFormat: 未知格式（同时是 ``ValueError``）
-    :raises ExportUnavailable: 导出 PDF 但没有 LibreOffice / 转换失败
+    :raises ExportUnavailable: 导出 PDF 但转换服务未配置/不可用/转换失败
     """
     key = normalize_format(fmt)
     title = str(getattr(document, "title", "") or "")
@@ -1303,10 +1296,7 @@ def build_export(document, fmt: str) -> ExportPayload:
         note = "OOXML（zip）字节；Word范本复用页面设置、页眉页脚和样式"
     else:
         content = docx_to_pdf(format_docx(document_to_docx(document), options))
-        note = (
-            "由镜像内 LibreOffice（soffice --headless --convert-to pdf）"
-            "从本模块生成的 DOCX 转换而来"
-        )
+        note = "从本模块生成的 DOCX 转换而来"
 
     return ExportPayload(
         content=content,

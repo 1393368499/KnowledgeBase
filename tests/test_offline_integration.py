@@ -28,6 +28,7 @@ import pytest
 from django.test import override_settings
 
 from apps.knowledge import pipeline, storage, vectorindex
+from apps.knowledge.parsers import ParseError
 from apps.knowledge import testing_adapter as ta
 from apps.knowledge.embedding import active_profile
 from apps.knowledge.models import (
@@ -45,8 +46,8 @@ pytestmark = pytest.mark.django_db
 DIM = 1024
 
 #: 本地嵌入模式的 Qdrant 不支持 payload 索引（它会明确警告），
-#: 所以关键字检索（MatchText）只有在真实 server 模式才有意义。
-#: 相关断言按这个开关分流，避免把"本地模式测不出来"说成"功能坏了"。
+#: 因此只有真实 server 模式可以验收全文索引的分词行为。
+#: 嵌入模式的 MatchText 仍可做基本文本匹配。
 LOCAL_MODE = True
 
 
@@ -93,6 +94,7 @@ def indexed_library(library, isolated_paths, qdrant_client):
     """给一个库准备好 generation=1 的**测试专用** collection（带 __offline_test 后缀）。"""
     name = ta.test_collection_name(library.pk, 1)
     vectorindex.ensure_collection(qdrant_client, name, DIM)
+    vectorindex.ensure_text_index(qdrant_client, name)
     VectorCollection.objects.create(
         name=name,
         dimension=DIM,
@@ -219,28 +221,27 @@ def test_parse_real_csv_rows(indexed_library, make_file):
 def test_parse_unsupported_format_is_explicit(indexed_library, make_file):
     """坏掉的旧格式文件明确报错，不假装解析成功、也不返回空正文。
 
-    `.xls` 现在**是被支持的**（走受限 LibreOffice 转换，见
-    ``apps/knowledge/office_convert.py``）。所以这里断言的不再是"格式不支持"，
-    而是"这份内容不是有效的工作簿 → 解析必须明确失败并带原因"。
-    宿主没有 LibreOffice 时同样是明确失败（原因写明缺 soffice）。
+    `.xls` 依赖**隔离的 Office 转换服务**（Docker 部署，``KB_OFFICE_SOCKET``）
+    才能转换，宿主上不跑任何本地转换进程。因此这里断言的是"明确失败并带原因"：
+    未配置服务时说明能力缺失，配置了服务时由服务判定文件损坏。
 
     2026-10-16 更新（独立审查发现"伪成功"）：`.xls` 声明的是 OLE2 复合文档，
-    因此**先做容器结构校验** —— 不是 OLE2 魔数就直接判"损坏文件，拒绝转换"，
-    根本不会送进 LibreOffice（否则它会把垃圾字节当纯文本吞下、产出"成功"）。
+    转换前的容器结构校验会先拦住"不是 OLE2 的垃圾字节"，不把它送进转换器。
     """
     library, _qdrant, _collection = indexed_library
     record = _make_with_bytes(library, make_file, b"PK\x03\x04 junk", name="坏工作簿.xls")
-    with pytest.raises(pipeline.ParseError) as excinfo:
+    with pytest.raises(ParseError) as excinfo:
         pipeline.parse_stored_file(record)
     message = str(excinfo.value)
     assert message, "失败必须带原因"
-    # 可能的原因：容器结构不符（损坏文件）／没有 soffice／转换-解析全部失败
+    # 可能的原因：未配置转换服务 / 连不上服务 / 容器结构不符或被服务判损坏
     assert (
-        "损坏文件" in message
+        "KB_OFFICE_SOCKET" in message
+        or "Office 转换服务" in message
+        or "无法连接" in message
+        or "损坏文件" in message
         or "OLE2" in message
-        or "LibreOffice" in message
-        or "转换/解析全部失败" in message
-        or "xlsx" in message
+        or "转换" in message
     ), message
 
 
@@ -437,13 +438,12 @@ def test_sparse_search_hits_keyword(indexed_library, make_file):
     hits = vectorindex.search_sparse(
         qdrant, collections=[collection], text="预付款", limit=5, permission_codes=None
     )
-    if _sparse_works():
-        assert len(hits) == 1
-        assert "预付款比例" in hits[0].payload["text"]
-    else:
-        # 本地模式无 payload 索引：MatchText 一定为空。这里断言"确实是 0"，
-        # 就是在**如实记录模式边界**，不粉饰成通过。
-        assert hits == []
+    assert len(hits) == 1
+    assert "预付款比例" in hits[0].payload["text"]
+    assert vectorindex.search_sparse(
+        qdrant, collections=[collection], text="预付款", limit=5,
+        permission_codes=["library:unauthorized"],
+    ) == []
 
 
 def test_retry_is_idempotent_no_duplicate_points(indexed_library, make_file):
