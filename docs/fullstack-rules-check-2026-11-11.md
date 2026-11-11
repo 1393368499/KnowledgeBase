@@ -120,6 +120,6 @@
 - **供应链**：基础镜像钉 digest、compose 钉 postgres/redis digest、构建记录写入 digest、worker 补 `--no-deps`+`pip check`、CI 工作流与 ruff 配置入库。
 - **安全与可靠性**：错误详情收敛、重试抖动、停用库不可读、登录限速、密码校验器、设备协议版本校验、Qdrant 版本可见性；新增 4 组安全回归用例。
 - **前端无障碍**：3 项 P1 已修并用真实 Chromium 复验（弹窗 dialog 语义/背景 inert/焦点 12 次 Tab 零逃逸、10/10 复选框可访问名、搜索 aria-live、控件边框 3.17:1、四档视口零溢出零 console 错误）。
-- **交付与恢复**：PG 备份恢复演练 0.84 秒、完整性计数与在线库一致；RPO ≤24h / RTO ≤4h 已写入 `docs/backup-restore-policy.md`；候选已整理为 12 个逻辑提交，构建记录 `snapshots/builds/20261111-130007-build.json`，最终镜像 `sha256:59a7ce71…39850`。
+- **交付与恢复**：PG 备份恢复演练 0.84 秒、完整性计数与在线库一致；RPO ≤24h / RTO ≤4h 已写入 `docs/backup-restore-policy.md`；候选已整理为 12 个逻辑提交，构建记录 `snapshots/builds/20261111-131335-build.json`，最终镜像 `sha256:6f59aa7cf1e1de710faa5bf0a90e9bf371ac50889cce440a4afd59355885665c`（由干净工作树构建，构建记录 gitHead=12af4be、gitDirty=false）。
 
 仍保留为**已登记延期**：管理入口 MFA、HTTPS 强制、voice-asr/qdrant 非 root、解析沙箱、OpenAPI、pypdf/celery 大版本、真实屏读器、真实 CWV、滚动发布共存、字体商用授权、Redis/psycopg 许可评估、向量冷备 SHA 清单、页面层字面色值收敛、Python 依赖 hash 锁定、宽泛异常逐项审查。这些项已记录影响、替代控制、责任人与期限（批准人待项目负责人签字）。
