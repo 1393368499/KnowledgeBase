@@ -1,56 +1,70 @@
 # 知识库系统（真实后端）
 
-## 当前部署方式（唯一入口）
+## Docker 启动与访问
 
-```bash
-docker compose up -d          # 在**仓库根**执行；根 compose 是统一入口（include 引用 deploy/docker-compose.unified.yml）
+Windows 首次启动或更新，执行：
+
+```powershell
+powershell -File deploy/start.ps1
 ```
 
-一套 Compose 起全栈：**web（gunicorn，宿主 8800）· migrate（一次性迁移）· worker · scheduler ·
-PostgreSQL · Redis · Qdrant**，服务间用服务名寻址。
+脚本检查 Docker、准备数据卷和目录、构建当前源码、运行迁移，并等待服务就绪。
+首次缺少 `.env` 时会从样例生成，使用随机数据库口令和签名密钥；已有配置与数据卷保留。
+模型接口仍需在 `.env` 中配置为实际可用的服务地址。
 
-**换机器 / 首次部署**（顺序有意义，逐条原因见 [部署与运维](docs/deployment-and-operations.md) §1.1）：
+浏览器打开 **http://127.0.0.1:8800/**，会自动进入助手（未登录时进入登录页）。
+初次部署创建账号：
 
-```bash
-bash deploy/preflight.sh                      # 检查 .env、建 external 卷、绑定目录交给 uid 10001
-bash deploy/build-app.sh                      # 两步建镜像（Windows：powershell -File deploy/build-app.ps1）
-docker compose up -d                          # migrate 服务先成功跑完迁移，应用服务才会启动
-docker compose exec web python manage.py kbcreateuser --username X --password Y --staff
-curl -sS http://127.0.0.1:8800/api/v1/health/ready/       # 期望 200 且 checks.migrations == "ok"
+```powershell
+docker compose exec web python manage.py kbcreateuser --username YOUR_NAME --password YOUR_PASSWORD --staff
 ```
 
-预检会统一准备 `media/raw`、`media/templates` 与 `deploy/worker/beat-state` 的目录权限。
-Linux 上不要省略这一步，否则原件或模板上传可能因 uid 10001 没有写权限而失败。
+已构建镜像与准备好配置后，可直接在 Docker Desktop 中启动容器，或执行：
+
+```bash
+docker compose up -d --wait
+```
+
+服务包含 web、一次性 migrate、worker、scheduler、PostgreSQL、Redis 和 Qdrant；
+常驻服务设置自动重启，应用等待迁移成功后启动。宿主默认端口 8800，容器内监听 `0.0.0.0:8000`。
+
+Linux/macOS 首次部署：
+
+```bash
+cp .env.example .env
+# 编辑 .env，设置 DJANGO_SECRET_KEY、KB_PG_PASSWORD 和实际模型接口。
+bash deploy/preflight.sh
+docker compose up -d --build --wait
+```
+
+默认镜像从 `python:3.13-slim` 安装仓库固定依赖与中文字体；旧版 Office
+（`.doc` / `.xls` / `.ppt`）与 DOCX→PDF 由独立的 office 转换容器处理
+（Apache POI / docx4j），应用镜像与宿主都**不再需要 LibreOffice**。
+构建脚本会把产物 image ID 与 digest 记到 `snapshots/builds/`，便于把发布制品和复审记录对上。
+
+需要局域网访问时，在 `.env` 设置 `KB_WEB_BIND=0.0.0.0`，并将服务器 IP 或域名加入
+`KB_ALLOWED_HOSTS`，然后重新执行启动命令。端口可用 `KB_WEB_HOST_PORT` 修改。
+
+当前已使用语音/设备服务的部署，启动或更新使用：
+
+```powershell
+powershell -File deploy/start.ps1 -Voice
+```
+
+语音服务需要预先下载本地模型和隧道组件，详见 [语音部署](docs/note4-voice-development.md)。
+它们继续使用独立附加编排；单独启动网页不要求下载这些组件。
 
 | 数据 | 位置 |
 |---|---|
-| **向量数据** | **Docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015`（由 Docker 管理，**不在项目根**） |
-| 原件（不可修改） | `media/raw`（web 可写=内容寻址新增；worker 只读） |
-| PG / Redis | 既有命名卷 `knowledgebase-pgdata` / `knowledgebase-redisdata`（原样复用） |
-| Celery | 专用队列 `kb_worker_v2` + 专用 Redis DB（`/14`）；**DB0 的历史消息不被消费** |
+| PostgreSQL | 既有命名卷 `knowledgebase-pgdata` |
+| Redis | 既有命名卷 `knowledgebase-redisdata`；任务使用 DB14 专用队列 |
+| Qdrant | 命名卷 `knowledgebase-qdrantdata-delivery-20261015` |
+| 原件、模板、字体 | `media/raw`、`media/templates`、`media/fonts` |
 
-> **向量存储位置是 2026-10-15 用户明确授权的变更**：原「向量数据强制落在项目根 `vector_data/`」
-> 的约束**已被该授权取代**。原因：旧的 `vector_data/qdrant` 是 Windows bind mount，
-> Qdrant **重启后**会出现 payload 读取失败（`OutputTooSmall`）—— 对 id 9–15 共 7 个库重建新代次、
-> 逐库验证通过后，仅重启 Qdrant 仍 **7/7 复现**。
-> 旧目录 `vector_data/qdrant` **原样保留可回溯，但已不再被挂载**。详见 [交付状态与未解决风险](docs/delivery-status-2026-10-15.md)。
+不要删除数据卷。旧 `vector_data/qdrant` 仅保留回溯，不挂载使用。
 
-镜像构建（**一条命令可复现**，不依赖他人机器上的本地缓存）：
-
-```powershell
-pwsh -File deploy/build-app.ps1              # 有缓存基座则走交付路径，否则自动降级为标准从源码构建
-pwsh -File deploy/build-app.ps1 -Standard    # 强制标准路径（完全从源码构建，需 PyPI）
-```
-
-Linux / macOS 用等价脚本：
-
-```bash
-bash deploy/build-app.sh                     # 标准路径：kb-worker:local-build → kb-app:delivery
-```
-
-> 交付路径固定了基座镜像的 **本地 image ID**（不是易变 tag，也不是 Registry digest）。
-> 若本机没有该基座，脚本会自动改用标准路径按仓库 `deploy/worker/Dockerfile` 从源码构建，无需人工干预。
-> 新机器上 compose 的 build 也需要一个存在的基座 tag：先跑上面的脚本，再 `export KB_BASE_IMAGE=kb-worker:local-build`。
+检查服务：`docker compose ps`；查看网页日志：`docker compose logs --tail 100 web`；
+就绪检查：`http://127.0.0.1:8800/api/v1/health/ready/`。
 
 ---
 
@@ -122,7 +136,8 @@ docker compose ps
 ```
 
 应当看到三个 `healthy`：`knowledgebase-postgres`（`127.0.0.1:55432`）、
-`knowledgebase-redis`（`127.0.0.1:56379`）、`knowledgebase-qdrant`（`127.0.0.1:56333`）。
+`knowledgebase-redis`（`127.0.0.1:56379`）和 `knowledgebase-qdrant`。
+正式 Qdrant 只接入内部向量网络，运维检查可通过 `docker compose exec web` 使用应用客户端。宿主开发使用嵌入模式或单独的测试实例。
 Qdrant 数据落在 **Docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015`（由 Docker 管理，不在项目根）。
 > 变更缘由（2026-10-15，用户批准）：原先的 `vector_data/qdrant` bind mount 在 Qdrant **重启后**会出现
 > payload 读取失败（`OutputTooSmall`）；对 id 9–15 共 7 个库重建新代次并逐库验证通过后，仅重启 Qdrant 仍 **7/7 复现**，
@@ -331,3 +346,53 @@ tests/              pytest 测试包（含离线与真实依赖标记）
 **默认只读**：`loadtest_runner.py` 与存储迁移脚本默认 `--dry-run` / 只读，
 必须显式 `--execute` 才会做变更；清理失败一律**非零退出并列出残留项**，
 不会只报"向量已删"就算全清。
+
+---
+
+## 7. AI 检索评测（`evals/`）
+
+第一周的检索 + 问答评测基线。**离线可跑、不烧 API、不依赖任何服务**：默认 sqlite + Qdrant embedded + `KB_TEST_ADAPTER=offline`，50 条题约 5 秒、0 次外呼。完整指标表、失败分析与修复建议见 [`evals/BASELINE.md`](evals/BASELINE.md)。
+
+### 7.1 三条命令
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'   # Windows 控制台中文日志防 GBK 报错
+
+python evals\validate_dataset.py      # 数据中心自检：50 条、86 要点、真值逐字命中
+python evals\run_eval.py             # 跑基线：结果写 evals\results\<时间戳>.json
+python evals\run_eval.py --limit 10  # 只跑前 10 条，排查用
+```
+
+### 7.2 输入形态对照（同一批题，只改 query 写法）
+
+```powershell
+# 去空格 = 真实用户连续输入（词法路会明显掉点，详见 BASELINE §6-F1）
+python evals\make_query_variant.py --in evals\datasets\kb-50.jsonl --out artifacts\kb-50-natural.jsonl
+python evals\run_eval.py --dataset artifacts\kb-50-natural.jsonl
+
+# 桩向量组：只验证 dense 链路通不通，不能当语义质量看
+python evals\run_eval.py --dense
+```
+
+### 7.3 真实栈（需要 PG / Qdrant / AS711 在线）
+
+```powershell
+python evals\build_live_dataset.py --library-code contract-archive   # 从真实语料造 10 条题（产物落在 evals/ 外）
+python evals\live_check.py --limit 10                                # dense + RRF
+python evals\live_check.py --limit 10 --rerank                       # 加 rerank 对照
+```
+
+提交版结果只保留 `doc-<sha8>` 别名，**不含真实文件名、file_id、客户名、金额与 query 原文**。
+
+### 7.4 口径边界（别误读数字）
+
+| 项目 | 说明 |
+|---|---|
+| 离线 dense / rerank | 都是**桩**（确定性假向量 / 无重排服务），`results/*.json` 的 `not_measured` 里逐条带 reason |
+| answer 级要点命中 | 离线不生成答案，只报 context 级要点命中 |
+| token / 成本 | 启发式估算，单价默认 0（占位，不是账单） |
+| `--online` | **未实现**，明确非 0 退出并指向 `evals/live_check.py` |
+| 真实栈样本量 | 本次只跑 10 条真实合同（真实语料不可导出，且真值需人工确认） |
+| 工作目录 | 必须在仓库根目录内（`config/paths.py` 强校验）；每次运行自动新建并清理 `artifacts/evals/<run_id>/` |
+
+评测集与语料：`evals/datasets/kb-50.jsonl`（20 typical / 20 hard / 10 pitfall）、`evals/corpus/`（20 篇脱敏构造语料）。评测过程**不修改主链路代码**，只读 `pipeline.search()` 的返回值。
