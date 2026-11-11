@@ -1,0 +1,273 @@
+{
+  "meta": {
+    "stack": "live: PostgreSQL(real) + Qdrant + AS711(bge-large-zh-v1.5, rerank)",
+    "library": {
+      "library_code": "contract-archive",
+      "library_id": 7,
+      "vector_collection": "kb-7-g2",
+      "active_generation": 2,
+      "target_file_count": 47
+    },
+    "dataset_cases": 10,
+    "generated_at_utc": "2026-10-30T02:08:15+00:00",
+    "metric_definitions": {
+      "recall5": "文档级去重后 top-5 命中任一真值记 1（多真值不摊薄），10 条取平均",
+      "mrr": "首个命中真值的文档级名次倒数，未命中记 0",
+      "keypoint_rate": "top-5 chunk 文本拼接后 NFKC+去空白+小写 子串匹配，逐条要点命中比例",
+      "p50_p95": "线性插值百分位；10 条样本下 P95 偏向最大值"
+    },
+    "desensitization": "文档一律 doc-<sha256(original_name)[:8]> alias；不含原始文件名/客户名/金额原文"
+  },
+  "summary": {
+    "cases": 10,
+    "cases_ok": 10,
+    "cases_error": 0,
+    "k": 5,
+    "retrieval_limit": 10,
+    "rerank": false,
+    "recall5": 0.5,
+    "recall_all5": 0.45,
+    "mrr": 0.303333,
+    "keypoint_rate": 0.633333,
+    "latency": {
+      "p50_ms": 1181.8,
+      "p95_ms": 1862.45,
+      "mean_ms": 1293.83,
+      "min_ms": 1017.2,
+      "max_ms": 2209.4,
+      "count": 10
+    },
+    "retrieval_report": {
+      "dense_hits_mean": 30.0,
+      "db_keyword_hits_mean": 30.0,
+      "sparse_hits_mean": 0.0,
+      "fused_hits_mean": 30.0,
+      "degraded_cases": 0,
+      "rerank_applied_cases": 0
+    },
+    "buckets": {
+      "编号型": {
+        "cases": 1,
+        "recall5": 0.0,
+        "mrr": 0.0,
+        "keypoint_rate": 0.0
+      },
+      "编号型+资产数+金额": {
+        "cases": 1,
+        "recall5": 0.0,
+        "mrr": 0.0,
+        "keypoint_rate": 0.3333
+      },
+      "编号型+资产数": {
+        "cases": 1,
+        "recall5": 1.0,
+        "mrr": 0.2,
+        "keypoint_rate": 1.0
+      },
+      "近重复兄弟文件": {
+        "cases": 1,
+        "recall5": 1.0,
+        "mrr": 0.3333,
+        "keypoint_rate": 1.0
+      },
+      "近重复兄弟文件+金额": {
+        "cases": 1,
+        "recall5": 0.0,
+        "mrr": 0.0,
+        "keypoint_rate": 0.5
+      },
+      "条款/收费标准": {
+        "cases": 1,
+        "recall5": 0.0,
+        "mrr": 0.0,
+        "keypoint_rate": 0.5
+      },
+      "单据类": {
+        "cases": 1,
+        "recall5": 1.0,
+        "mrr": 1.0,
+        "keypoint_rate": 1.0
+      },
+      "小文档": {
+        "cases": 1,
+        "recall5": 1.0,
+        "mrr": 0.5,
+        "keypoint_rate": 1.0
+      },
+      "日期型+近重复兄弟文件": {
+        "cases": 1,
+        "recall5": 0.0,
+        "mrr": 0.0,
+        "keypoint_rate": 0.0
+      },
+      "跨文档真值": {
+        "cases": 1,
+        "recall5": 1.0,
+        "mrr": 1.0,
+        "keypoint_rate": 1.0
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "L01",
+      "bucket": "编号型",
+      "recall5": 0.0,
+      "mrr": 0.0,
+      "keypoint_rate": 0.0,
+      "elapsed_ms": 2209.4,
+      "ranked_doc_aliases": [
+        "doc-94191e1e",
+        "doc-cb8d3323",
+        "doc-de9b7d53",
+        "doc-477305c1",
+        "doc-d67648c5"
+      ],
+      "notes": "编号把范围锁到云服务类合同；金额是该文件独有的大额数字，考 dense 能否按编号+金额语义定位"
+    },
+    {
+      "id": "L02",
+      "bucket": "编号型+资产数+金额",
+      "recall5": 0.0,
+      "mrr": 0.0,
+      "keypoint_rate": 0.333333,
+      "elapsed_ms": 1294.5,
+      "ranked_doc_aliases": [
+        "doc-477305c1",
+        "doc-81b495bd",
+        "doc-940e5883",
+        "doc-b1dfe0cb",
+        "doc-3ba45a41"
+      ],
+      "notes": "同一模板下的 3 资产小单合同很多，靠编号+总价双重线索区分"
+    },
+    {
+      "id": "L03",
+      "bucket": "编号型+资产数",
+      "recall5": 1.0,
+      "mrr": 0.2,
+      "keypoint_rate": 1.0,
+      "elapsed_ms": 1104.2,
+      "ranked_doc_aliases": [
+        "doc-940e5883",
+        "doc-81b495bd",
+        "doc-de9b7d53",
+        "doc-d4745eb9",
+        "doc-b1dfe0cb"
+      ],
+      "notes": "13 个资产是全部 47 份里最多的参演规模，考数字型条款定位"
+    },
+    {
+      "id": "L04",
+      "bucket": "近重复兄弟文件",
+      "recall5": 1.0,
+      "mrr": 0.333333,
+      "keypoint_rate": 1.0,
+      "elapsed_ms": 1438.4,
+      "ranked_doc_aliases": [
+        "doc-cb8d3323",
+        "doc-477305c1",
+        "doc-706e3c01",
+        "doc-de9b7d53",
+        "doc-3ba45a41"
+      ],
+      "notes": "2025 年度同模板兄弟文件多，编号前缀是唯一区分点"
+    },
+    {
+      "id": "L05",
+      "bucket": "近重复兄弟文件+金额",
+      "recall5": 0.0,
+      "mrr": 0.0,
+      "keypoint_rate": 0.5,
+      "elapsed_ms": 1181.2,
+      "ranked_doc_aliases": [
+        "doc-81b495bd",
+        "doc-cb8d3323",
+        "doc-de9b7d53",
+        "doc-477305c1",
+        "doc-940e5883"
+      ],
+      "notes": "2 个资产的小单，两个参演系统的名称是该文件独有要点"
+    },
+    {
+      "id": "L06",
+      "bucket": "条款/收费标准",
+      "recall5": 0.0,
+      "mrr": 0.0,
+      "keypoint_rate": 0.5,
+      "elapsed_ms": 1017.2,
+      "ranked_doc_aliases": [
+        "doc-de9b7d53",
+        "doc-d4745eb9",
+        "doc-901c7edf",
+        "doc-27017c5f",
+        "doc-940e5883"
+      ],
+      "notes": "非合同文体（邀请函、2 chunk 小文档），考跨文档类型的语义召回"
+    },
+    {
+      "id": "L07",
+      "bucket": "单据类",
+      "recall5": 1.0,
+      "mrr": 1.0,
+      "keypoint_rate": 1.0,
+      "elapsed_ms": 1269.9,
+      "ranked_doc_aliases": [
+        "doc-b60dd1d3",
+        "doc-d4745eb9",
+        "doc-477305c1",
+        "doc-a67bb4c6",
+        "doc-de9b7d53"
+      ],
+      "notes": "采购订单（1 chunk 表格类文档），长订单号考关键词/精确串召回"
+    },
+    {
+      "id": "L08",
+      "bucket": "小文档",
+      "recall5": 1.0,
+      "mrr": 0.5,
+      "keypoint_rate": 1.0,
+      "elapsed_ms": 1159.6,
+      "ranked_doc_aliases": [
+        "doc-477305c1",
+        "doc-cec8d137",
+        "doc-b60dd1d3",
+        "doc-340568f0",
+        "doc-de9b7d53"
+      ],
+      "notes": "2 chunk 报价清单，靠编制日期锁定；测极小文档的召回稳定性"
+    },
+    {
+      "id": "L09",
+      "bucket": "日期型+近重复兄弟文件",
+      "recall5": 0.0,
+      "mrr": 0.0,
+      "keypoint_rate": 0.0,
+      "elapsed_ms": 1182.4,
+      "ranked_doc_aliases": [
+        "doc-81b495bd",
+        "doc-5049e7da",
+        "doc-901c7edf",
+        "doc-477305c1",
+        "doc-27017c5f"
+      ],
+      "notes": "年份+流水号族（2025194-N）兄弟文件多，zh/zy 前缀易混，考编号精确性"
+    },
+    {
+      "id": "L10",
+      "bucket": "跨文档真值",
+      "recall5": 1.0,
+      "mrr": 1.0,
+      "keypoint_rate": 1.0,
+      "elapsed_ms": 1081.5,
+      "ranked_doc_aliases": [
+        "doc-81b495bd",
+        "doc-de9b7d53",
+        "doc-d4745eb9",
+        "doc-940e5883",
+        "doc-706e3c01"
+      ],
+      "notes": "跨文档真值：两份 2025 年度合同金额相同；另有一份含同额但已单独作为 L05 目标，故本题真值取这两份，recall@5 口径为命中任一"
+    }
+  ]
+}

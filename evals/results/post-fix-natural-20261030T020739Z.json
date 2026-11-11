@@ -1,0 +1,5868 @@
+{
+  "meta": {
+    "report_version": 1,
+    "run_id": "20261030T020739Z-878c701c",
+    "mode": "offline",
+    "dataset": "D:\\AProjectScript\\KnowledgeBase\\artifacts\\w1-natural.jsonl",
+    "dataset_sha256": "888fc436ede29ccbc29440546fc5d0cc9a4da760ff8f723ce8f745f425a92ec7",
+    "limit": 50,
+    "k": 5,
+    "cases_total": 50,
+    "python": "3.13.5",
+    "python_executable": "D:\\AProjectScript\\KnowledgeBase\\.venv\\Scripts\\python.exe",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "git_short_hash": "e77cbd9",
+    "repo_root": "D:\\AProjectScript\\KnowledgeBase",
+    "workdir": "D:\\AProjectScript\\KnowledgeBase\\artifacts\\evals\\20261030T020739Z-878c701c",
+    "dense": false,
+    "rerank": false,
+    "prices": {
+      "input_per_m": 0.0,
+      "output_per_m": 0.0
+    },
+    "cost_basis": "estimated_placeholder_price",
+    "generated_at": "2026-10-30T02:07:39Z",
+    "elapsed_seconds": 3.963,
+    "degraded": [
+      "offline 模式：sqlite + Qdrant embedded + KB_TEST_ADAPTER=offline；稠密/重排为离线桩，不代表真实模型质量"
+    ],
+    "metric_definitions": {
+      "recall_at_5": "文档级去重后取前 5 个文档；命中任一 ground_truth 记为 1，按查询平均。空真值不参与平均。",
+      "recall_all_at_5": "前 5 个文档里命中真值数 / 真值总数，按查询平均；用于发现多真值只命中一部分。",
+      "mrr_at_5": "首个命中真值的文档级名次倒数；前 5 无命中记 0。",
+      "key_point_hit_rate": "top-5 chunk 文本拼接后，逐 key_point 做 NFKC + 删空白 + 小写后的子串匹配；微平均 = 总命中要点 / 总要点数。",
+      "latency": "harness 返回的 elapsed_ms 为主；另记 time.perf_counter 墙钟用于交叉校验。",
+      "percentile_method": "linear_interpolation",
+      "token_estimation": "确定性启发式：CJK 字符 1 个 = 1 token；连续拉丁词 = 1；连续数字串 = 1；空白标点不计。不是真实 tokenizer。"
+    },
+    "corpus": "D:\\AProjectScript\\KnowledgeBase\\evals\\corpus",
+    "corpus_files": 20,
+    "seed_documents": 20,
+    "seed_seconds": 2.715,
+    "search_limit": 10,
+    "run_seconds": 1.248,
+    "dataset_cases_loaded": 50,
+    "dataset_lines": 50,
+    "harness_returned_warnings": [
+      "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+      "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+      "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+    ],
+    "elapsed_total_seconds": 3.963,
+    "workdir_leftover": null
+  },
+  "summary": {
+    "overall": {
+      "k": 5,
+      "cases_total": 50,
+      "cases_scored": 50,
+      "cases_error": 0,
+      "cases_with_ground_truth": 50,
+      "cases_missing_ground_truth": 0,
+      "recall_at_5": 0.92,
+      "recall_all_at_5": 0.92,
+      "mrr_at_5": 0.798333,
+      "answer_key_point_hit_rate": null,
+      "key_point_hit": 82,
+      "key_point_total": 86,
+      "key_point_hit_rate": 0.953488,
+      "key_point_hit_rate_macro": 0.92,
+      "latency": {
+        "harness_p50_ms": 21.5625,
+        "harness_p95_ms": 27.54105,
+        "harness_mean_ms": 23.11908,
+        "harness_min_ms": 11.621,
+        "harness_max_ms": 94.991,
+        "harness_count": 50,
+        "wall_p50_ms": 21.6055,
+        "wall_p95_ms": 27.5879,
+        "wall_mean_ms": 23.16346,
+        "wall_min_ms": 11.663,
+        "wall_max_ms": 95.032,
+        "wall_count": 50
+      },
+      "total_wall_ms": 1158.173,
+      "tokens": {
+        "embed_tokens": 544,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "total_tokens": 544
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 544,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "error_rate": 0.0
+    },
+    "by_bucket": {
+      "typical": {
+        "k": 5,
+        "cases_total": 20,
+        "cases_scored": 20,
+        "cases_error": 0,
+        "cases_with_ground_truth": 20,
+        "cases_missing_ground_truth": 0,
+        "recall_at_5": 1.0,
+        "recall_all_at_5": 1.0,
+        "mrr_at_5": 0.916667,
+        "answer_key_point_hit_rate": null,
+        "key_point_hit": 39,
+        "key_point_total": 39,
+        "key_point_hit_rate": 1.0,
+        "key_point_hit_rate_macro": 1.0,
+        "latency": {
+          "harness_p50_ms": 21.792,
+          "harness_p95_ms": 36.7579,
+          "harness_mean_ms": 26.17445,
+          "harness_min_ms": 18.462,
+          "harness_max_ms": 94.991,
+          "harness_count": 20,
+          "wall_p50_ms": 21.8335,
+          "wall_p95_ms": 36.79605,
+          "wall_mean_ms": 26.21785,
+          "wall_min_ms": 18.5,
+          "wall_max_ms": 95.032,
+          "wall_count": 20
+        },
+        "total_wall_ms": 524.357,
+        "tokens": {
+          "embed_tokens": 260,
+          "rerank_tokens": 0,
+          "llm_tokens": 0,
+          "llm_input_tokens": 0,
+          "llm_output_tokens": 0,
+          "total_tokens": 260
+        },
+        "cost": {
+          "input_per_m": 0.0,
+          "output_per_m": 0.0,
+          "estimated_input_tokens": 260,
+          "estimated_output_tokens": 0,
+          "estimated_cost_usd": 0.0
+        },
+        "error_rate": 0.0,
+        "bucket": "typical"
+      },
+      "hard": {
+        "k": 5,
+        "cases_total": 20,
+        "cases_scored": 20,
+        "cases_error": 0,
+        "cases_with_ground_truth": 20,
+        "cases_missing_ground_truth": 0,
+        "recall_at_5": 1.0,
+        "recall_all_at_5": 1.0,
+        "mrr_at_5": 0.891667,
+        "answer_key_point_hit_rate": null,
+        "key_point_hit": 37,
+        "key_point_total": 37,
+        "key_point_hit_rate": 1.0,
+        "key_point_hit_rate_macro": 1.0,
+        "latency": {
+          "harness_p50_ms": 20.493,
+          "harness_p95_ms": 25.35075,
+          "harness_mean_ms": 21.0299,
+          "harness_min_ms": 17.551,
+          "harness_max_ms": 27.436,
+          "harness_count": 20,
+          "wall_p50_ms": 20.532,
+          "wall_p95_ms": 25.3928,
+          "wall_mean_ms": 21.0738,
+          "wall_min_ms": 17.59,
+          "wall_max_ms": 27.479,
+          "wall_count": 20
+        },
+        "total_wall_ms": 421.476,
+        "tokens": {
+          "embed_tokens": 185,
+          "rerank_tokens": 0,
+          "llm_tokens": 0,
+          "llm_input_tokens": 0,
+          "llm_output_tokens": 0,
+          "total_tokens": 185
+        },
+        "cost": {
+          "input_per_m": 0.0,
+          "output_per_m": 0.0,
+          "estimated_input_tokens": 185,
+          "estimated_output_tokens": 0,
+          "estimated_cost_usd": 0.0
+        },
+        "error_rate": 0.0,
+        "bucket": "hard"
+      },
+      "pitfall": {
+        "k": 5,
+        "cases_total": 10,
+        "cases_scored": 10,
+        "cases_error": 0,
+        "cases_with_ground_truth": 10,
+        "cases_missing_ground_truth": 0,
+        "recall_at_5": 0.6,
+        "recall_all_at_5": 0.6,
+        "mrr_at_5": 0.375,
+        "answer_key_point_hit_rate": null,
+        "key_point_hit": 6,
+        "key_point_total": 10,
+        "key_point_hit_rate": 0.6,
+        "key_point_hit_rate_macro": 0.6,
+        "latency": {
+          "harness_p50_ms": 22.6025,
+          "harness_p95_ms": 23.26415,
+          "harness_mean_ms": 21.1867,
+          "harness_min_ms": 11.621,
+          "harness_max_ms": 23.405,
+          "harness_count": 10,
+          "wall_p50_ms": 22.643,
+          "wall_p95_ms": 23.31515,
+          "wall_mean_ms": 21.234,
+          "wall_min_ms": 11.663,
+          "wall_max_ms": 23.456,
+          "wall_count": 10
+        },
+        "total_wall_ms": 212.34,
+        "tokens": {
+          "embed_tokens": 99,
+          "rerank_tokens": 0,
+          "llm_tokens": 0,
+          "llm_input_tokens": 0,
+          "llm_output_tokens": 0,
+          "total_tokens": 99
+        },
+        "cost": {
+          "input_per_m": 0.0,
+          "output_per_m": 0.0,
+          "estimated_input_tokens": 99,
+          "estimated_output_tokens": 0,
+          "estimated_cost_usd": 0.0
+        },
+        "error_rate": 0.0,
+        "bucket": "pitfall"
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "T01",
+      "bucket": "typical",
+      "query": "琼州交通集团2025攻防演练单个资产多少钱",
+      "notes": "典型口语问价，短词命中正文『单个资产费用为 3,800 元』『合同总金额为 19,000 元』。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-25-jiaotong-2025"
+      ],
+      "key_points_expected": [
+        "3,800 元",
+        "19,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-25-jiaotong-2025"
+      ],
+      "ranked_docs": [
+        "1",
+        "2",
+        "17",
+        "7",
+        "10",
+        "14",
+        "20",
+        "3",
+        "4",
+        "5"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "3,800 元",
+          "19,000 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 18,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3398
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 18,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 33.693,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0011,
+      "wall_ms": 33.731
+    },
+    {
+      "id": "T02",
+      "bucket": "typical",
+      "query": "2026年琼州交通演练合同预付比例",
+      "notes": "典型：同客户不同年份合同，靠年份+预付区分，正确答案在 2026 年那份。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "key_points_expected": [
+        "33,600 元",
+        "50%"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "ranked_docs": [
+        "14",
+        "2",
+        "7",
+        "17",
+        "10",
+        "1",
+        "20",
+        "3",
+        "4",
+        "8"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "33,600 元",
+          "50%"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 14,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3201
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 14,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 27.627,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0018,
+      "wall_ms": 27.677
+    },
+    {
+      "id": "T03",
+      "bucket": "typical",
+      "query": "琼州迎宾馆驻场2人机房",
+      "notes": "典型：问现场配合人数，正文写『安排驻场 2 人』。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-8-qiongzhou-hotel"
+      ],
+      "key_points_expected": [
+        "驻场 2 人",
+        "11,400 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-8-qiongzhou-hotel"
+      ],
+      "ranked_docs": [
+        "5",
+        "6",
+        "7",
+        "15",
+        "20",
+        "1",
+        "2",
+        "3",
+        "4",
+        "8"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "驻场 2 人",
+          "11,400 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 11,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3173
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 11,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 20.7,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0021,
+      "wall_ms": 20.743
+    },
+    {
+      "id": "T04",
+      "bucket": "typical",
+      "query": "三湾迎宾馆应急演练桌面推演驻场1人",
+      "notes": "典型：与 8 号迎宾馆合同近重复，靠『三湾』『桌面推演』区分。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-9-sanwan-hotel"
+      ],
+      "key_points_expected": [
+        "15,200 元",
+        "桌面推演"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-9-sanwan-hotel"
+      ],
+      "ranked_docs": [
+        "6",
+        "14",
+        "7",
+        "20",
+        "5",
+        "15",
+        "8",
+        "1",
+        "2",
+        "3"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "15,200 元",
+          "桌面推演"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 17,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3003
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 17,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.265,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 22.314
+    },
+    {
+      "id": "T05",
+      "bucket": "typical",
+      "query": "琼州能源股份高危漏洞48小时整改",
+      "notes": "典型：问整改时限与金额，注意补充协议也提到 48 小时，属跨文档干扰。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "key_points_expected": [
+        "96,000 元",
+        "48 小时"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "ranked_docs": [
+        "3",
+        "4",
+        "20",
+        "15",
+        "17",
+        "8",
+        "16",
+        "1",
+        "14",
+        "2"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "96,000 元",
+          "48 小时"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 15,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2898
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 15,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.512,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0019,
+      "wall_ms": 21.552
+    },
+    {
+      "id": "T06",
+      "bucket": "typical",
+      "query": "新增2个资产补充协议调整后合同总金额",
+      "notes": "典型：问补充协议调整后总额，不要答成原合同 96,000 元。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026-supplement"
+      ],
+      "key_points_expected": [
+        "105,000 元",
+        "9,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026-supplement"
+      ],
+      "ranked_docs": [
+        "3",
+        "17",
+        "2",
+        "1",
+        "4",
+        "5",
+        "6",
+        "16",
+        "7",
+        "8"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "105,000 元",
+          "9,000 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 18,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3082
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 18,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.613,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0021,
+      "wall_ms": 21.659
+    },
+    {
+      "id": "T07",
+      "bucket": "typical",
+      "query": "合同档案归档10个工作日命名规范",
+      "notes": "典型：制度类文档，问归档时限与容量上限。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-contract-archive-management"
+      ],
+      "key_points_expected": [
+        "10 个工作日",
+        "200MB"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-contract-archive-management"
+      ],
+      "ranked_docs": [
+        "10",
+        "13",
+        "11",
+        "12",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "10 个工作日",
+          "200MB"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 15,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3065
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 15,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 24.686,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0019,
+      "wall_ms": 24.732
+    },
+    {
+      "id": "T08",
+      "bucket": "typical",
+      "query": "知识库权限申请审批几个工作日",
+      "notes": "典型：权限审批时限，正文『审批时限为 2 个工作日』。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-data-classification"
+      ],
+      "key_points_expected": [
+        "2 个工作日",
+        "library:7"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-data-classification"
+      ],
+      "ranked_docs": [
+        "11",
+        "10",
+        "12",
+        "13",
+        "7",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "2 个工作日",
+          "library:7"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 14,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3337
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 14,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 94.991,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0004,
+      "wall_ms": 95.032
+    },
+    {
+      "id": "T09",
+      "bucket": "typical",
+      "query": "删除文档三次确认工单有效期",
+      "notes": "典型：删除流程的关键要素，工单有效期 10 分钟。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-deletion-and-ticket"
+      ],
+      "key_points_expected": [
+        "10 分钟",
+        "ActionTicket"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 9,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-deletion-and-ticket"
+      ],
+      "ranked_docs": [
+        "12",
+        "11",
+        "13",
+        "7",
+        "14",
+        "1",
+        "5",
+        "6",
+        "9"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "10 分钟",
+          "ActionTicket"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 13,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3210
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 13,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 23.428,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.002,
+      "wall_ms": 23.476
+    },
+    {
+      "id": "T10",
+      "bucket": "typical",
+      "query": "合同保管期限多少年移交",
+      "notes": "典型：查表格里的保管期限，合同 30 年、结算 10 年。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-retention-and-archive"
+      ],
+      "key_points_expected": [
+        "30 年",
+        "移交集团档案室"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-retention-and-archive"
+      ],
+      "ranked_docs": [
+        "13",
+        "7",
+        "1",
+        "2",
+        "4",
+        "5",
+        "6",
+        "10",
+        "11",
+        "14"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "30 年",
+          "移交集团档案室"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 11,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3616
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 11,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.443,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 21.489
+    },
+    {
+      "id": "T11",
+      "bucket": "typical",
+      "query": "2025演练高危漏洞修复率",
+      "notes": "典型：年度总结报告，问漏洞数与修复率。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "report-attack-defense-2025-summary"
+      ],
+      "key_points_expected": [
+        "37 个",
+        "91%"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "report-attack-defense-2025-summary"
+      ],
+      "ranked_docs": [
+        "15",
+        "16",
+        "20",
+        "3",
+        "4",
+        "8",
+        "17",
+        "1",
+        "2",
+        "5"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 16,
+          "doc_id": "report-attack-defense-2026-midterm",
+          "original_name": "report-attack-defense-2026-midterm.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "37 个",
+          "91%"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 10,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2827
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 10,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.582,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0026,
+      "wall_ms": 19.633
+    },
+    {
+      "id": "T12",
+      "bucket": "typical",
+      "query": "中期检查6家延期11天",
+      "notes": "典型：中期报告，靠『中期检查』『延期 11 天』区分于年度总结。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "report-attack-defense-2026-midterm"
+      ],
+      "key_points_expected": [
+        "19 个",
+        "78%"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.333333,
+      "first_hit_rank": 3,
+      "matched_ground_truth": [
+        "report-attack-defense-2026-midterm"
+      ],
+      "ranked_docs": [
+        "4",
+        "8",
+        "16",
+        "5",
+        "17",
+        "20",
+        "1",
+        "2",
+        "3",
+        "6"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 8,
+          "doc_id": "minutes-2026-q2-kickoff",
+          "original_name": "minutes-2026-q2-kickoff.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 16,
+          "doc_id": "report-attack-defense-2026-midterm",
+          "original_name": "report-attack-defense-2026-midterm.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "19 个",
+          "78%"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 10,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2816
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 10,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.967,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0019,
+      "wall_ms": 22.008
+    },
+    {
+      "id": "T13",
+      "bucket": "typical",
+      "query": "演练范围8家重点单位时间节点责任人",
+      "notes": "典型：会议纪要里的决议事项，注意中期报告也提到 8 家重点单位。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "minutes-2026-q2-kickoff"
+      ],
+      "key_points_expected": [
+        "8 家重点单位",
+        "11 月 15 日"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "minutes-2026-q2-kickoff"
+      ],
+      "ranked_docs": [
+        "8",
+        "15",
+        "16",
+        "3",
+        "4",
+        "20",
+        "1",
+        "2",
+        "5",
+        "6"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 8,
+          "doc_id": "minutes-2026-q2-kickoff",
+          "original_name": "minutes-2026-q2-kickoff.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 16,
+          "doc_id": "report-attack-defense-2026-midterm",
+          "original_name": "report-attack-defense-2026-midterm.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "8 家重点单位",
+          "11 月 15 日"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 17,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2867
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 17,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 24.428,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0018,
+      "wall_ms": 24.472
+    },
+    {
+      "id": "T14",
+      "bucket": "typical",
+      "query": "第38周周报进场高危6个",
+      "notes": "典型：按周次找周报，正文有报告周期与累计数据。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "weekly-2026-w38"
+      ],
+      "key_points_expected": [
+        "2026 年 9 月 14 日",
+        "累计高危 19 个"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 8,
+      "doc_level_count": 8,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "weekly-2026-w38"
+      ],
+      "ranked_docs": [
+        "20",
+        "17",
+        "3",
+        "4",
+        "8",
+        "13",
+        "15",
+        "16"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 8,
+          "doc_id": "minutes-2026-q2-kickoff",
+          "original_name": "minutes-2026-q2-kickoff.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "2026 年 9 月 14 日",
+          "累计高危 19 个"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 11,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2798
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 11,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 18.615,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 18.655
+    },
+    {
+      "id": "T15",
+      "bucket": "typical",
+      "query": "RAG链路P99延迟QPS多少",
+      "notes": "典型：技术方案里的性能目标，英文术语直接命中最稳。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "tech-rag-retrieval-design"
+      ],
+      "key_points_expected": [
+        "800ms",
+        "QPS 不低于 50"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 5,
+      "doc_level_count": 5,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "tech-rag-retrieval-design"
+      ],
+      "ranked_docs": [
+        "19",
+        "7",
+        "9",
+        "12",
+        "18"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 18,
+          "doc_id": "tech-ocr-pipeline",
+          "original_name": "tech-ocr-pipeline.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "800ms",
+          "QPS 不低于 50"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 10,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3125
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 10,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.117,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0021,
+      "wall_ms": 19.156
+    },
+    {
+      "id": "T16",
+      "bucket": "typical",
+      "query": "OCR并发16单页0.5秒",
+      "notes": "典型：OCR 方案性能参数，RAG 方案里也提到 OCR，属干扰。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "tech-ocr-pipeline"
+      ],
+      "key_points_expected": [
+        "0.5 秒",
+        "16 个 worker"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 9,
+      "doc_level_count": 9,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "tech-ocr-pipeline"
+      ],
+      "ranked_docs": [
+        "18",
+        "19",
+        "1",
+        "2",
+        "4",
+        "5",
+        "6",
+        "7",
+        "14"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 18,
+          "doc_id": "tech-ocr-pipeline",
+          "original_name": "tech-ocr-pipeline.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "0.5 秒",
+          "16 个 worker"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 8,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3113
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 8,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 18.462,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0021,
+      "wall_ms": 18.5
+    },
+    {
+      "id": "T17",
+      "bucket": "typical",
+      "query": "续约报价报价单号有效期30天",
+      "notes": "典型：报价单，问单号与合计金额。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "quote-2026-defense-renewal"
+      ],
+      "key_points_expected": [
+        "BJ2026-0142",
+        "39,600 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "quote-2026-defense-renewal"
+      ],
+      "ranked_docs": [
+        "14",
+        "13",
+        "12",
+        "7",
+        "11",
+        "17",
+        "1",
+        "3",
+        "4",
+        "5"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "BJ2026-0142",
+          "39,600 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 13,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3210
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 13,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.252,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0018,
+      "wall_ms": 21.291
+    },
+    {
+      "id": "T18",
+      "bucket": "typical",
+      "query": "检索服务升级维护窗口多久",
+      "notes": "典型：通知类，问维护窗口时间段。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "notice-kb-search-upgrade"
+      ],
+      "key_points_expected": [
+        "2026 年 10 月 17 日",
+        "22:00 至 23:30"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "notice-kb-search-upgrade"
+      ],
+      "ranked_docs": [
+        "9",
+        "19",
+        "1",
+        "4",
+        "7",
+        "10",
+        "15",
+        "16",
+        "18",
+        "20"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "2026 年 10 月 17 日",
+          "22:00 至 23:30"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 12,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3265
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 12,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.445,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.002,
+      "wall_ms": 22.49
+    },
+    {
+      "id": "T19",
+      "bucket": "typical",
+      "query": "结算单号发票号码付款日期",
+      "notes": "典型：结算资料，问单号/发票号/付款日期三要素。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "settlement-2025-summary"
+      ],
+      "key_points_expected": [
+        "JS2025-011",
+        "FP2025-3382"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "settlement-2025-summary"
+      ],
+      "ranked_docs": [
+        "17",
+        "7",
+        "13",
+        "14",
+        "15",
+        "1",
+        "2",
+        "4",
+        "5",
+        "6"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "JS2025-011",
+          "FP2025-3382"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 12,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3324
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 12,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.617,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0019,
+      "wall_ms": 21.659
+    },
+    {
+      "id": "T20",
+      "bucket": "typical",
+      "query": "知识库检索最多返回10条",
+      "notes": "典型：使用手册里的限制说明，答案在超长文档最后一节。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "manual-kb-search-guide"
+      ],
+      "key_points_expected": [
+        "最多返回 10 条"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 9,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "manual-kb-search-guide"
+      ],
+      "ranked_docs": [
+        "7",
+        "9",
+        "12",
+        "19",
+        "11",
+        "13",
+        "10",
+        "18",
+        "1"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 3,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 4,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.015384615384615385
+        },
+        {
+          "rank": 5,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.015151515151515152
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "最多返回 10 条"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 11,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3073
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 11,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 24.046,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0017,
+      "wall_ms": 24.088
+    },
+    {
+      "id": "H01",
+      "bucket": "hard",
+      "query": "网络安全演习服务费20个资产多少钱",
+      "notes": "同义改写：用户说『演习/服务费』，文档写『攻防演练/资产费用』，需靠 20 个资产锁定能源合同。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "key_points_expected": [
+        "单个资产费用为 4,800 元",
+        "96,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.333333,
+      "first_hit_rank": 3,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "ranked_docs": [
+        "1",
+        "2",
+        "4",
+        "5",
+        "6",
+        "15",
+        "7",
+        "3",
+        "16",
+        "20"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "单个资产费用为 4,800 元",
+          "96,000 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 16,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3084
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 16,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.931,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 19.975
+    },
+    {
+      "id": "H02",
+      "bucket": "hard",
+      "query": "档案一般保存多久合同结算单",
+      "notes": "同义改写：『保存』对应文档『保管期限』，答案在 markdown 表格里。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-retention-and-archive"
+      ],
+      "key_points_expected": [
+        "30 年",
+        "10 年"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-retention-and-archive"
+      ],
+      "ranked_docs": [
+        "13",
+        "7",
+        "17",
+        "11",
+        "15",
+        "8",
+        "10",
+        "12",
+        "14",
+        "1"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "30 年",
+          "10 年"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 13,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3383
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 13,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 23.091,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0019,
+      "wall_ms": 23.136
+    },
+    {
+      "id": "H03",
+      "bucket": "hard",
+      "query": "RRF融合系数k",
+      "notes": "术语检索：RRF 融合系数，文档写『RRF 融合，k=60』。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "tech-rag-retrieval-design"
+      ],
+      "key_points_expected": [
+        "k=60"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 3,
+      "doc_level_count": 2,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "tech-rag-retrieval-design"
+      ],
+      "ranked_docs": [
+        "19",
+        "7"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "k=60"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 6,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2030
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 6,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 17.851,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0025,
+      "wall_ms": 17.896
+    },
+    {
+      "id": "H04",
+      "bucket": "hard",
+      "query": "zy2025194-9",
+      "notes": "编号检索：纯编号触发整串匹配特例，能精确命中 9 号迎宾馆合同，与 8 号、48 号区分。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-9-sanwan-hotel"
+      ],
+      "key_points_expected": [
+        "15,200 元",
+        "参演资产 4 个"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 4,
+      "doc_level_count": 4,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-9-sanwan-hotel"
+      ],
+      "ranked_docs": [
+        "6",
+        "7",
+        "10",
+        "3"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.04841188524590165
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.03225806451612903
+        },
+        {
+          "rank": 3,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.031746031746031744
+        },
+        {
+          "rank": 4,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.01639344262295082
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "15,200 元",
+          "参演资产 4 个"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 3,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2639
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 3,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 20.51,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0015,
+      "wall_ms": 20.542
+    },
+    {
+      "id": "H05",
+      "bucket": "hard",
+      "query": "zy2025194-48补充协议新增资产单价",
+      "notes": "编号+线索：同时命中主合同与补充协议，需按『新增资产』『补充协议』选后者。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026-supplement"
+      ],
+      "key_points_expected": [
+        "4,500 元",
+        "9,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026-supplement"
+      ],
+      "ranked_docs": [
+        "3",
+        "17",
+        "10",
+        "13",
+        "2",
+        "4",
+        "8",
+        "14",
+        "16",
+        "20"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "4,500 元",
+          "9,000 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 13,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3083
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 13,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 25.241,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0017,
+      "wall_ms": 25.283
+    },
+    {
+      "id": "H06",
+      "bucket": "hard",
+      "query": "扫描件识别单页耗时",
+      "notes": "只给线索不给关键词：『扫描件识别』即 OCR 链路，正文『单页 OCR 平均耗时 0.5 秒』。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "tech-ocr-pipeline"
+      ],
+      "key_points_expected": [
+        "0.5 秒",
+        "OCR 平均耗时"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 8,
+      "doc_level_count": 8,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "tech-ocr-pipeline"
+      ],
+      "ranked_docs": [
+        "18",
+        "7",
+        "10",
+        "19",
+        "6",
+        "15",
+        "16",
+        "20"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 18,
+          "doc_id": "tech-ocr-pipeline",
+          "original_name": "tech-ocr-pipeline.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "0.5 秒",
+          "OCR 平均耗时"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 9,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3248
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 9,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 23.944,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0023,
+      "wall_ms": 23.999
+    },
+    {
+      "id": "H07",
+      "bucket": "hard",
+      "query": "修复率78%中期报告",
+      "notes": "数字检索：78% 只出现在中期报告，年度总结是 91%，用来排除干扰。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "report-attack-defense-2026-midterm"
+      ],
+      "key_points_expected": [
+        "78%",
+        "19 个"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "report-attack-defense-2026-midterm"
+      ],
+      "ranked_docs": [
+        "20",
+        "16",
+        "15",
+        "4",
+        "8",
+        "1",
+        "2",
+        "5",
+        "6",
+        "13"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 16,
+          "doc_id": "report-attack-defense-2026-midterm",
+          "original_name": "report-attack-defense-2026-midterm.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 8,
+          "doc_id": "minutes-2026-q2-kickoff",
+          "original_name": "minutes-2026-q2-kickoff.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "78%",
+          "19 个"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 8,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2813
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 8,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.687,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.002,
+      "wall_ms": 22.732
+    },
+    {
+      "id": "H08",
+      "bucket": "hard",
+      "query": "周婷负责什么分工",
+      "notes": "人名检索：会议纪要里的责任分工。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "minutes-2026-q2-kickoff"
+      ],
+      "key_points_expected": [
+        "周婷负责漏洞通报"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 9,
+      "doc_level_count": 9,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "minutes-2026-q2-kickoff"
+      ],
+      "ranked_docs": [
+        "8",
+        "7",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "20"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 8,
+          "doc_id": "minutes-2026-q2-kickoff",
+          "original_name": "minutes-2026-q2-kickoff.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "周婷负责漏洞通报"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 8,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3033
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 8,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.198,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0026,
+      "wall_ms": 19.248
+    },
+    {
+      "id": "H09",
+      "bucket": "hard",
+      "query": "9月14日到18日那周情况",
+      "notes": "时间区间检索：用日期反查周报周期，2025 年度报告也有日期需要排除。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "weekly-2026-w38"
+      ],
+      "key_points_expected": [
+        "2026 年 9 月 14 日",
+        "3 家参演单位进场"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 9,
+      "doc_level_count": 9,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "weekly-2026-w38"
+      ],
+      "ranked_docs": [
+        "15",
+        "20",
+        "3",
+        "7",
+        "8",
+        "9",
+        "13",
+        "14",
+        "17"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 8,
+          "doc_id": "minutes-2026-q2-kickoff",
+          "original_name": "minutes-2026-q2-kickoff.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "2026 年 9 月 14 日",
+          "3 家参演单位进场"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 11,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2740
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 11,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 27.436,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0016,
+      "wall_ms": 27.479
+    },
+    {
+      "id": "H10",
+      "bucket": "hard",
+      "query": "10月17日晚上知识库停多久",
+      "notes": "日期+口语：『停多久』即中断时长 90 分钟，窗口写 22:00 至 23:30。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "notice-kb-search-upgrade"
+      ],
+      "key_points_expected": [
+        "22:00 至 23:30"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "notice-kb-search-upgrade"
+      ],
+      "ranked_docs": [
+        "9",
+        "7",
+        "12",
+        "13",
+        "19",
+        "11",
+        "17",
+        "1",
+        "2",
+        "3"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "22:00 至 23:30"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 12,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3254
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 12,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.211,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.002,
+      "wall_ms": 21.254
+    },
+    {
+      "id": "H11",
+      "bucket": "hard",
+      "query": "报价单BJ2026-0142",
+      "notes": "单号检索：报价单号直接命中。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "quote-2026-defense-renewal"
+      ],
+      "key_points_expected": [
+        "39,600 元",
+        "报价有效期 30 天"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 2,
+      "doc_level_count": 2,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "quote-2026-defense-renewal"
+      ],
+      "ranked_docs": [
+        "14",
+        "13"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.016129032258064516
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "39,600 元",
+          "报价有效期 30 天"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 6,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 1187
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 6,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 17.572,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0024,
+      "wall_ms": 17.615
+    },
+    {
+      "id": "H12",
+      "bucket": "hard",
+      "query": "FP2025-3382发票金额",
+      "notes": "发票号检索：发票号只在结算单里，19,000 元同时出现在 25 号合同，属跨文档干扰。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "settlement-2025-summary"
+      ],
+      "key_points_expected": [
+        "19,000 元",
+        "FP2025-3382"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "settlement-2025-summary"
+      ],
+      "ranked_docs": [
+        "17",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "14",
+        "13"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "19,000 元",
+          "FP2025-3382"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 7,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3082
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 7,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.814,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.002,
+      "wall_ms": 19.853
+    },
+    {
+      "id": "H13",
+      "bucket": "hard",
+      "query": "readerwriteradmin权限区别",
+      "notes": "角色检索：权限矩阵表格里的三种角色，问区别。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-data-classification"
+      ],
+      "key_points_expected": [
+        "reader",
+        "writer",
+        "admin"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 4,
+      "doc_level_count": 4,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-data-classification"
+      ],
+      "ranked_docs": [
+        "11",
+        "7",
+        "10",
+        "12"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015625
+        }
+      ],
+      "key_points": {
+        "hit": 3,
+        "total": 3,
+        "rate": 1.0,
+        "hit_points": [
+          "reader",
+          "writer",
+          "admin"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 5,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2610
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 5,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 17.551,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 17.59
+    },
+    {
+      "id": "H14",
+      "bucket": "hard",
+      "query": "content_sha256去重",
+      "notes": "技术字段检索：content_sha256 判重规则，删除规范里也提到该字段，属干扰。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-contract-archive-management"
+      ],
+      "key_points_expected": [
+        "content_sha256",
+        "200MB"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 3,
+      "doc_level_count": 3,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-contract-archive-management"
+      ],
+      "ranked_docs": [
+        "10",
+        "7",
+        "12"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015873015873015872
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "content_sha256",
+          "200MB"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 5,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 2091
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 5,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.764,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0014,
+      "wall_ms": 22.797
+    },
+    {
+      "id": "H15",
+      "bucket": "hard",
+      "query": "琼州迎宾馆3个资产多少钱",
+      "notes": "多文档真值：合同与年度报告都写了『参演 3 个资产、11,400 元』，两份都算正确。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-8-qiongzhou-hotel",
+        "report-attack-defense-2025-summary"
+      ],
+      "key_points_expected": [
+        "11,400 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "contract-zy2025194-8-qiongzhou-hotel",
+        "report-attack-defense-2025-summary"
+      ],
+      "ranked_docs": [
+        "7",
+        "5",
+        "15",
+        "20",
+        "6",
+        "1",
+        "2",
+        "3",
+        "4",
+        "8"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "11,400 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 12,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3173
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 12,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.029,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0018,
+      "wall_ms": 22.068
+    },
+    {
+      "id": "H16",
+      "bucket": "hard",
+      "query": "2026琼州交通8个资产33,600",
+      "notes": "年份+金额：33,600 元只在 2026 年那份合同里，2025 年是 19,000 元。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "key_points_expected": [
+        "33,600 元",
+        "参演资产 8 个"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "ranked_docs": [
+        "2",
+        "14",
+        "17",
+        "7",
+        "20",
+        "1",
+        "3",
+        "4",
+        "8",
+        "10"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 14,
+          "doc_id": "quote-2026-defense-renewal",
+          "original_name": "quote-2026-defense-renewal.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "33,600 元",
+          "参演资产 8 个"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 10,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3104
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 10,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 20.476,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 20.522
+    },
+    {
+      "id": "H17",
+      "bucket": "hard",
+      "query": "琼州能源调整后合同总金额",
+      "notes": "多跳：需先知道能源合同有补充协议，再取调整后金额（原 96,000 元 + 变更 9,000 元）。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026-supplement"
+      ],
+      "key_points_expected": [
+        "105,000 元",
+        "调整后合同总金额"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026-supplement"
+      ],
+      "ranked_docs": [
+        "3",
+        "4",
+        "1",
+        "2",
+        "5",
+        "6",
+        "17",
+        "7",
+        "11",
+        "14"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "105,000 元",
+          "调整后合同总金额"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 12,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3049
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 12,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.109,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 21.156
+    },
+    {
+      "id": "H18",
+      "bucket": "hard",
+      "query": "知识库检索排序规则文件名",
+      "notes": "排序规则检索：使用手册第八节说明三路融合与文件名优先，答案在超长文档后半段。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "manual-kb-search-guide"
+      ],
+      "key_points_expected": [
+        "文件名命中",
+        "融合名次相同时按入库先后排序"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 9,
+      "doc_level_count": 8,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "manual-kb-search-guide"
+      ],
+      "ranked_docs": [
+        "7",
+        "9",
+        "11",
+        "12",
+        "10",
+        "13",
+        "18",
+        "19"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015151515151515152
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "文件名命中",
+          "融合名次相同时按入库先后排序"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 12,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3037
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 12,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 20.156,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0029,
+      "wall_ms": 20.214
+    },
+    {
+      "id": "H19",
+      "bucket": "hard",
+      "query": "ActionTicket一次性有效期",
+      "notes": "术语检索：ActionTicket 的有效期与一次性语义。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "policy-deletion-and-ticket"
+      ],
+      "key_points_expected": [
+        "10 分钟",
+        "一次性凭证"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 9,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "policy-deletion-and-ticket"
+      ],
+      "ranked_docs": [
+        "12",
+        "13",
+        "1",
+        "5",
+        "6",
+        "7",
+        "11",
+        "14",
+        "17"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "10 分钟",
+          "一次性凭证"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 7,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3083
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 7,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.462,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 19.505
+    },
+    {
+      "id": "H20",
+      "bucket": "hard",
+      "query": "迎宾馆机房驻场几个人",
+      "notes": "跨文档干扰：8 号合同驻场 2 人、9 号合同驻场 1 人，『迎宾馆』两篇都有，靠『机房』与 file_id 顺序区分。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-8-qiongzhou-hotel"
+      ],
+      "key_points_expected": [
+        "驻场 2 人",
+        "机房"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 6,
+      "doc_level_count": 6,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-8-qiongzhou-hotel"
+      ],
+      "ranked_docs": [
+        "5",
+        "6",
+        "7",
+        "15",
+        "20",
+        "11"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 20,
+          "doc_id": "weekly-2026-w38",
+          "original_name": "weekly-2026-w38.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 2,
+        "total": 2,
+        "rate": 1.0,
+        "hit_points": [
+          "驻场 2 人",
+          "机房"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 10,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3173
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 10,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 18.565,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0025,
+      "wall_ms": 18.612
+    },
+    {
+      "id": "P01",
+      "bucket": "pitfall",
+      "query": "琼州交通集团2025年攻防演练项目合同单个资产费用是多少元",
+      "notes": "中文长串无空格整句：_db_keyword_search 用 re.split(r[\\s\\W_]+) 切词，汉字属 \\w，整句变成一个 term，icontains 整串在正文不存在 → 0 命中，检索返回空。这是离线关键词基线最主要的失败模式。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-25-jiaotong-2025"
+      ],
+      "key_points_expected": [
+        "19,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "contract-zy2025194-25-jiaotong-2025"
+      ],
+      "ranked_docs": [
+        "1",
+        "2",
+        "17",
+        "7",
+        "5",
+        "6",
+        "10",
+        "4",
+        "20",
+        "3"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "19,000 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 26,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3356
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 26,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.71,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0017,
+      "wall_ms": 22.75
+    },
+    {
+      "id": "P02",
+      "bucket": "pitfall",
+      "query": "琼州交通攻防演练单个资产费用合同",
+      "notes": "近重复标题平票：2025 与 2026 两份同客户合同在每个 term 上命中数完全相同，_db_keyword_search 按 (-hits, file_id, ordinal) 排序，file_id 小的旧合同排第一，正确答案掉到第 2 名 → Recall@5 仍过，但 MRR 从 1.0 掉到 0.5。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "key_points_expected": [
+        "33,600 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "ranked_docs": [
+        "1",
+        "2",
+        "7",
+        "3",
+        "4",
+        "5",
+        "6",
+        "17",
+        "14",
+        "15"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "33,600 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 16,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3433
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 16,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 23.092,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 23.143
+    },
+    {
+      "id": "P03",
+      "bucket": "pitfall",
+      "query": "zy2025194",
+      "notes": "编号公共前缀泛命中 + 文件名优先：zy2025194 是 6 份合同的公共前缀，filename_search.recall 用 original_name icontains 整串召回 6 份，match_rank=2，promote 把它们全部置顶并按 match_rank、file_id 排序；正文关键词这 6 份命中数也都是 1，按 file_id 平票 → 目标 9 号合同（file_id 最大）排第 6，掉出 top-5。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-9-sanwan-hotel"
+      ],
+      "key_points_expected": [
+        "15,200 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 0.0,
+      "recall_all_at_5": 0.0,
+      "mrr_at_5": 0.0,
+      "first_hit_rank": null,
+      "matched_ground_truth": [],
+      "ranked_docs": [
+        "1",
+        "3",
+        "2",
+        "5",
+        "4",
+        "6",
+        "7",
+        "18",
+        "17",
+        "10"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.04918032786885246
+        },
+        {
+          "rank": 2,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.04787506400409626
+        },
+        {
+          "rank": 3,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.04764267990074442
+        },
+        {
+          "rank": 4,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.04664224664224664
+        },
+        {
+          "rank": 5,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.045535714285714284
+        }
+      ],
+      "key_points": {
+        "hit": 0,
+        "total": 1,
+        "rate": 0.0,
+        "hit_points": [],
+        "missing": [
+          "15,200 元"
+        ]
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 2,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3049
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 2,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.855,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 22.906
+    },
+    {
+      "id": "P04",
+      "bucket": "pitfall",
+      "query": "2025报告参演3个资产合同金额",
+      "notes": "跨文档数字混淆：年度报告引用了『参演 3 个资产，合同金额 11,400 元』，与 8 号合同正文完全重合；harness 没有 BM25 的 IDF 加权，命中数打平后按 file_id，合同（file_id 更小）压过报告，真值排第 6。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "report-attack-defense-2025-summary"
+      ],
+      "key_points_expected": [
+        "11,400 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 0.0,
+      "recall_all_at_5": 0.0,
+      "mrr_at_5": 0.0,
+      "first_hit_rank": null,
+      "matched_ground_truth": [],
+      "ranked_docs": [
+        "1",
+        "2",
+        "4",
+        "5",
+        "6",
+        "15",
+        "17",
+        "3",
+        "7",
+        "14"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 6,
+          "doc_id": "contract-zy2025194-9-sanwan-hotel",
+          "original_name": "contract-zy2025194-9-sanwan-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "11,400 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 13,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3084
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 13,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.495,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0018,
+      "wall_ms": 22.536
+    },
+    {
+      "id": "P05",
+      "bucket": "pitfall",
+      "query": "知识库检索使用入口权限",
+      "notes": "超长文档尾部答案：1432 字的手册被 split_long 每 1200 字切成 2 段，答案『最多返回 10 条』只在第 2 段；query 全是头部段落里的词，召回的是 chunk 0，文档级 Recall@5 命中但要点命中率丢分（同文档后续分段不进 top-5 chunk）。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "manual-kb-search-guide"
+      ],
+      "key_points_expected": [
+        "最多返回 10 条"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 9,
+      "doc_level_count": 8,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "first_hit_rank": 1,
+      "matched_ground_truth": [
+        "manual-kb-search-guide"
+      ],
+      "ranked_docs": [
+        "7",
+        "11",
+        "12",
+        "19",
+        "9",
+        "10",
+        "13",
+        "18"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 11,
+          "doc_id": "policy-data-classification",
+          "original_name": "policy-data-classification.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 12,
+          "doc_id": "policy-deletion-and-ticket",
+          "original_name": "policy-deletion-and-ticket.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 19,
+          "doc_id": "tech-rag-retrieval-design",
+          "original_name": "tech-rag-retrieval-design.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 9,
+          "doc_id": "notice-kb-search-upgrade",
+          "original_name": "notice-kb-search-upgrade.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 0,
+        "total": 1,
+        "rate": 0.0,
+        "hit_points": [],
+        "missing": [
+          "最多返回 10 条"
+        ]
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 11,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3046
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 11,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 22.918,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0025,
+      "wall_ms": 22.976
+    },
+    {
+      "id": "P06",
+      "bucket": "pitfall",
+      "query": "合同资料怎么找",
+      "notes": "泛化 query 无区分度：『合同/资料/怎么』在十几篇文档里出现，命中数打平后由 file_id 与手册里的『怎么』句式决定排序，真值排第 9；离线无稠密语义、无重排，纯词频+序号排序无法体现意图。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "key_points_expected": [
+        "96,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 9,
+      "recall_at_5": 0.0,
+      "recall_all_at_5": 0.0,
+      "mrr_at_5": 0.0,
+      "first_hit_rank": null,
+      "matched_ground_truth": [],
+      "ranked_docs": [
+        "7",
+        "13",
+        "15",
+        "16",
+        "17",
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 7,
+          "doc_id": "manual-kb-search-guide",
+          "original_name": "manual-kb-search-guide.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 13,
+          "doc_id": "policy-retention-and-archive",
+          "original_name": "policy-retention-and-archive.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 3,
+          "file_id": 15,
+          "doc_id": "report-attack-defense-2025-summary",
+          "original_name": "report-attack-defense-2025-summary.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 4,
+          "file_id": 16,
+          "doc_id": "report-attack-defense-2026-midterm",
+          "original_name": "report-attack-defense-2026-midterm.md",
+          "score": 0.015384615384615385
+        },
+        {
+          "rank": 5,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015151515151515152
+        }
+      ],
+      "key_points": {
+        "hit": 0,
+        "total": 1,
+        "rate": 0.0,
+        "hit_points": [],
+        "missing": [
+          "96,000 元"
+        ]
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 7,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3339
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 7,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.499,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0024,
+      "wall_ms": 21.55
+    },
+    {
+      "id": "P07",
+      "bucket": "pitfall",
+      "query": "3800",
+      "notes": "千分位写法不一致：合同写 3,800，查询写 3800，icontains 不做数字归一化 → 目标合同 0 命中；只有手册里恰好提到该写法。数字类检索必须先做千分位/全角归一。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-25-jiaotong-2025"
+      ],
+      "key_points_expected": [
+        "3,800 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 0,
+      "doc_level_count": 0,
+      "recall_at_5": 0.0,
+      "recall_all_at_5": 0.0,
+      "mrr_at_5": 0.0,
+      "first_hit_rank": null,
+      "matched_ground_truth": [],
+      "ranked_docs": [],
+      "top_docs": [],
+      "key_points": {
+        "hit": 0,
+        "total": 1,
+        "rate": 0.0,
+        "hit_points": [],
+        "missing": [
+          "3,800 元"
+        ]
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 1,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 0
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 1,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 11.621,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0036,
+      "wall_ms": 11.663
+    },
+    {
+      "id": "P08",
+      "bucket": "pitfall",
+      "query": "服务等级协议",
+      "notes": "缩写 vs 中文全称：合同只写 SLA 99.5% 与『服务等级约定』，用户写『服务等级协议』，term 整串 6 字在正文不存在 → 0 命中。离线无同义词/向量扩展，缩写与全称互不命中。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "key_points_expected": [
+        "SLA 99.5%"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "ranked_docs": [
+        "3",
+        "4",
+        "10",
+        "17",
+        "1",
+        "2",
+        "5",
+        "6",
+        "7",
+        "9"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 10,
+          "doc_id": "policy-contract-archive-management",
+          "original_name": "policy-contract-archive-management.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 17,
+          "doc_id": "settlement-2025-summary",
+          "original_name": "settlement-2025-summary.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "SLA 99.5%"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 6,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3022
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 6,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 19.86,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0018,
+      "wall_ms": 19.896
+    },
+    {
+      "id": "P09",
+      "bucket": "pitfall",
+      "query": "zy202519448合同",
+      "notes": "编号带空格拆词：整串匹配特例 re.fullmatch(r[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)+) 只对『zy2025194-48』这类紧凑写法生效，带空格后退化为 re.split 拆出 zy2025194 与 48 做 OR 匹配，6 份同族合同命中数打平，按 file_id 排序时补充协议（文件名字典序 -48-…-supplement 先入库）反超主合同，MRR 掉到 0.5。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "key_points_expected": [
+        "96,000 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.25,
+      "first_hit_rank": 4,
+      "matched_ground_truth": [
+        "contract-zy2025194-48-energy-2026"
+      ],
+      "ranked_docs": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "10",
+        "11"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "96,000 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 4,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3049
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 4,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 21.412,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0024,
+      "wall_ms": 21.464
+    },
+    {
+      "id": "P10",
+      "bucket": "pitfall",
+      "query": "今年签的那份演练合同总金额",
+      "notes": "相对时间口语指代：『今年』是单字以下/无年份锚点的词，离线检索无法把它解析成 2026，只剩『演练/合同/总金额』这些两份合同都有的泛化词，命中数打平后按 file_id 命中旧合同，真值掉到第 2 名；表现为 MRR 损失而非 0 召回。 [variant:strip]",
+      "ground_truth_doc_ids": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "key_points_expected": [
+        "33,600 元"
+      ],
+      "limit": 10,
+      "k": 5,
+      "status": "ok",
+      "error": null,
+      "warnings": [
+        "dense=False：检索阶段临时摘掉 KB_TEST_ADAPTER 以真正跳过稠密路（pipeline.py:2038 在适配器开启时会忽略全局 dense 开关）；入库阶段写入的确定性假向量不受影响，本口径结果来自 sparse + DB 关键词两路",
+        "检索降级：当前离线模式（KB_MODEL_CALLS_DISABLED=1）：语义检索未启用，结果来自关键字匹配",
+        "Qdrant 非 server 模式（embedded）：sparse(MatchText) 路的可靠性见 BASELINE 说明"
+      ],
+      "result_count": 10,
+      "doc_level_count": 10,
+      "recall_at_5": 1.0,
+      "recall_all_at_5": 1.0,
+      "mrr_at_5": 0.5,
+      "first_hit_rank": 2,
+      "matched_ground_truth": [
+        "contract-zy2025194-29-jiaotong-2026"
+      ],
+      "ranked_docs": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "14",
+        "15",
+        "17"
+      ],
+      "top_docs": [
+        {
+          "rank": 1,
+          "file_id": 1,
+          "doc_id": "contract-zy2025194-25-jiaotong-2025",
+          "original_name": "contract-zy2025194-25-jiaotong-2025.md",
+          "score": 0.01639344262295082
+        },
+        {
+          "rank": 2,
+          "file_id": 2,
+          "doc_id": "contract-zy2025194-29-jiaotong-2026",
+          "original_name": "contract-zy2025194-29-jiaotong-2026.md",
+          "score": 0.016129032258064516
+        },
+        {
+          "rank": 3,
+          "file_id": 3,
+          "doc_id": "contract-zy2025194-48-energy-2026-supplement",
+          "original_name": "contract-zy2025194-48-energy-2026-supplement.md",
+          "score": 0.015873015873015872
+        },
+        {
+          "rank": 4,
+          "file_id": 4,
+          "doc_id": "contract-zy2025194-48-energy-2026",
+          "original_name": "contract-zy2025194-48-energy-2026.md",
+          "score": 0.015625
+        },
+        {
+          "rank": 5,
+          "file_id": 5,
+          "doc_id": "contract-zy2025194-8-qiongzhou-hotel",
+          "original_name": "contract-zy2025194-8-qiongzhou-hotel.md",
+          "score": 0.015384615384615385
+        }
+      ],
+      "key_points": {
+        "hit": 1,
+        "total": 1,
+        "rate": 1.0,
+        "hit_points": [
+          "33,600 元"
+        ],
+        "missing": []
+      },
+      "answer_key_points": {
+        "measured": false,
+        "hit": null,
+        "total": null,
+        "rate": null,
+        "reason": "离线无 LLM 生成，answer 级要点命中未实测"
+      },
+      "tokens": {
+        "embed_tokens": 13,
+        "rerank_tokens": 0,
+        "llm_tokens": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "context_tokens": 3049
+      },
+      "cost": {
+        "input_per_m": 0.0,
+        "output_per_m": 0.0,
+        "estimated_input_tokens": 13,
+        "estimated_output_tokens": 0,
+        "estimated_cost_usd": 0.0
+      },
+      "elapsed_ms": 23.405,
+      "elapsed_source": "harness",
+      "elapsed_delta_ratio": 0.0022,
+      "wall_ms": 23.456
+    }
+  ],
+  "not_measured": [
+    {
+      "metric": "answer_level_keypoint_hit",
+      "measured": false,
+      "reason": "answer 级要点命中需要 LLM 生成答案；离线链路不生成答案，该指标为 null，本报告只输出 context 级要点命中率。"
+    },
+    {
+      "metric": "dense_semantic_quality",
+      "measured": false,
+      "reason": "离线 Qdrant embedded 下的向量由确定性桩生成（假向量），不代表真实 embedding 的语义召回质量。"
+    },
+    {
+      "metric": "rerank_quality",
+      "measured": false,
+      "reason": "离线适配器没有 AS711 重排服务，rerank 为退化/桩路径，不能用于评价重排质量。"
+    },
+    {
+      "metric": "real_model_tokens",
+      "measured": false,
+      "reason": "token 数为启发式估算（CJK 字符 / 拉丁词 / 数字串），本次没有真实模型调用，不是真实 tokenizer 计数。"
+    },
+    {
+      "metric": "live_stack",
+      "measured": false,
+      "reason": "真实栈（PG / Qdrant / AS711 / 真实检索链路）的数字见 evals/results/live-*.json（由 evals/live_check.py 产出），不混进本份离线报告。"
+    }
+  ]
+}
