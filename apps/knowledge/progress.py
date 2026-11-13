@@ -6,12 +6,13 @@ import json
 import logging
 import time
 import uuid
+from typing import Any
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
-_file = ContextVar('file_progress', default=None)
-_operation = ContextVar('operation_progress', default=None)
+_file: ContextVar[dict[str, Any] | None] = ContextVar('file_progress', default=None)
+_operation: ContextVar[dict[str, Any] | None] = ContextVar('operation_progress', default=None)
 _connection = None
 _connection_url = None
 _retry_after = 0.0

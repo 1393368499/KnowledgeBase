@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from django.db import connection
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 from apps.planner.models import Conversation, Message
 from apps.voice.models import VoiceTurn
 from apps.voice import services
@@ -88,6 +88,8 @@ def test_two_real_worker_threads_reach_ai_concurrently_in_distinct_sessions(user
     assert all(t.state == "answer_ready" for t in turns)
     assert len({t.conversation_id for t in turns}) == 2
     for t in turns:
-        assert Message.objects.filter(conversation=t.conversation, role="user").count() == 1
-        assert Message.objects.filter(conversation=t.conversation, role="assistant").count() == 1
-        assert t.conversation.title.startswith("独立任务")
+        conversation = t.conversation
+        assert conversation is not None
+        assert Message.objects.filter(conversation=conversation, role="user").count() == 1
+        assert Message.objects.filter(conversation=conversation, role="assistant").count() == 1
+        assert conversation.title.startswith("独立任务")

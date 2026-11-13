@@ -19,10 +19,12 @@ def test_model_timeout_is_durable_system_feedback_and_readable_on_board(user):
         services.process_turn(turn.pk)
     turn.refresh_from_db()
     assert turn.state == "uncertain" and turn.user_message_id
-    rows = Message.objects.filter(conversation=turn.conversation, role="system")
+    conversation = turn.conversation
+    assert conversation is not None
+    rows = Message.objects.filter(conversation=conversation, role="system")
     assert rows.count() == 1
     assert "AI 模型服务超时" in rows.get().content
-    assert not Message.objects.filter(conversation=turn.conversation, role="assistant").exists()
+    assert not Message.objects.filter(conversation=conversation, role="assistant").exists()
     services.record_failure_notice(turn)
     services.process_turn(turn.pk)
     assert rows.count() == 1
@@ -41,4 +43,6 @@ def test_canceled_turn_never_gets_failure_notice(user):
     turn = VoiceTurn.objects.get(pk=result.data["task_id"])
     services.cancel_turn(turn.device, turn.client_turn_id)
     services.record_failure_notice(turn)
-    assert not Message.objects.filter(conversation=turn.conversation).exists()
+    conversation = turn.conversation
+    assert conversation is not None
+    assert not Message.objects.filter(conversation=conversation).exists()

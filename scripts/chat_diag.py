@@ -19,6 +19,8 @@ from django.test import Client
 from apps.planner.models import Message
 
 admin = get_user_model().objects.filter(username="admin").first()
+if admin is None:
+    raise SystemExit("找不到 admin 测试账号")
 client = Client()
 client.force_login(admin)
 

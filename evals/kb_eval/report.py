@@ -257,11 +257,11 @@ def summarize_cases(
 
     latency = {}
     latency.update(m.latency_stats(
-        [case.get("elapsed_ms") for case in scored if case.get("elapsed_ms") is not None],
+        [elapsed for case in scored if (elapsed := case.get("elapsed_ms")) is not None],
         prefix="harness",
     ))
     latency.update(m.latency_stats(
-        [case.get("wall_ms") for case in scored if case.get("wall_ms") is not None],
+        [wall for case in scored if (wall := case.get("wall_ms")) is not None],
         prefix="wall",
     ))
     total_wall_ms = sum(

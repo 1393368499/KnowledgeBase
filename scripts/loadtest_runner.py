@@ -325,6 +325,8 @@ class LoadTestRun:
             # 令牌用于防 PID 复用（系统会复用 PID，只比 PID 不足以确认身份）。
             import run_resources as _rr2
 
+            if self.run_resources is None:
+                raise RunnerError("缺少当前压测运行的资源登记")
             self.run_resources.set_meta(
                 service_pid=self.service.pid,
                 service_pid_start=_rr2.pid_start_token(self.service.pid),

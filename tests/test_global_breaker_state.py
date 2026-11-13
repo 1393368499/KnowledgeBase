@@ -696,6 +696,63 @@ def test_reset_all_with_redis_down_never_claims_global():
     assert snap["redis_error"]
 
 
+@pytest.mark.parametrize(
+    ("failure", "deleted"),
+    [("before_capture", 0), ("scan", 1), ("delete", 1), ("final_scan", 2), (None, 2)],
+)
+def test_reset_all_requires_completed_verification(monkeypatch, failure, deleted):
+    store = BreakerStore(
+        url="redis://127.0.0.1:1/15",
+        prefix=f"{PREFIX}verify",
+        enabled=True,
+    )
+
+    class Client:
+        scan_count = 0
+        delete_count = 0
+
+        def scan_iter(self, *, match, count):
+            self.scan_count += 1
+            if (failure == "scan" and self.scan_count == 2) or (
+                failure == "final_scan" and self.scan_count == 4
+            ):
+                raise ConnectionError("复查连接中断")
+            if self.scan_count <= 2:
+                yield store._key("verify")
+
+        def smembers(self, key):
+            return {"verify"}
+
+        def exists(self, key):
+            return True
+
+        def eval(self, script, numkeys, *keys):
+            self.delete_count += 1
+            if failure == "delete" and self.delete_count == 2:
+                raise ConnectionError("补删连接中断")
+            return 1
+
+    monkeypatch.setattr(store, "_client", Client())
+    if failure == "before_capture":
+        connectivity = store.connectivity
+
+        def disconnect_after_check():
+            result = connectivity()
+            store._note_error(ConnectionError("连接检查后失效"))
+            return result
+
+        monkeypatch.setattr(store, "connectivity", disconnect_after_check)
+
+    result = store.reset_all()
+    assert result["deleted"] == deleted
+    assert result["global_reset"] is (failure is None)
+    assert result["redis_available"] is (failure is None)
+    assert result["remaining"] == (0 if failure is None else None)
+    if failure is not None:
+        assert result["scope"] == "process"
+        assert "ConnectionError" in result["redis_error"]
+
+
 def test_redis_down_degrades_to_process_without_breaking_calls():
     """Redis 不可用时熔断逻辑仍按**进程内**工作（不抛 Redis 异常打断检索），口径如实。"""
     store = BreakerStore(

@@ -7,6 +7,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
+from docx.styles.style import ParagraphStyle
 
 
 @pytest.mark.django_db
@@ -50,7 +51,9 @@ def test_real_template_direct_layout_and_footer_controls_survive_export(
     from apps.planner import document_templates
 
     template = Document()
-    template.styles["Normal"].font.size = Pt(16)
+    normal_style = template.styles["Normal"]
+    assert isinstance(normal_style, ParagraphStyle)
+    normal_style.font.size = Pt(16)
     title = template.add_paragraph("标题示例")
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.runs[0].font.size = Pt(22)
@@ -101,7 +104,9 @@ def test_real_template_direct_layout_and_footer_controls_survive_export(
     assert [p.text for p in output.paragraphs].count("报告") == 1
     assert output.paragraphs[0].runs[0].bold is False
     section_heading = next(p for p in output.paragraphs if p.text == "一、情况")
-    assert section_heading._p.pPr.numPr.numId.val == 0
+    properties = section_heading._p.pPr
+    assert properties is not None
+    assert properties.numPr.numId.val == 0
     paragraph = next(p for p in output.paragraphs if p.text == "正文。")
     assert paragraph.paragraph_format.first_line_indent == Pt(32)
     assert paragraph.paragraph_format.line_spacing_rule == WD_LINE_SPACING.EXACTLY

@@ -44,8 +44,12 @@ def run_check(live_server, client, user, library, make_file, settings):
     cookie = client.cookies[settings.SESSION_COOKIE_NAME].value
     presentation = Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[1])
-    slide.shapes.title.text = "验收汇报范本"
-    slide.placeholders[1].text = "项目概况\n验收结果"
+    from pptx.shapes.autoshape import Shape
+
+    title, body = slide.shapes.title, slide.placeholders[1]
+    assert title is not None and isinstance(body, Shape)
+    title.text_frame.paragraphs[0].add_run().text = "验收汇报范本"
+    body.text_frame.paragraphs[0].add_run().text = "项目概况\n验收结果"
     buffer = io.BytesIO()
     presentation.save(buffer)
     out = Path("artifacts/acceptance/template-library")
@@ -75,6 +79,7 @@ def run_check(live_server, client, user, library, make_file, settings):
         select = page.locator(f'[data-op-template="{proposal["operation_id"]}"]')
         expect(select).to_be_visible()
         template_id = select.locator("option").filter(has_text="验收演示模板").get_attribute("value")
+        assert template_id is not None
         select.select_option(template_id)
         expect(select).to_have_attribute("data-selected-template", template_id)
         operation = SimpleNamespace(pk=proposal["operation_id"])
@@ -108,7 +113,8 @@ def run_check(live_server, client, user, library, make_file, settings):
         expect(page.locator("[data-library-summary]")).to_contain_text("2 个向量记录")
         page.screenshot(path=str(out / "library-details.png"), full_page=True)
         page.set_viewport_size({"width": 390, "height": 844})
-        assert page.locator(".modal").bounding_box()["width"] < 391
+        bounds = page.locator(".modal").bounding_box()
+        assert bounds is not None and bounds["width"] < 391
         page.screenshot(path=str(out / "library-mobile.png"), full_page=True)
         assert not errors, errors
         browser.close()

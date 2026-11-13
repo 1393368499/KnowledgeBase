@@ -769,6 +769,8 @@ class RunResources:
             try:
                 if kind == "qdrant_collection":
                     self._check_collection_allowed(key)
+                    if qdrant_client is None:
+                        raise RuntimeError("Qdrant 清理客户端不可用")
                     # **幂等**：集合不存在就是"已经干净了"，不是失败
                     if qdrant_client.collection_exists(key):
                         qdrant_client.delete_collection(collection_name=key)

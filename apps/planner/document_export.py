@@ -469,9 +469,9 @@ def parse_markdown_blocks(markdown: str) -> list[_Block]:
 
         bullet = _BULLET.match(line)
         ordered = _ORDERED.match(line)
-        if bullet or ordered:
+        match = bullet or ordered
+        if match is not None:
             flush_paragraph()
-            match = bullet or ordered
             indent = len(match.group(1).replace("\t", "  "))
             item = match.group(2)
             is_ordered = ordered is not None
@@ -1175,7 +1175,8 @@ def document_to_pptx(document) -> bytes:
     """按二级标题分页，复用所选 PPTX/POTX 的主题、母版和版式。"""
     from copy import deepcopy
     from pptx import Presentation
-    from pptx.util import Inches, Pt
+    from pptx.shapes.autoshape import Shape
+    from pptx.util import Emu, Inches, Pt
 
     template = getattr(document, "template", None)
     try:
@@ -1228,6 +1229,8 @@ def document_to_pptx(document) -> bytes:
                     sections[-1][1].append(block.text)
         if len(sections) > 1 and sections[0][0] == document.title and not sections[0][1]:
             sections.pop(0)
+        slide_width = prs.slide_width or Inches(10)
+        slide_height = prs.slide_height or Inches(7.5)
         for i, (title, lines) in enumerate(sections or [[document.title, []]]):
             layout = layouts[min(i, len(layouts) - 1)] if layouts else prs.slide_layouts[1]
             slide = prs.slides.add_slide(layout)
@@ -1242,18 +1245,21 @@ def document_to_pptx(document) -> bytes:
                     slide._element.cSld.insert(0, bg)
             heading = slide.shapes.title
             if heading is None:
-                heading = slide.shapes.add_textbox(Inches(.5), Inches(.25), prs.slide_width - Inches(1), Inches(1))
-            heading.text = title
+                heading = slide.shapes.add_textbox(Inches(.5), Inches(.25), Emu(slide_width - Inches(1)), Inches(1))
+            heading.text_frame.clear()
+            heading.text_frame.paragraphs[0].add_run().text = str(title)
             bodies = [p for p in slide.placeholders if p != heading and p.has_text_frame
                       and p.placeholder_format.type in {2, 7, 6}]
             body = bodies[0] if bodies else slide.shapes.add_textbox(
-                Inches(.6), Inches(1.5), prs.slide_width - Inches(1.2), prs.slide_height - Inches(2))
-            body.text_frame.clear()
+                Inches(.6), Inches(1.5), Emu(slide_width - Inches(1.2)), Emu(slide_height - Inches(2)))
+            assert isinstance(body, Shape)
+            frame = body.text_frame
+            frame.clear()
             for j, line in enumerate(lines):
-                paragraph = body.text_frame.paragraphs[0] if j == 0 else body.text_frame.add_paragraph()
+                paragraph = frame.paragraphs[0] if j == 0 else frame.add_paragraph()
                 paragraph.text = re.sub(r"\*\*|__|`", "", str(line))
                 paragraph.font.size = Pt(20)
-            body.text_frame.word_wrap = True
+            frame.word_wrap = True
         buffer = io.BytesIO()
         prs.save(buffer)
         return buffer.getvalue()

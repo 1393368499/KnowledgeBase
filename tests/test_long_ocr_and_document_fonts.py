@@ -96,7 +96,7 @@ def test_fifty_page_scanned_pdf_keeps_all_pages_with_bounded_rendering(monkeypat
         return [(page, str(page).encode()) for page in pages]
     monkeypatch.setattr(parsers, "render_pdf_pages", render)
     ocr = SimpleNamespace(available=True, recognize_image=lambda data, hint="": "第" + data.decode() + "页正文")
-    result = parsers.parse_bytes(source.getvalue(), "50页合同.pdf", ocr=ocr)
+    result = parsers.parse_bytes(source.getvalue(), "50页合同.pdf", ocr=ocr)  # pyright: ignore[reportArgumentType]
     assert len(result.blocks) == 50
     assert [block.page for block in result.blocks] == list(range(1, 51))
     assert max(map(len, rendered)) == 1
@@ -109,7 +109,7 @@ def test_explicit_ocr_limit_still_fails_before_recognition(monkeypatch):
     source = io.BytesIO()
     pdf.write(source)
     with pytest.raises(parsers.ParseError, match="超过单份上限"):
-        parsers.parse_bytes(source.getvalue(), "3页.pdf", ocr=SimpleNamespace(available=True), ocr_pages=2)
+        parsers.parse_bytes(source.getvalue(), "3页.pdf", ocr=SimpleNamespace(available=True), ocr_pages=2)  # pyright: ignore[reportArgumentType]
 
 
 def test_long_embedding_input_uses_all_text_and_returns_one_vector_per_chunk():

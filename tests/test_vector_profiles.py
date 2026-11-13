@@ -137,7 +137,9 @@ class FakeQdrant:
         return out
 
     def count(self, *, collection_name: str, exact: bool = True):
-        return type("R", (), {"count": len(self.points.get(collection_name, {}))})()
+        from qdrant_client.models import CountResult
+
+        return CountResult(count=len(self.points.get(collection_name, {})))
 
     def delete(self, *, collection_name: str, points_selector, wait: bool = True) -> None:
         bucket = self.points.get(collection_name, {})

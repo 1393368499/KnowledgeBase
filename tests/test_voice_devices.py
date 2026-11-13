@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 from apps.planner.models import Conversation, Message
 from apps.voice.models import VoiceDevice, VoiceTurn
 from apps.voice import services
@@ -129,7 +129,7 @@ def test_real_pipeline_links_one_user_and_one_answer_on_replayed_job(user):
     assert turn.state == "answer_ready", turn.error
     assert Message.objects.filter(conversation_id=d["conversation_id"], role="user").count() == 1
     assert Message.objects.filter(conversation_id=d["conversation_id"], role="assistant").count() == 1
-    assert turn.user_message.payload["device_id"] == d["id"]
+    assert turn.user_message is not None and turn.user_message.payload["device_id"] == d["id"]
 
 
 def test_asr_failure_retry_is_stage_limited(user):

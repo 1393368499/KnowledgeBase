@@ -398,7 +398,8 @@ def render_pdf_pages(raw: bytes, pages: list[int], *, scale: float = 2.0) -> lis
             if page_number < 1 or page_number > len(document):
                 continue
             page = document[page_number - 1]
-            bitmap = page.render(scale=scale)
+            # PDFium 接受小数缩放，Pylance 从默认值 1 推断为 int。
+            bitmap = page.render(scale=scale)  # pyright: ignore[reportArgumentType]
             image = bitmap.to_pil().convert("RGB")
             buffer = io.BytesIO()
             image.save(buffer, format="PNG")

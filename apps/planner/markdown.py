@@ -148,14 +148,15 @@ def render_markdown(markdown: str) -> str:
 
         bullet = _BULLET.match(line)
         ordered = _ORDERED.match(line)
-        if bullet or ordered:
+        match = bullet or ordered
+        if match is not None:
             flush_paragraph()
             want = "ul" if bullet else "ol"
             if list_type != want:
                 close_list()
                 html.append(f"<{want}>")
                 list_type = want
-            html.append(f"<li>{_inline((bullet or ordered).group(1))}</li>")
+            html.append(f"<li>{_inline(match.group(1))}</li>")
             continue
         close_list()
 

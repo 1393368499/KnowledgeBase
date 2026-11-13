@@ -117,6 +117,8 @@ def extract_text(raw: bytes, original_name: str) -> str:
         if suffix in {".pptx", ".potx"}:
             from io import BytesIO
             from pptx import Presentation
+            from pptx.shapes.autoshape import Shape
+            from pptx.shapes.graphfrm import GraphicFrame
             from zipfile import ZipFile
 
             # potx 和 pptx 使用相同结构，主部件 MIME 不同。
@@ -136,9 +138,9 @@ def extract_text(raw: bytes, original_name: str) -> str:
             for i, slide in enumerate(prs.slides, 1):
                 texts = []
                 for shape in slide.shapes:
-                    if shape.has_text_frame:
+                    if isinstance(shape, Shape):
                         texts.append(shape.text)
-                    if shape.has_table:
+                    if isinstance(shape, GraphicFrame) and shape.has_table:
                         texts.extend(" | ".join(c.text for c in row.cells) for row in shape.table.rows)
                 sections.append(f"第{i}页（版式：{slide.slide_layout.name}）\n" + "\n".join(texts))
             # 纯母版模板也可用：真实读取版式和占位符供撰写参考。
@@ -352,7 +354,7 @@ def delete_template(template: DocumentTemplate) -> dict:
     """
     from .models import DerivedDocument  # 局部导入：避免与 models 的模块级循环
 
-    referencing = DerivedDocument.objects.filter(template=template).count()
+    referencing = DerivedDocument.objects.filter(template=template).count()  # pyright: ignore[reportCallIssue]
     path = None
     try:
         path = template_path(template)

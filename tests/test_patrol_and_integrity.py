@@ -221,7 +221,7 @@ def test_stalled_running_count_requires_dead_lease(db, library, make_file):
 
 def _armed(user, intent, params):
     from apps.planner.models import Conversation, OperationRecord
-    from apps.planner.operations import get as get_spec
+    from tests.planner_fixtures import require_spec as get_spec
     from apps.planner.services import _describe_target
 
     ref, label = _describe_target(get_spec(intent), params)

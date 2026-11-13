@@ -79,7 +79,7 @@ def _queue_state() -> dict:
         "visibility_timeout_default": default_timeout,
         "unacked_index": [
             {
-                "id": str(key, "utf-8"),
+                "id": key.decode("utf-8") if isinstance(key, bytes) else str(key),
                 "unacked_since": float(score),
                 "age_seconds": round(now - float(score), 1),
                 # 还要等这么久才会被重新投递

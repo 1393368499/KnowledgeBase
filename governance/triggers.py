@@ -79,7 +79,8 @@ def existing_columns(table: str) -> frozenset[str]:
         # 表不存在时 introspection 正好会抛错，不隔离就会连累调用方。
         with transaction.atomic():
             with connection.cursor() as cursor:
-                description = connection.introspection.get_table_description(
+                # Implemented by the active Django database backend.
+                description = connection.introspection.get_table_description(  # pyright: ignore[reportAttributeAccessIssue]
                     cursor, table
                 )
         names = frozenset(column.name for column in description)

@@ -266,7 +266,7 @@ def test_archive_must_wait_for_gate_and_does_no_remote_delete_when_frozen(
     frozen_token = writegate.freeze(library.pk, reason="重建中（测试）")
     try:
         with pytest.raises(writegate.WriteFrozen):
-            planner_services._archive_file(user, operation, record)
+            planner_services._archive_file(user, operation, record)  # pyright: ignore[reportArgumentType]
         assert deleted == [], "库已冻结时绝不允许发生远端删点"
         record.refresh_from_db()
         assert record.parse_status == ParseStatus.DONE, "归档被拒时状态不得改变"
@@ -308,7 +308,7 @@ def test_archive_must_wait_for_gate_and_does_no_remote_delete_when_frozen(
     monkeypatch.setattr(
         "apps.knowledge.vectorindex.delete_points", _delete_and_try_freeze
     )
-    result = planner_services._archive_file(user, operation, record)
+    result = planner_services._archive_file(user, operation, record)  # pyright: ignore[reportArgumentType]
     assert result["archived"] is True
     assert deleted == ["kb-arch-g1"], "归档必须真的做了精确删点"
     record.refresh_from_db()

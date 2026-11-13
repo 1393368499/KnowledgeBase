@@ -530,6 +530,8 @@ class OperationResumeView(APIView):
             locked = (
                 OperationRecord.objects.select_for_update().filter(pk=operation.pk).first()
             )
+            if locked is None:
+                return Response({"detail": "操作已不存在"}, status=status.HTTP_404_NOT_FOUND)
             # 旧凭证一律作废（显式，避免"到处是有效凭证"）
             ActionTicket.objects.filter(
                 operation=locked, consumed_at__isnull=True
@@ -1210,7 +1212,7 @@ class GuideView(APIView):
         llm = services_config.get("llm", {}) or {}
         base_url = str(llm.get("base_url", "") or "")
         model = str(llm.get("model", "") or "")
-        payload = {"configured": bool(base_url)}
+        payload: dict[str, bool | str] = {"configured": bool(base_url)}
         if is_system_admin(request.user):
             payload["model"] = model
             payload["base_url"] = base_url

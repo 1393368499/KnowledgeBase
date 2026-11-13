@@ -96,10 +96,15 @@ def apply_feedback_weight(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return items
 
     for index, item in enumerate(items):
-        file_id = item.get("file_id")
-        weight = weights.get(int(file_id), 0.0) if file_id is not None else 0.0
+        raw_file_id = item.get("file_id")
+        file_id = int(raw_file_id) if raw_file_id is not None else None
+        weight = weights.get(file_id, 0.0) if file_id is not None else 0.0
         item["feedback_weight"] = weight
-        item["feedback_counts"] = counts.get(int(file_id), {"accurate": 0, "inaccurate": 0})
+        item["feedback_counts"] = (
+            counts.get(file_id, {"accurate": 0, "inaccurate": 0})
+            if file_id is not None
+            else {"accurate": 0, "inaccurate": 0}
+        )
         if weight and isinstance(item.get("score"), (int, float)):
             item["score"] = round(float(item["score"]) * (1 + weight), 6)
         item["_feedback_order"] = -weight        # 次序微调（稳定排序用）

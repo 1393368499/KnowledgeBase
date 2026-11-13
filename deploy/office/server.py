@@ -157,9 +157,9 @@ def validate_package(source, deadline):
 def process_limits():
     import resource
 
-    # Single-threaded parent; this runs between fork and exec.
-    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))
-    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    # Linux container only. Single-threaded parent; this runs between fork and exec.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_OUTPUT, MAX_OUTPUT))  # pyright: ignore[reportAttributeAccessIssue]
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def run_java(mode, source, target, work, deadline):
@@ -179,7 +179,7 @@ def run_java(mode, source, target, work, deadline):
         try:
             code = process.wait(timeout=max(0, deadline - time.monotonic()))
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
             process.wait()
             raise
     if code or not target.is_file():
@@ -213,7 +213,10 @@ class Handler(socketserver.StreamRequestHandler):
                     while length:
                         if time.monotonic() >= deadline:
                             raise subprocess.TimeoutExpired("Office input", JOB_TIMEOUT)
-                        self.connection.settimeout(min(self.timeout, max(0.001, deadline - time.monotonic())))
+                        remaining = max(0.001, deadline - time.monotonic())
+                        self.connection.settimeout(
+                            remaining if self.timeout is None else min(self.timeout, remaining)
+                        )
                         chunk = self.rfile.read1(min(length, 128 * 1024))
                         if not chunk:
                             raise BadDocument("Incomplete input")
@@ -246,10 +249,10 @@ def main():
         raise RuntimeError("Office runtime missing")
     os.umask(0o077)
     with SOCKET.with_suffix(".lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)  # pyright: ignore[reportAttributeAccessIssue]
         if SOCKET.is_socket():
             SOCKET.unlink()
-        with socketserver.UnixStreamServer(str(SOCKET), Handler) as server:
+        with socketserver.UnixStreamServer(str(SOCKET), Handler) as server:  # pyright: ignore[reportAttributeAccessIssue]
             server.serve_forever()
 
 

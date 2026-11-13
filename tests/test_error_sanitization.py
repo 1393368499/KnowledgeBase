@@ -20,6 +20,7 @@ def test_llm_unavailable_response_hides_upstream_detail():
     )
     response = _llm_unavailable_response(exc)
     assert response.status_code == 503
+    assert response.data is not None
     assert response.data["code"] == "assistant_unavailable"
     text = str(response.data)
     assert "10.9.8.7" not in text
@@ -35,6 +36,7 @@ def test_llm_unavailable_response_hides_upstream_detail():
 
 def test_llm_unavailable_response_marks_timeout():
     response = _llm_unavailable_response(TimeoutError("timed out after 60s"))
+    assert response.data is not None
     assert response.data["reason"] == "upstream_timeout"
 
 

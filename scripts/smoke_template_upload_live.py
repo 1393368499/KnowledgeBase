@@ -51,7 +51,7 @@ print(json.dumps({'key': session.session_key}))
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.goto(BASE + "/app/templates/", wait_until="networkidle")
-            csrf = next(cookie["value"] for cookie in context.cookies() if cookie["name"] == "csrftoken")
+            csrf = next(cookie["value"] for cookie in context.cookies() if cookie.get("name") == "csrftoken" and "value" in cookie)
             try:
                 document = Document()
                 document.add_paragraph("公文基本规范模板验收")
@@ -60,8 +60,12 @@ print(json.dumps({'key': session.session_key}))
                 document.save(docx)
                 presentation = Presentation()
                 slide = presentation.slides.add_slide(presentation.slide_layouts[1])
-                slide.shapes.title.text = "项目汇报模板验收"
-                slide.placeholders[1].text = "项目概况\n进度安排"
+                from pptx.shapes.autoshape import Shape
+
+                title, body = slide.shapes.title, slide.placeholders[1]
+                assert title is not None and isinstance(body, Shape)
+                title.text_frame.paragraphs[0].add_run().text = "项目汇报模板验收"
+                body.text_frame.paragraphs[0].add_run().text = "项目概况\n进度安排"
                 pptx = io.BytesIO()
                 presentation.save(pptx)
                 sources = [("docx", docx.getvalue(), "公文基本规范模板验收"),

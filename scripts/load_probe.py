@@ -52,6 +52,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
+from typing import Protocol
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
@@ -417,7 +418,11 @@ def assert_local_only(base: str) -> None:
         )
 
 
-def assert_models_disabled(base: str, session: Session) -> None:
+class _ReadOnlySession(Protocol):
+    def request(self, method: str, path: str) -> tuple[int, dict]: ...
+
+
+def assert_models_disabled(base: str, session: _ReadOnlySession) -> None:
     """**fail-closed**：服务端必须自述"模型已禁用 **且** 是负载测试实例"，否则拒绝发压。
 
     旧版只是打印一句提示就继续——那不是保护。现在读服务端 ``/guide/`` 的
@@ -500,7 +505,7 @@ READ_ONLY_INTENTS = {
 }
 
 
-def assert_read_only_intent(intent: str, session: Session) -> None:
+def assert_read_only_intent(intent: str, session: _ReadOnlySession) -> None:
     """`execute` 只允许只读意图；并用服务端目录交叉核对 ``is_mutation``。"""
     if intent not in READ_ONLY_INTENTS:
         raise SystemExit(

@@ -40,6 +40,9 @@ def record(name, ok, detail=""):
 
 def main() -> int:
     admin = get_user_model().objects.filter(username="admin").first()
+    if admin is None:
+        print("找不到 admin 测试账号")
+        return 2
     # 用最近一批验收样本里的那一份（不新建、不删除）
     record_row = (
         IngestedFile._base_manager.filter(

@@ -326,14 +326,17 @@ def test_docx_export_maps_chinese_numbered_headings(user):
             "2026年10月19日\n"
         ),
         status=DerivedDocument.Status.DRAFT,
-        template=template,
-        template_name=template.name,
+        template=template,  # pyright: ignore[reportCallIssue]
+        template_name=template.name,  # pyright: ignore[reportCallIssue]
     )
 
     output = DocxDocument(io.BytesIO(document_export.document_to_docx(document)))
     paragraphs = [p for p in output.paragraphs if (p.text or "").strip()]
     by_text = {p.text.strip(): p for p in paragraphs}
 
+    assert by_text["一、基本情况"].style is not None
+    assert by_text["（一）出差人员"].style is not None
+    assert by_text["一、去程票据为海口东至陵水，票价为人民币92.00元。"].style is not None
     assert by_text["一、基本情况"].style.name == "Heading 1"
     assert by_text["（一）出差人员"].style.name == "Heading 2"
     # 分条正文（长句、以句号结尾）不能被刷成标题
@@ -355,14 +358,15 @@ def test_docx_export_attachment_file_names_are_not_headings(user):
             "# 报告\n\n一、基本情况\n\n正文。\n\n附件：1.海口东-陵水.pdf\n2.陵水-海口东.pdf\n"
         ),
         status=DerivedDocument.Status.DRAFT,
-        template=template,
-        template_name=template.name,
+        template=template,  # pyright: ignore[reportCallIssue]
+        template_name=template.name,  # pyright: ignore[reportCallIssue]
     )
 
     output = DocxDocument(io.BytesIO(document_export.document_to_docx(document)))
     by_text = {p.text.strip(): p for p in output.paragraphs if (p.text or "").strip()}
 
-    assert by_text["2.陵水-海口东.pdf"].style.name == "Normal"
+    style = by_text["2.陵水-海口东.pdf"].style
+    assert style is not None and style.name == "Normal"
 
 
 def test_docx_export_uses_official_typography(user):
@@ -380,8 +384,8 @@ def test_docx_export_uses_official_typography(user):
             "2026年10月19日\n"
         ),
         status=DerivedDocument.Status.DRAFT,
-        template=template,
-        template_name=template.name,
+        template=template,  # pyright: ignore[reportCallIssue]
+        template_name=template.name,  # pyright: ignore[reportCallIssue]
     )
 
     data = document_export.document_to_docx(document)
@@ -395,7 +399,7 @@ def test_docx_export_uses_official_typography(user):
 
     # Markdown 的 `##` 是公文"一级标题"：样式必须落到 Heading 1，不再是 Heading 2
     heading = next(p for p in paragraphs if p.text.startswith("一、基本情况"))
-    assert heading.style.name == "Heading 1"
+    assert heading.style is not None and heading.style.name == "Heading 1"
 
     # 成文日期居右
     date_para = next(p for p in paragraphs if p.text.strip() == "2026年10月19日")
@@ -431,8 +435,8 @@ def test_document_detail_exposes_template_category(user, auth_api):
         topic="事项",
         content_markdown="# 通知\n\n正文",
         status=DerivedDocument.Status.DRAFT,
-        template=template,
-        template_name=template.name,
+        template=template,  # pyright: ignore[reportCallIssue]
+        template_name=template.name,  # pyright: ignore[reportCallIssue]
     )
     client = auth_api(user)
 

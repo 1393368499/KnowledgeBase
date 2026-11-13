@@ -134,7 +134,7 @@ class EventsView(APIView):
         rows = list(qs.filter(id__gt=cursor).select_related("device", "turn").order_by("id")[:100])
         return Response({"results": [{"id": e.pk, "kind": e.kind, "device_id": str(e.device_id),
                            "device_name": e.device.name, "turn_id": str(e.turn_id) if e.turn_id else None,
-                           "conversation_id": e.turn.conversation_id if e.turn_id else None, **e.payload}
+                           "conversation_id": e.turn.conversation_id if e.turn is not None else None, **e.payload}
                           for e in rows], "next_cursor": rows[-1].pk if rows else cursor})
 
 

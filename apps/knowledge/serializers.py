@@ -6,15 +6,8 @@ import math
 
 from rest_framework import serializers
 
-from .models import (
-    FILE_TYPE_GROUP_LABELS,
-    DocumentChunk,
-    IngestedFile,
-    KnowledgeLibrary,
-    LibraryMember,
-    VectorCollection,
-    file_type_group,
-)
+from .models import FILE_TYPE_GROUP_LABELS, file_type_group
+from .models import DocumentChunk, IngestedFile, KnowledgeLibrary, LibraryMember, VectorCollection
 
 
 class LibrarySerializer(serializers.ModelSerializer):

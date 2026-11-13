@@ -11,4 +11,9 @@
 本文件只放包说明，不写业务逻辑；避免与其它模块循环导入。
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from . import metrics, report
+
 __all__ = ["metrics", "report"]

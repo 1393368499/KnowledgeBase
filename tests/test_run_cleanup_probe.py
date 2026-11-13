@@ -65,6 +65,7 @@ def test_start_token_is_stable_and_distinguishes_pids(harmless_process):
     second = rr.pid_start_token(pid)
     if first is None:      # 非 Windows 或查询不可用
         pytest.skip("该平台不支持创建时间令牌")
+    assert second is not None
     assert abs(first - second) < 0.001, "同一进程的令牌应稳定"
     other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:
@@ -80,7 +81,7 @@ def test_start_token_is_stable_and_distinguishes_pids(harmless_process):
 def test_unknown_and_invalid_inputs_are_treated_as_alive():
     """保守原则：未知/非法一律视为存活（宁可拒绝清理，不可误删）。"""
     assert rr.pid_is_alive_readonly(-1) is True
-    assert rr.pid_is_alive_readonly("not-a-pid") is True
+    assert rr.pid_is_alive_readonly("not-a-pid") is True  # pyright: ignore[reportArgumentType]
     assert rr.pid_is_alive_readonly(0) is True
 
 

@@ -288,7 +288,8 @@ def test_after_cleanup_commits_the_collection_is_retiring_not_activatable(librar
                 "WHERE library_id = %s AND name = %s AND retiring_at IS NOT NULL",
                 [library.pk, stale.name],
             )
-            assert cursor.fetchone()[0] == 1
+            row = cursor.fetchone()
+            assert row is not None and row[0] == 1
     finally:
         other.close()
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC as _UTC
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
@@ -21,6 +22,9 @@ GENESIS_HASH = "0" * 64
 
 
 class AuditEvent(models.Model):
+    if TYPE_CHECKING:
+        actor_id: int | None
+
     class Severity(models.TextChoices):
         INFO = "info", "信息"
         WARNING = "warning", "警告"
@@ -48,7 +52,8 @@ class AuditEvent(models.Model):
     prev_hash = models.CharField(max_length=64, default=GENESIS_HASH)
     entry_hash = models.CharField(max_length=64, default="", db_index=True)
 
-    objects = ImmutableManager()
+    # Pylance 为该模型合成了另一个管理器类型，实际写保护由 ImmutableManager 实现。
+    objects = ImmutableManager()  # pyright: ignore[reportAssignmentType]
 
     class Meta:
         ordering = ("-id",)
@@ -123,6 +128,9 @@ class AuditChainHead(models.Model):
     last_event = models.ForeignKey(
         AuditEvent, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
+    if TYPE_CHECKING:
+        last_event_id: int | None
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -17,8 +17,11 @@ def configured():
 def request(mode, raw=b"", *, timeout=office_wire.JOB_TIMEOUT + 15):
     if len(raw) > office_wire.MAX_INPUT:
         raise ParseError("Office 文件超过转换器体积上限")
+    family = getattr(socket, "AF_UNIX", None)
+    if family is None:
+        raise ParseError("当前平台不支持 Office 转换器所需的 Unix 套接字")
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+        with socket.socket(family, socket.SOCK_STREAM) as conn:
             conn.settimeout(timeout)
             conn.connect(os.environ["KB_OFFICE_SOCKET"])
             conn.sendall(office_wire.HEADER.pack(office_wire.OPERATIONS[mode], len(raw)))
@@ -48,14 +51,15 @@ def request(mode, raw=b"", *, timeout=office_wire.JOB_TIMEOUT + 15):
 
 def available():
     # A conversion can occupy the server while the listening socket still accepts jobs.
-    # AttributeError：平台没有 AF_UNIX（如 Windows 宿主）——按"不可用"处理，让调用方
-    # 给出可执行提示，而不是把平台差异抛成 500。
+    family = getattr(socket, "AF_UNIX", None)
+    if family is None:
+        return False
     try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
+        with socket.socket(family, socket.SOCK_STREAM) as conn:
             conn.settimeout(1.0)
             conn.connect(os.environ["KB_OFFICE_SOCKET"])
         return True
-    except (KeyError, OSError, AttributeError):
+    except (KeyError, OSError):
         return False
 
 

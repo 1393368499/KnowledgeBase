@@ -58,8 +58,6 @@ try:  # 以包方式导入（python -m evals.build_live_dataset）
     from evals.kb_eval.live_harness import (  # type: ignore[no-redef]
         DEFAULT_LIBRARY_CODE,
         bootstrap_live,
-        doc_alias,
-        extension_of,
     )
 except ImportError:  # 直接跑脚本（python evals/build_live_dataset.py）
     from kb_eval.live_harness import (  # type: ignore[no-redef]
@@ -394,6 +392,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.auto:
             cases = build_auto(harness, files, chunks)
         else:
+            if args.spec is None:
+                raise SystemExit("请指定 --spec，或使用 --auto")
             spec = json.loads(Path(args.spec).read_text(encoding="utf-8-sig"))
             cases = build_from_spec(harness, spec, files, chunks)
         if len(cases) != TARGET_CASE_COUNT:

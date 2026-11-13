@@ -719,7 +719,7 @@ class BreakerStore:
         if client is None:
             return []
         try:
-            keys, _truncated = self._scan_keys()
+            keys, _truncated = self._scan_keys(client)
         except Exception as exc:  # noqa: BLE001
             self._note_error(exc)
             return []
@@ -804,6 +804,10 @@ class BreakerStore:
           ``note``（人话说明，Redis 不可用时明确写"未做全局重置"）。
         """
         available, error = self.connectivity()
+        client = self._client if available else None
+        if available and client is None:
+            error = self._client_error or "共享熔断 Redis 不可用"
+        available = client is not None
         result: dict[str, Any] = {
             "scope": "global" if available else "process",
             "backend": "redis" if available else "process",
@@ -827,19 +831,18 @@ class BreakerStore:
             "redis_db": self.db_index,
             "at": time.time(),
         }
-        if not available:
+        if client is None:
             result["note"] = (
                 f"共享存储不可用（{error}）→ **未做任何全局重置**；"
                 "只能重置各自进程内的状态，不能在 Redis 不可用时声称全局成功"
             )
             return result
 
-        client = self._client
         index_key = self._index_key()
         # 1) **按前缀真实扫描**发现键（不只看索引：索引可能丢失/过期，
         #    而长冷却的熔断状态仍然有效；只信索引会漏删）。
         try:
-            scanned_keys, truncated = self._scan_keys()
+            scanned_keys, truncated = self._scan_keys(client)
             indexed = {_to_text(name) for name in (client.smembers(index_key) or [])}
             index_present = bool(client.exists(index_key))
         except Exception as exc:  # noqa: BLE001 - 发现阶段失败 → 如实报告
@@ -873,38 +876,35 @@ class BreakerStore:
         to_delete = list(scanned_keys)
         if index_key not in to_delete:
             to_delete.append(index_key)
-        deleted = self._eval(_DELETE_KEYS_LUA, [], to_delete)
-        if deleted is None:
+        try:
+            result["deleted"] = int(client.eval(_DELETE_KEYS_LUA, 0, *to_delete))
+            # 最多两轮补删。最终扫描成功返回后才能判断是否已清空。
+            for _round in range(2):
+                remaining_keys, more_truncated = self._scan_keys(client)
+                result["truncated"] |= more_truncated
+                if not remaining_keys:
+                    break
+                result["deleted"] += int(client.eval(_DELETE_KEYS_LUA, 0, *remaining_keys))
+                for key in remaining_keys:
+                    name = self._service_from_key(key)
+                    if name and name not in names:
+                        names.append(name)
+                names.sort()
+            remaining_keys, more_truncated = self._scan_keys(client)
+            result["truncated"] |= more_truncated
+            remaining = len(remaining_keys)
+        except Exception as exc:  # noqa: BLE001 - 删除或复查失败 → 如实报告
+            self._note_error(exc)
             result.update(
                 {
                     "scope": "process",
                     "backend": "process",
                     "redis_available": False,
                     "redis_error": self._client_error,
-                    "note": (
-                        f"批量删除脚本执行失败（{self._client_error}）→ **未完成全局重置**，"
-                        "不能在失败时说全局成功"
-                    ),
+                    "note": f"删除或复查共享状态失败（{self._client_error}）→ **未完成全局重置**",
                 }
             )
             return result
-
-        # 3) 复查（最多两轮，捕捉并发新建的键）：还有残留就再删一轮，并如实记账
-        for _round in range(2):
-            remaining_keys, more_truncated = self._scan_keys()
-            truncated = truncated or more_truncated
-            if not remaining_keys:
-                break
-            extra = self._eval(_DELETE_KEYS_LUA, [], remaining_keys)
-            if extra is None:
-                break
-            deleted += extra
-            for key in remaining_keys:
-                name = self._service_from_key(key)
-                if name and name not in names:
-                    names.append(name)
-            names = sorted(names)
-        remaining = self._count_prefix()
 
         reset_entries = [
             {
@@ -922,10 +922,8 @@ class BreakerStore:
                 "reset": reset_entries,
                 "reset_count": len(reset_entries),
                 "services": names,
-                "deleted": int(deleted),
                 "remaining": remaining,
-                "truncated": truncated,
-                "global_reset": remaining == 0 and not truncated,
+                "global_reset": remaining == 0 and not result["truncated"],
             }
         )
         if result["global_reset"]:
@@ -937,16 +935,13 @@ class BreakerStore:
         else:
             result["note"] = (
                 f"共享 Redis 已执行重置，但复查仍有 {remaining} 个键未删除"
-                f"{'（扫描达到上限，结果可能被截断）' if truncated else ''}"
+                f"{'（扫描达到上限，结果可能被截断）' if result['truncated'] else ''}"
                 " → **不能**声称全局重置成功"
             )
         return result
 
-    def _scan_keys(self) -> tuple[list[str], bool]:
+    def _scan_keys(self, client: Any) -> tuple[list[str], bool]:
         """按前缀扫描发现键（SCAN 增量扫描，不阻塞 Redis；有上限并如实报告截断）。"""
-        client = self._client
-        if client is None:
-            return [], False
         keys: list[str] = []
         truncated = False
         for key in client.scan_iter(match=f"{self.prefix}:*", count=200):
@@ -955,11 +950,6 @@ class BreakerStore:
                 break
             keys.append(_to_text(key))
         return keys, truncated
-
-    def _count_prefix(self) -> int:
-        keys, _truncated = self._scan_keys()
-        return len(keys)
-
 
 # ------------------------------------------------------- 进程内单例/便捷入口 ----
 

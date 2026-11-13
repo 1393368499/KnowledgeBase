@@ -113,13 +113,15 @@ class Harness:
 
         mapping: dict[str, int] = {}
         used_keys: set[str] = set()
+        root = Path(corpus_dir) if isinstance(corpus_dir, (str, os.PathLike)) else None
         for path in files:
             raw = path.read_bytes()
             blob = storage.store_bytes(raw)  # 内容寻址落盘（已存在则复用）
             rel_parent = ""
             try:
-                rel_parent = str(path.parent.relative_to(Path(corpus_dir))).replace("\\", "/")
-            except (TypeError, ValueError):
+                if root is not None:
+                    rel_parent = path.parent.relative_to(root).as_posix()
+            except ValueError:
                 rel_parent = ""
             if rel_parent == ".":
                 rel_parent = ""

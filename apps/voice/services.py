@@ -21,7 +21,7 @@ from .models import VoiceDevice, VoiceEvent, VoiceTurn, ConversationLease
 from .rendering import frame
 
 logger = logging.getLogger(__name__)
-ACTIVE = ("queued", "transcribing", "transcribed", "answering", "rendering")
+ACTIVE = ["queued", "transcribing", "transcribed", "answering", "rendering"]
 MAX_PARALLEL_TASKS = 4
 MAX_PENDING_TURNS = 12
 
@@ -57,7 +57,7 @@ def select_task(device, conversation_id):
 
 
 def emit(device, kind, turn=None, **payload):
-    return VoiceEvent.objects.create(device=device, turn=turn, kind=kind, payload=payload)
+    return VoiceEvent.objects.create(device=device, turn=turn, kind=kind, payload=payload)  # pyright: ignore[reportCallIssue]
 
 
 def scope(user, mode, codes):
@@ -216,7 +216,7 @@ def accept_audio(device, data, raw):
                 out.write(raw)
             turn = VoiceTurn.objects.create(
                 id=turn_id, device=device, client_turn_id=client_id,
-                conversation=conversation, config_version=version,
+                conversation=conversation, config_version=version,  # pyright: ignore[reportArgumentType]
                 scope_mode=device.scope_mode, library_codes=codes,
                 audio_sha256=digest, audio_path=str(target),
             )
@@ -243,7 +243,8 @@ def cancel_turn(device, client_id):
             if VoiceTurn.objects.filter(device=device, created_at__gte=timezone.now() - timedelta(minutes=1)).count() >= 60:
                 raise ValidationError("取消请求过于频繁，请稍后重试")
             turn = VoiceTurn.objects.create(device=device, client_turn_id=client_id,
-                conversation=None if device.capabilities.get("conversation_mode") == "tasks" else device.conversation, config_version=device.config_version,
+                conversation=None if device.capabilities.get("conversation_mode") == "tasks" else device.conversation,  # pyright: ignore[reportArgumentType]
+                config_version=device.config_version,
                 scope_mode=device.scope_mode, library_codes=device.library_codes,
                 audio_sha256="", audio_path="", state="canceled", error="已取消发送")
         else:
@@ -272,7 +273,7 @@ def process_turn(turn_id):
     if not candidate:
         return
     with transaction.atomic():
-        VoiceDevice.objects.select_for_update().get(pk=candidate.device_id)
+        VoiceDevice.objects.select_for_update().get(id=candidate.device_id)
         if candidate.conversation_id:
             Conversation.objects.select_for_update().get(pk=candidate.conversation_id)
             from django.db.models import Q
@@ -296,8 +297,8 @@ def process_turn(turn_id):
             turn.transcript = transcribe(turn)
         _, _, turn.transcript_pages = frame(turn.transcript, "我说")
         with transaction.atomic():
-            locked_device = VoiceDevice.objects.select_for_update().get(pk=device.pk)
-            locked_turn = VoiceTurn.objects.select_for_update().get(pk=turn.pk)
+            locked_device = VoiceDevice.objects.select_for_update().get(id=device.pk)
+            locked_turn = VoiceTurn.objects.select_for_update().get(id=turn.pk)
             if locked_turn.state == "canceled":
                 return
             if not locked_device.enabled or locked_device.removed_at or locked_device.config_version != turn.config_version:
@@ -320,8 +321,8 @@ def process_turn(turn_id):
             exc_info=True,
         )
         with transaction.atomic():
-            VoiceDevice.objects.select_for_update().get(pk=turn.device_id)
-            current = VoiceTurn.objects.select_for_update().get(pk=turn.pk)
+            VoiceDevice.objects.select_for_update().get(id=turn.device_id)
+            current = VoiceTurn.objects.select_for_update().get(id=turn.pk)
             if current.state == "canceled":
                 return
             turn.state = "uncertain" if turn.stage == "answer" else "failed"
@@ -363,7 +364,7 @@ def record_failure_notice(turn):
         if current.state not in {"failed", "uncertain"} or not current.conversation_id:
             return
         existing = Message.objects.filter(conversation_id=current.conversation_id, role=Message.Role.SYSTEM,
-                                          payload__voice_turn_id=str(current.pk), payload__unavailable=True)
+                                          payload__voice_turn_id=str(current.pk), payload__unavailable=True)  # pyright: ignore[reportCallIssue]
         if existing.exists():
             return
         Message.objects.create(conversation_id=current.conversation_id, role=Message.Role.SYSTEM,
@@ -462,8 +463,8 @@ def sweep(*, process_queued=True):
     stale = VoiceTurn.objects.filter(state__in=["transcribing", "transcribed", "answering", "rendering"], claimed_at__lt=now - timedelta(minutes=15))
     for candidate in stale:
         with transaction.atomic():
-            VoiceDevice.objects.select_for_update().get(pk=candidate.device_id)
-            turn = VoiceTurn.objects.select_for_update().get(pk=candidate.pk)
+            VoiceDevice.objects.select_for_update().get(id=candidate.device_id)
+            turn = VoiceTurn.objects.select_for_update().get(id=candidate.pk)
             if turn.state not in {"transcribing", "transcribed", "answering", "rendering"} or not turn.claimed_at or turn.claimed_at >= now - timedelta(minutes=15):
                 continue
             if turn.assistant_message_id and turn.stage == "render":

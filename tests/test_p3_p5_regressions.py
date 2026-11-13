@@ -611,7 +611,7 @@ def test_conversation_belongs_to_user(api, user, other_user):
 
 def test_chat_requires_staff_for_system_operations(user):
     """系统级操作对普通用户 fail-closed（未声明权限名也拒绝）。"""
-    from apps.planner.operations import get as get_spec
+    from tests.planner_fixtures import require_spec as get_spec
 
     spec = get_spec("reset_breaker")
     with pytest.raises(services.PlannerError):

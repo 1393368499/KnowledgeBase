@@ -2,7 +2,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import patch
 import pytest
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 from apps.planner import services as planner
 from apps.planner.models import Conversation, Message, OperationRecord, DerivedDocument
 from apps.voice.models import VoiceTurn
@@ -100,6 +100,7 @@ def test_rename_is_immediate_and_delete_requires_confirmation_and_preserves_docu
     response = upload(api, d, route_version=1)
     turn = VoiceTurn.objects.get(pk=response.data["task_id"])
     conversation = turn.conversation_id
+    assert conversation is not None
     root = f"/api/v1/voice/device/tasks/{conversation}/"
     assert api.post(root + "delete/", {"action": "prepare"}, format="json").status_code == 400
     assert not OperationRecord.objects.exists()
@@ -142,7 +143,7 @@ def test_abandoning_delete_keeps_task_and_rename_cannot_target_other_device(user
     assert second.post(root + "rename/", {"title": "篡改"}, format="json").status_code == 404
     p = api.post(root + "delete/", {"action": "prepare"}, format="json").data
     VoiceTurn.objects.create(
-        device_id=other["id"], client_turn_id=uuid.uuid4(), conversation=turn.conversation,
+        device_id=other["id"], client_turn_id=uuid.uuid4(), conversation=turn.conversation,  # pyright: ignore[reportArgumentType]
         config_version=1, scope_mode="all_authorized", state="answer_ready",
     )
     assert second.get(root).status_code == 200
@@ -158,4 +159,5 @@ def test_abandoning_delete_keeps_task_and_rename_cannot_target_other_device(user
     }, format="json").status_code == 400
     assert OperationRecord.objects.get(pk=web_proposal["operation_id"]).status == "proposed"
     result = api.post(root + "delete/", {"action": "abandon", "operation_id": p["operation_id"]}, format="json")
+    assert turn.conversation_id is not None
     assert result.status_code == 200 and Conversation.objects.filter(pk=turn.conversation_id).exists()

@@ -13,7 +13,7 @@ import wave
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 
 pytestmark = pytest.mark.django_db
 

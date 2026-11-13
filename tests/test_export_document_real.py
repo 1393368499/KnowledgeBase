@@ -16,7 +16,7 @@ def _armed(user, params):
     from django.utils import timezone
 
     from apps.planner.models import Conversation, OperationRecord
-    from apps.planner.operations import get as get_spec
+    from tests.planner_fixtures import require_spec as get_spec
     from apps.planner.services import _describe_target
 
     ref, label = _describe_target(get_spec("export_document"), params)

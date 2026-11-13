@@ -257,8 +257,12 @@ def test_http_deadline_is_request_local_and_stops_before_network():
     import time
     token = deadline.set(time.monotonic() - 1)
     calls = []
+    def unexpected_request(request):
+        calls.append(request)
+        return httpx.Response(500)
+
     try:
-        with httpx.Client(transport=httpx.MockTransport(lambda r: calls.append(r))) as client:
+        with httpx.Client(transport=httpx.MockTransport(unexpected_request)) as client:
             with pytest.raises(ServiceUnavailable, match="预算"):
                 post_json(http=client, url="http://llm.test", payload={}, service="test",
                           breaker=CircuitBreaker("test"), max_attempts=1)

@@ -50,7 +50,7 @@ def format_docx(data, options):
         for run in paragraph.runs:
             if font:
                 run.font.name = font
-                run._element.get_or_add_rPr().rFonts.set(qn("w:eastAsia"), font)
+                run._element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), font)
             if color:
                 run.font.color.rgb = RGBColor.from_string(color)
     stream = io.BytesIO()

@@ -38,7 +38,7 @@ def tasks(device):
         spec = OPERATIONS.get(op.intent)
         # Target names may refer to permissions the account no longer has.
         rows.append("执行：" + (spec.label if spec else "知识库操作"))
-    for run in LibraryRebuildRun.objects.filter(library__in=libraries, status="running").select_related("library")[:2]:
+    for run in LibraryRebuildRun.objects.filter(library__in=libraries, status="running").select_related("library")[:2]:  # pyright: ignore[reportCallIssue]
         rows.append("重建：" + run.library.name[:28])
     for item in IngestedFile.objects.filter(library__in=libraries, parse_status__in=["pending", "running"]).order_by("id")[:4]:
         rows.append(("解析：" if item.parse_status == "running" else "排队：") + item.original_name[:28])
@@ -140,7 +140,7 @@ def standby_frame(device):
             latest = turns.order_by("-created_at").values_list("state", flat=True).first()
     state = {"queued": "等待识别", "transcribing": "识别中", "transcribed": "准备回答",
              "answering": "AI 回答中", "rendering": "整理回复", "answer_ready": "已完成 · 可继续",
-             "failed": "处理未完成", "uncertain": "请查看任务", "canceled": "已取消"}.get(latest, "准备就绪")
+             "failed": "处理未完成", "uncertain": "请查看任务", "canceled": "已取消"}.get(latest or "", "准备就绪")
     return render(now.isoformat(), tasks(device), selection, title or "", state)
 
 

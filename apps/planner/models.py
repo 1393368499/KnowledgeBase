@@ -1,14 +1,13 @@
-"""AI 会话、操作提案、确认凭证与派生文档。
+"""AI 会话、操作提案、确认凭证与派生文档。"""
 
-不可篡改原则在这层体现为：已入库资料不被 AI 流程间接改写——
-所有"看起来像写入"的动作都记录成 OperationRecord（追加型），
-真正的破坏性删除必须拿到一次性 ActionTicket。
-"""
+# 已入库资料不被 AI 流程间接改写。写入类动作记入追加型 OperationRecord，
+# 破坏性删除必须取得一次性 ActionTicket。
 
 from __future__ import annotations
 
 import hashlib
 import secrets
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
@@ -31,6 +30,10 @@ def new_token() -> tuple[str, str]:
 
 
 class Conversation(models.Model):
+    if TYPE_CHECKING:
+        user_id: int
+        message_count: int
+
     class Source(models.TextChoices):
         WEB = "web", "网页"
         API = "api", "接口"
@@ -50,6 +53,9 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
+    if TYPE_CHECKING:
+        conversation_id: int
+
     class Role(models.TextChoices):
         USER = "user", "用户"
         ASSISTANT = "assistant", "助手"
@@ -92,6 +98,10 @@ class OperationRecord(models.Model):
     #: 与再执行（CAS 要求 ``ARMED``）两条路都被状态机挡住 —— 没有超时判决，
     #: 一条被 SIGKILL 打断的操作会**永久**卡在"执行中"，用户既不能放弃也不能重试。
     EXECUTING_STALE_SECONDS = 30 * 60
+
+    if TYPE_CHECKING:
+        conversation_id: int | None
+        user_id: int
 
     conversation = models.ForeignKey(
         Conversation, on_delete=models.CASCADE, related_name="operations", null=True, blank=True
@@ -163,6 +173,11 @@ class OperationRecord(models.Model):
 
 
 class ActionTicket(models.Model):
+    if TYPE_CHECKING:
+        user_id: int
+        operation_id: int | None
+        conversation_id: int | None
+
     """一次性确认凭证：绑定用户 + 会话 + 操作 + 对象，用过即废。"""
 
     class Scope(models.TextChoices):
@@ -281,6 +296,9 @@ class DeletionJob(models.Model):
     operation = models.ForeignKey(
         OperationRecord, on_delete=models.CASCADE, related_name="deletion_jobs"
     )
+    if TYPE_CHECKING:
+        operation_id: int
+
     target_kind = models.CharField(max_length=32)
     target_ref = models.CharField(max_length=200)
     #: 删除前的必要信息（用于清理向量与原件）：collection、content_sha256 等
@@ -350,6 +368,10 @@ class DerivedDocument(models.Model):
         null=True,
         blank=True,
     )
+    if TYPE_CHECKING:
+        template_id: int | None
+        conversation_id: int | None
+
     template_name = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -394,6 +416,11 @@ class DocumentTemplate(models.Model):
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="document_templates"
     )
+    if TYPE_CHECKING:
+        uploaded_by_id: int
+
+        def get_category_display(self) -> str: ...
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -438,6 +465,9 @@ class LibraryRebuildRun(models.Model):
     library = models.ForeignKey(
         KnowledgeLibrary, on_delete=models.CASCADE, related_name="rebuild_runs"
     )
+    if TYPE_CHECKING:
+        library_id: int
+
     operation = models.ForeignKey(
         "OperationRecord",
         on_delete=models.SET_NULL,

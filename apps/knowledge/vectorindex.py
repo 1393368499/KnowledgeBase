@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Sequence
+from typing import Any, Collection, Iterable, Sequence
 
 from django.conf import settings
 from django.db import transaction
@@ -229,14 +229,14 @@ def _vector_size(info: Any) -> int | None:
 
 def ensure_text_index(client, name: str, field_name: str = "text") -> None:
     """给 payload 的 text 字段建全文索引，供稀疏检索用。"""
-    from qdrant_client.models import PayloadSchemaType, TextIndexParams, TokenizerType
+    from qdrant_client.models import TextIndexParams, TextIndexType, TokenizerType
 
     try:
         client.create_payload_index(
             collection_name=name,
             field_name=field_name,
             field_schema=TextIndexParams(
-                type=PayloadSchemaType.TEXT, tokenizer=TokenizerType.MULTILINGUAL, lowercase=True
+                type=TextIndexType.TEXT, tokenizer=TokenizerType.MULTILINGUAL, lowercase=True
             ),
         )
     except Exception:  # noqa: BLE001 - 已存在索引时 qdrant 会报错，视为成功
@@ -887,7 +887,7 @@ def search_dense(
     vector: list[float],
     limit: int,
     permission_codes: Sequence[str] | None = None,
-    file_ids: Sequence[int] | None = None,
+    file_ids: Collection[int] | None = None,
 ) -> list[SearchCandidate]:
     """稠密向量检索。
 
@@ -941,7 +941,7 @@ def search_sparse(
     text: str,
     limit: int,
     permission_codes: Sequence[str] | None = None,
-    file_ids: Sequence[int] | None = None,
+    file_ids: Collection[int] | None = None,
 ) -> list[SearchCandidate]:
     """关键词检索（Qdrant 全文索引）。
 

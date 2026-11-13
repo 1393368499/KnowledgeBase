@@ -254,8 +254,8 @@ def test_delete_template_keeps_the_document_and_its_template_name(user):
         topic="质保",
         content_markdown="# 通知\n\n正文",
         status=DerivedDocument.Status.DRAFT,
-        template=template,
-        template_name=template.name,
+        template=template,  # pyright: ignore[reportCallIssue]
+        template_name=template.name,  # pyright: ignore[reportCallIssue]
     )
 
     outcome = dt.delete_template(template)
@@ -429,7 +429,7 @@ def test_compose_document_without_template_uses_generic_format(user, sources):
     stub = _StubLlm()
 
     result = services.compose_document(
-        user, title="通知", topic="质保", source_file_ids=[record.pk], client=stub
+        user, title="通知", topic="质保", source_file_ids=[record.pk], client=stub  # pyright: ignore[reportArgumentType]
     )
 
     system_content = stub.calls[0][0]["content"]
@@ -450,7 +450,7 @@ def test_compose_document_with_template_injects_format_block_and_records_it(user
         topic="质保",
         source_file_ids=[record.pk],
         template_id=template.pk,
-        client=stub,
+        client=stub,  # pyright: ignore[reportArgumentType]
     )
 
     system_content = stub.calls[0][0]["content"]
@@ -714,7 +714,9 @@ def test_operation_template_survives_into_the_armed_execution(user, sources, mon
         return {"document_id": 1, "title": "通知", "content_markdown": "# 通知"}
 
     monkeypatch.setattr(services, "compose_document", fake_compose)
-    services._dispatch(user, operation, services.get_spec("compose_document"))
+    spec = services.get_spec("compose_document")
+    assert spec is not None
+    services._dispatch(user, operation, spec)
 
     assert captured["template_id"] == template.pk
 

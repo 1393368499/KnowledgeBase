@@ -38,7 +38,7 @@ class Command(BaseCommand):
                     sweep(process_queued=False)
                     free = options["concurrency"] - len(running)
                     blocked = set(VoiceTurn.objects.filter(state__in=["transcribing", "transcribed", "answering", "rendering"]).values_list("conversation_id", flat=True))
-                    blocked.update(VoiceTurn.objects.filter(pk__in=running).values_list("conversation_id", flat=True))
+                    blocked.update(VoiceTurn.objects.filter(id__in=list(running)).values_list("conversation_id", flat=True))
                     blocked.update(ConversationLease.objects.values_list("conversation_id", flat=True))
                     selected = []
                     for pk, conversation_id in VoiceTurn.objects.filter(state="queued").exclude(pk__in=running).order_by("created_at").values_list("pk", "conversation_id")[:100]:

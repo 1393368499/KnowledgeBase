@@ -47,7 +47,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 logger = logging.getLogger("kb_eval.live")
 
@@ -600,9 +600,10 @@ def _main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--list-files", action="store_true")
     args = parser.parse_args(argv)
 
-    if hasattr(sys.stdout, "reconfigure"):
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
         try:
-            sys.stdout.reconfigure(encoding="utf-8")  # 控制台乱码很吵
+            reconfigure(encoding="utf-8")
         except Exception:  # pragma: no cover
             pass
 

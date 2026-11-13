@@ -2668,8 +2668,9 @@ def _drop_tombstoned(candidates: list, report: dict) -> list:
             f"（{dropped_reasons}；向量清理尚未收敛）"
         )
         report["degraded"] = True
+        previous_reason = report.get("degraded_reason")
         report["degraded_reason"] = (
-            (report.get("degraded_reason") + "；") if report.get("degraded_reason") else ""
+            (previous_reason + "；") if previous_reason else ""
         ) + f"检测到 {dropped} 条无法核验或已删除的残留向量，已从结果中剔除"
         logger.warning("检索丢弃 %d 条残留向量：%s", dropped, dropped_reasons)
     return kept

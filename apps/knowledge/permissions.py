@@ -13,7 +13,7 @@ from rest_framework.permissions import BasePermission
 
 from .models import LibraryLevel, MemberRole
 
-ROLE_ORDER = {MemberRole.READER: 1, MemberRole.WRITER: 2, MemberRole.ADMIN: 3}
+ROLE_ORDER: dict[str, int] = {MemberRole.READER: 1, MemberRole.WRITER: 2, MemberRole.ADMIN: 3}
 
 
 def role_at_least(role: str | None, required: str) -> bool:

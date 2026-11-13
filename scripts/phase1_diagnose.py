@@ -20,11 +20,15 @@ from django.test import Client
 from apps.knowledge.models import KnowledgeLibrary
 
 admin = get_user_model().objects.filter(username="admin").first()
+if admin is None:
+    raise SystemExit("找不到 admin 测试账号")
 client = Client()
 client.force_login(admin)
 
 library = KnowledgeLibrary.objects.filter(code__startswith="phase1-accept").order_by("-id").first()
 print("样本库:", library.code if library else None)
+if library is None:
+    raise SystemExit("找不到 phase1-accept 样本库")
 
 print("\n--- 缺陷 A：全库撰写 400 的真实原因 ---")
 for payload in (
@@ -39,9 +43,9 @@ for payload in (
     print(f"  {sorted(payload)} -> HTTP {response.status_code} {body}")
 
 print("\n--- 缺陷 B：Qdrant 客户端模式与集合 ---")
-from apps.knowledge.vectorindex import build_qdrant_client
+from apps.knowledge.vectorindex import build_client
 
-client_q = build_qdrant_client()
+client_q = build_client()
 print("  client:", type(client_q).__name__)
 print("  QDRANT_URL =", repr(getattr(settings, "QDRANT_URL", None)))
 print("  QDRANT_PATH =", repr(getattr(settings, "QDRANT_PATH", None)))

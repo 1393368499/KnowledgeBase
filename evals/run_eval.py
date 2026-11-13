@@ -260,7 +260,7 @@ def resolve_workdir(
 # ---------------------------------------------------------------------------
 def import_harness(*, verbose: bool = False):
     try:
-        from kb_eval.harness import bootstrap  # noqa: WPS433
+        from kb_eval.harness import bootstrap
     except ModuleNotFoundError as exc:
         name = exc.name or ""
         if name == "kb_eval.harness" or name.startswith("kb_eval.harness."):
@@ -630,7 +630,7 @@ def _cleanup_workdir(workdir: Path) -> str | None:
     2) sqlite / Qdrant embedded 的文件句柄可能拖住删除，先关 Django 连接。
     """
     try:  # 先关掉 Django 连接，避免 Windows 上 sqlite 句柄拖住目录删除
-        from django.db import connections  # noqa: WPS433 - 离线链路才 import 得到
+        from django.db import connections
 
         connections.close_all()
     except Exception:  # noqa: BLE001
@@ -755,7 +755,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.dataset_cases_loaded = len(cases)
     args.dataset_lines = dataset_lines
 
-    dataset_short = dataset_path.name
     say(f"[dataset] {dataset_path}")
     say(f"[dataset] {len(cases)} 条用例（文件 {dataset_lines} 行），"
         f"sha256={(args.dataset_sha256 or 'n/a')[:16]}…")

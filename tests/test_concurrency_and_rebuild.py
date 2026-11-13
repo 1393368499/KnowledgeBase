@@ -556,7 +556,8 @@ class _ExplodingQdrant(FakeQdrant):
         if self.fail_on_text_index:
             raise RuntimeError("模拟：collection 建好了，但建索引时超时")
         return super().create_payload_index(
-            collection_name, field_name, field_schema, **kwargs
+            collection_name=collection_name, field_name=field_name,
+            field_schema=field_schema, **kwargs
         )
 
 

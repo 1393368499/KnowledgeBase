@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 import pytest
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 from tests.test_voice_devices import manager
 
 
@@ -26,6 +26,7 @@ def test_endpoint_requires_web_login_and_reports_saved_address(user, settings, t
 
 def startup_module():
     spec = importlib.util.spec_from_file_location("startup_endpoint", Path(__file__).resolve().parents[1] / "deploy/voice-tunnel/save_endpoint.py")
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -46,5 +47,7 @@ def test_startup_rejects_redirect_and_accepts_authentication_gate():
     assert module.NoRedirect().redirect_request(None) is None
     with patch.object(module, "build_opener") as opener:
         for status in (401, 302, 404, 502):
-            opener.return_value.open.side_effect = HTTPError("https://example.org", status, "test", {}, None)
+            from email.message import Message
+
+            opener.return_value.open.side_effect = HTTPError("https://example.org", status, "test", Message(), None)
             assert module.gateway_ready("https://example.trycloudflare.com") == (status == 401)

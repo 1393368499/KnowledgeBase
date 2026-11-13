@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 from django.db import close_old_connections, connection
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 
 from apps.planner.models import Message
 from apps.voice import services
@@ -31,7 +31,7 @@ def test_cancel_before_slow_upload_is_durable_and_idempotent(user):
     with patch.object(services, 'transcribe') as transcribe:
         services.process_turn(turn.pk)
         transcribe.assert_not_called()
-    assert VoiceEvent.objects.filter(kind='turn.canceled').count() == 1
+    assert VoiceEvent.objects.filter(kind='turn.canceled').count() == 1  # pyright: ignore[reportCallIssue]
     assert not Message.objects.exists()
     assert upload(api, d).status_code == 202  # Cancellation does not block the next recording.
 
@@ -69,7 +69,7 @@ def test_started_ai_is_never_reported_as_canceled(user, state):
     assert response.status_code == 409
     turn.refresh_from_db()
     assert turn.state == state
-    assert not VoiceEvent.objects.filter(kind='turn.canceled').exists()
+    assert not VoiceEvent.objects.filter(kind='turn.canceled').exists()  # pyright: ignore[reportCallIssue]
 
 
 def test_cancellation_is_scoped_to_device_and_requires_device_auth(user):

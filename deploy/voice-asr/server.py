@@ -4,9 +4,10 @@ import threading
 import wave
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from faster_whisper import WhisperModel
-from faster_whisper.vad import get_speech_timestamps, VadOptions
+# These dependencies are installed in the ASR image from requirements.lock.
+from fastapi import FastAPI, File, HTTPException, UploadFile  # pyright: ignore[reportMissingImports]
+from faster_whisper import WhisperModel  # pyright: ignore[reportMissingImports]
+from faster_whisper.vad import get_speech_timestamps, VadOptions  # pyright: ignore[reportMissingImports]
 import numpy as np
 
 model = None
@@ -45,6 +46,8 @@ def transcribe(file: UploadFile = File(...)):
     except (ValueError, EOFError, wave.Error):
         raise HTTPException(400, "需要 16kHz PCM16 WAV 音频")
     with lock:
+        if model is None:
+            raise HTTPException(503, "语音识别模型未就绪")
         speech = get_speech_timestamps(audio, VadOptions(min_speech_duration_ms=200))
         if not speech:
             return {"text": "", "speech_detected": False}

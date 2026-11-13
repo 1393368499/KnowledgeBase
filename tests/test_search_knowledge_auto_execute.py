@@ -24,7 +24,8 @@ import pytest
 from apps.planner import services
 from apps.planner.llm import LlmClient, LlmProfile
 from apps.planner.models import Conversation, Message, OperationRecord
-from apps.planner.operations import all_specs, get as get_spec
+from apps.planner.operations import all_specs
+from tests.planner_fixtures import require_spec as get_spec
 
 pytestmark = pytest.mark.django_db
 

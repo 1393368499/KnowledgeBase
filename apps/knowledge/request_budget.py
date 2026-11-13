@@ -4,7 +4,7 @@ from functools import wraps
 import time
 from django.conf import settings
 
-deadline = ContextVar("knowledge_request_deadline", default=None)
+deadline: ContextVar[float | None] = ContextVar("knowledge_request_deadline", default=None)
 
 
 def remaining():

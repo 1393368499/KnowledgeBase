@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 spec = importlib.util.spec_from_file_location("voice_gateway", Path(__file__).resolve().parents[1] / "deploy/voice-gateway/server.py")
+assert spec is not None and spec.loader is not None
 gateway = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gateway)
 

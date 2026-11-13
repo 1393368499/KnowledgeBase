@@ -1288,7 +1288,7 @@ def test_migration_failure_keeps_guards_and_sql_protection(stage, library, make_
     assert _expected_guards() <= before_guards, "前置：注入前守卫应当是完整的"
 
     with pytest.raises(RuntimeError):
-        with _stage_injection(stage):
+        with _stage_injection(stage):  # pyright: ignore[reportGeneralTypeIssues]
             migration_module.add_fields_backfill_and_guards(
                 None, FakeSchemaEditor(connection)
             )

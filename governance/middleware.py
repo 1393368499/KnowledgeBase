@@ -25,14 +25,15 @@ class ImmutabilityGuardMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         label = protected_resource_for(request.path)
-        if label is not None and request.method.upper() in PROTECTED_HTTP_METHODS:
+        method = (request.method or "").upper()
+        if label is not None and method in PROTECTED_HTTP_METHODS:
             self._record(request, label)
             return JsonResponse(
                 {
                     "detail": f"{label}不可修改或删除（后端强制约束）",
                     "code": "immutable_resource",
                     "resource": label,
-                    "method": request.method.upper(),
+                    "method": method,
                     "path": request.path,
                 },
                 status=403,
@@ -57,7 +58,7 @@ class ImmutabilityGuardMiddleware:
                 resource_kind="http_path",
                 resource_key=request.path,
                 payload={
-                    "method": request.method.upper(),
+                    "method": (request.method or "").upper(),
                     "resource": label,
                     "query": request.META.get("QUERY_STRING", ""),
                 },
@@ -120,7 +121,7 @@ class LoginThrottleMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        if request.method.upper() != "POST" or request.path not in LOGIN_THROTTLE_PATHS:
+        if (request.method or "").upper() != "POST" or request.path not in LOGIN_THROTTLE_PATHS:
             return self.get_response(request)
         username = (request.POST.get("username") or "").strip()
         if not username:

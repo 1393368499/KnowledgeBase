@@ -1,10 +1,15 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
 
 
 class VoiceDevice(models.Model):
+    if TYPE_CHECKING:
+        conversation_id: int | None
+        user_id: int
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=80)
@@ -25,6 +30,12 @@ class VoiceDevice(models.Model):
 
 
 class VoiceTurn(models.Model):
+    if TYPE_CHECKING:
+        device_id: uuid.UUID
+        conversation_id: int | None
+        user_message_id: int | None
+        assistant_message_id: int | None
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     device = models.ForeignKey(VoiceDevice, on_delete=models.PROTECT)
     client_turn_id = models.UUIDField()
@@ -52,6 +63,10 @@ class VoiceTurn(models.Model):
 
 
 class VoiceEvent(models.Model):
+    if TYPE_CHECKING:
+        device_id: uuid.UUID
+        turn_id: uuid.UUID | None
+
     device = models.ForeignKey(VoiceDevice, on_delete=models.PROTECT)
     turn = models.ForeignKey(VoiceTurn, null=True, on_delete=models.CASCADE)
     kind = models.CharField(max_length=40)

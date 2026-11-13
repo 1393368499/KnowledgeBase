@@ -197,7 +197,7 @@ def _row_exists(instance: models.Model) -> bool:
     if pk is None:
         return False
     model = type(instance)
-    return model._base_manager.filter(pk=pk).exists()
+    return model._meta.base_manager.filter(pk=pk).exists()
 
 
 def guard_instance_save(
@@ -268,7 +268,7 @@ def controlled_save(
             model_label, "受控更新", "受控通道只能更新已存在的行，不能新建"
         )
     updates = {name: getattr(instance, name) for name in wanted}
-    type(instance)._base_manager.filter(pk=instance.pk).update(**updates)
+    type(instance)._meta.base_manager.filter(pk=instance.pk).update(**updates)
 
 
 class ImmutableQuerySet(models.QuerySet):

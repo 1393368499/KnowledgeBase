@@ -16,11 +16,13 @@ def setup_report(user, text=None):
     d, api = added(user)
     response = upload(api, d)
     turn = VoiceTurn.objects.get(pk=response.data['task_id'])
-    turn.user_message = Message.objects.create(conversation=turn.conversation, role='user', content='生成统计报告')
+    conversation = turn.conversation
+    assert conversation is not None
+    turn.user_message = Message.objects.create(conversation=conversation, role='user', content='生成统计报告')
     turn.state = 'answer_ready'
     turn.answer = '报告已生成，请到网页查看'
     turn.save()
-    doc = DerivedDocument.objects.create(created_by=user, conversation=turn.conversation,
+    doc = DerivedDocument.objects.create(created_by=user, conversation=conversation,
         title='完整统计报告', content_markdown=text or '\n'.join(f'第{i}项：真实报告内容' for i in range(100)))
     result = {'intent': 'compose_document', 'status': 'executed', 'result': {'document_id': doc.pk}}
     return d, api, turn, doc, result
@@ -49,6 +51,7 @@ def test_tables_preserve_every_header_and_value_for_small_screen(user):
     _, _, turn, _, result = setup_report(user, text)
     attach_result(turn, result)
     body = report_text(turn)
+    assert body is not None
     for text in ['年份：2025','数量：30','年份：2026','数量：17','报告末尾']:
         assert text in body
     assert '|---' not in body
@@ -76,13 +79,14 @@ def test_doc_binding_is_scoped_to_exact_owner_conversation_and_turn(user, other_
     doc.save()
     attach_result(turn, result)
     assert report_text(turn) is None
+    assert turn.user_message is not None
     turn.user_message.payload[KEY] = [doc.pk]
     turn.user_message.save()
-    assert '报告已删除' in report_text(turn)
+    assert '报告已删除' in (report_text(turn) or "")
     doc.created_by = user
     doc.conversation = None
     doc.save()
-    assert '报告已删除' in report_text(turn)
+    assert '报告已删除' in (report_text(turn) or "")
 
 
 def test_final_summary_failure_does_not_replay_saved_report_or_hide_body(user):
@@ -97,4 +101,4 @@ def test_final_summary_failure_does_not_replay_saved_report_or_hide_body(user):
     assert turn.state == 'answer_ready' and '第99项' in turn.answer
     assert DerivedDocument.objects.count() == 1
     assert not Message.objects.filter(role='assistant').exists()
-    assert Message.objects.filter(role='system', payload__document_saved_reply_unavailable=True).exists()
+    assert Message.objects.filter(role='system', payload__document_saved_reply_unavailable=True).exists()  # pyright: ignore[reportCallIssue]

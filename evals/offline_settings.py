@@ -104,7 +104,6 @@ os.environ.setdefault("KB_QDRANT_COLLECTION_PREFIX", "kb")
 
 # ---- 正式 settings（此时目录与开关都已就位）----
 from knowledgebase.settings import *  # noqa: E402,F401,F403  (star-import 是这里的目的)
-from knowledgebase.settings import DATABASES as _BASE_DATABASES  # noqa: E402
 
 # ============================ 显式覆盖（压平）============================
 # 1) 数据库：固定到 workdir 内的 sqlite 文件（不碰 db/kb.sqlite3）

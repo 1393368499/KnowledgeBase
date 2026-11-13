@@ -22,7 +22,8 @@ class DeviceAuthentication(BaseAuthentication):
         except UnicodeDecodeError:
             raise AuthenticationFailed("设备凭据无效")
         device = VoiceDevice.objects.select_related("user").filter(
-            token_hash=credential_hash(raw), enabled=True, removed_at__isnull=True, user__is_active=True,
+            token_hash=credential_hash(raw), enabled=True, removed_at__isnull=True,
+            user__is_active=True,  # pyright: ignore[reportCallIssue]
         ).first()
         if device is None:
             raise AuthenticationFailed("设备凭据无效或设备已停用")

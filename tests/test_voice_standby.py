@@ -2,7 +2,7 @@ import hashlib
 from unittest.mock import patch
 
 import pytest
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 from apps.knowledge.models import IngestedFile, LibraryMember, MemberRole
 from apps.planner.models import OperationRecord
 from apps.voice import services
@@ -59,7 +59,7 @@ def test_only_own_device_voice_and_own_operations_are_shown(user, other_user):
     another, _ = services.add_device(other_user, {"name": "别人的板"})
     import uuid
     for dev in [d, another]:
-        VoiceTurn.objects.create(device=dev, client_turn_id=uuid.uuid4(), conversation=dev.conversation,
+        VoiceTurn.objects.create(device=dev, client_turn_id=uuid.uuid4(), conversation=dev.conversation,  # pyright: ignore[reportArgumentType]
             config_version=dev.config_version, scope_mode="all_authorized", audio_sha256="", audio_path="", state="answering")
     OperationRecord.objects.create(user=other_user, intent="compose_document", status="executing", target_label="别人的私密任务")
     OperationRecord.objects.create(user=user, intent="compose_document", status="executed", target_label="已经结束")

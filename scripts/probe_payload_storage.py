@@ -89,7 +89,7 @@ def main() -> int:
 
     for name, on_disk in cases:
         print(f"== {name} (on_disk_payload={on_disk}) ==")
-        entry = {"on_disk_payload": on_disk}
+        entry: dict[str, bool | str] = {"on_disk_payload": on_disk}
         make_collection(client, name, on_disk)
         upsert_one(client, name)
         entry["before_restart_with_payload"] = query(client, name, True)

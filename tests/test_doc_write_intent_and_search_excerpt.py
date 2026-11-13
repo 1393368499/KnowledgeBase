@@ -49,7 +49,7 @@ def test_compose_document_is_registered_as_a_low_risk_writable_action():
     assert spec.risk == operations.RISK_LOW
     assert spec.requires_destructive_flow is False
     # 现行策略：只有删除保留人工确认；生成文档参数完整后直接执行
-    assert spec.requires_confirmation is False
+    assert spec is not None and spec.requires_confirmation is False
     assert spec.auto_execute is True
     # `template_id` 是这次新增的**可选**参数：不选就不用模板（用户明确要求的默认行为）
     assert set(spec.params) == {"title", "topic", "sources", "template_id"}
@@ -82,6 +82,7 @@ def test_compose_document_requires_sources_and_leaves_no_confirmation_card(admin
     assert "参考文件" in str(exc.value)
     assert not OperationRecord.objects.exists(), "缺参考文件不应留下待确认卡"
     spec = operations.get("compose_document")
+    assert spec is not None
     assert spec.requires_confirmation is False
     assert spec.auto_execute is True
 

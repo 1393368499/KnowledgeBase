@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, ClassVar
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -184,6 +186,12 @@ class IngestedFile(models.Model):
     - 状态字段只能通过 `update_parse_status()` 变更（服务层会写审计事件）。
     """
 
+    if TYPE_CHECKING:
+        _base_manager: ClassVar[models.Manager]
+        library_id: int
+
+        def get_parse_status_display(self) -> str: ...
+
     library = models.ForeignKey(
         KnowledgeLibrary, related_name="files", on_delete=models.PROTECT, verbose_name="信息库"
     )
@@ -254,7 +262,8 @@ class IngestedFile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     parsed_at = models.DateTimeField(null=True, blank=True)
 
-    objects = ImmutableManager()
+    # 保留实际执行写保护的管理器，Pylance 会另行合成 ORM 管理器类型。
+    objects = ImmutableManager()  # pyright: ignore[reportAssignmentType]
 
     # 允许通过受控领域方法变更的状态类字段
     # 注意：这张表必须与 governance.registry.CONTROLLED_MUTABLE_FIELDS 完全一致——
@@ -453,6 +462,9 @@ class IngestedFile(models.Model):
 class DocumentChunk(models.Model):
     """解析出的只读分段（派生数据，随资料产生）。"""
 
+    if TYPE_CHECKING:
+        file_id: int
+
     file = models.ForeignKey(IngestedFile, related_name="chunks", on_delete=models.CASCADE)
     ordinal = models.IntegerField()
     text = models.TextField()
@@ -461,7 +473,7 @@ class DocumentChunk(models.Model):
     permission_code = models.CharField(max_length=120, default="", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    objects = ImmutableManager()
+    objects = ImmutableManager()  # pyright: ignore[reportAssignmentType]
 
     class Meta:
         db_table = "kb_document_chunk"
@@ -505,6 +517,9 @@ class VectorCollection(models.Model):
     #: **它自己那一代**登记的端点与维度；只按全局 active profile 取模型，
     #: 会出现"旧集合被新模型查询/写入"的串模型事故（见 embedding.profile_for_registration）。
     base_url = models.CharField(max_length=300, blank=True, default="")
+    if TYPE_CHECKING:
+        library_id: int | None
+
     library = models.ForeignKey(
         KnowledgeLibrary, null=True, blank=True, related_name="collections", on_delete=models.SET_NULL
     )
@@ -593,6 +608,9 @@ class LibraryWriteGate(models.Model):
     **显式拒绝**并保留旧 job（见 ``apps.knowledge.writegate.assert_no_active_leases``）。
     """
 
+    if TYPE_CHECKING:
+        library_id: int
+
     library = models.OneToOneField(
         KnowledgeLibrary, on_delete=models.CASCADE, related_name="write_gate"
     )
@@ -629,6 +647,9 @@ class SearchFeedback(models.Model):
     class Verdict(models.TextChoices):
         ACCURATE = "accurate", "准确"
         INACCURATE = "inaccurate", "不准确"
+
+    if TYPE_CHECKING:
+        user_id: int
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

@@ -764,7 +764,7 @@ def _has_substantive_text(text: str) -> bool:
 def classification_label(value: str) -> str:
     for choice in FileNature:
         if choice.value == value:
-            return choice.label
+            return str(choice.label)
     return value or "（空）"
 
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+from typing import cast
 
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -23,6 +24,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -131,7 +133,7 @@ class LibraryViewSet(viewsets.ReadOnlyModelViewSet):
         allowed = readable_library_ids(self.request.user)
         if allowed is not None:
             queryset = queryset.filter(id__in=allowed)
-        if self.request.query_params.get("active", "1") != "0":
+        if cast(Request, self.request).query_params.get("active", "1") != "0":
             queryset = queryset.filter(is_active=True)
         return queryset.order_by("id")
 
@@ -174,7 +176,7 @@ class IngestedFileViewSet(viewsets.ReadOnlyModelViewSet):
         # 但库被停用后它名下的资料不再对外可读。这里必须过滤，不能只在库列表
         # 按钮上灰掉——否则"停用"只是界面效果，详情/处理接口照样能读到。
         queryset = queryset.filter(library__is_active=True)
-        params = self.request.query_params
+        params = cast(Request, self.request).query_params
         library = params.get("library")
         if library:
             if library.isdigit():
@@ -1775,6 +1777,7 @@ class SearchFeedbackView(APIView):
         )
         paginator = KbPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
+        assert page is not None  # KbPagination always has a positive default page size.
         net_by_file = {
             row["file_id"]: row["net"] for row in net_negative_feedback_rows()
         }
@@ -1821,6 +1824,7 @@ class SearchFeedbackView(APIView):
                 for item in page
             ]
         )
+        assert response.data is not None  # DRF builds the paginated response from the list above.
         response.data["note"] = (
             "只显示我自己的反馈；净分与「重扫未处理反馈」同一口径"
         )

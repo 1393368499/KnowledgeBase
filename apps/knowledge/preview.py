@@ -252,7 +252,8 @@ def render_pdf_page(path: Path, page_index: int, scale: float) -> bytes:
                 effective = MIN_SCALE
             elif pixels > MAX_PAGE_PIXELS:
                 effective = requested * ((MAX_PAGE_PIXELS / pixels) ** 0.5)
-            bitmap = page.render(scale=effective)
+            # PDFium 接受小数缩放，避免取整改变预览尺寸。
+            bitmap = page.render(scale=effective)  # pyright: ignore[reportArgumentType]
             try:
                 image = bitmap.to_pil()
                 try:

@@ -320,7 +320,8 @@ def test_delete_file_permission_is_unchanged(library, make_file, grant_member, u
         user, intent="delete_file", params={"file_id": record.pk}
     )
     assert proposal["operation_id"]
-    assert services.get_spec("delete_file").permission == "library:admin"
+    spec = services.get_spec("delete_file")
+    assert spec is not None and spec.permission == "library:admin"
 
 
 def test_in_lock_recheck_refuses_file_added_after_check(admin_user, library, make_file, monkeypatch):

@@ -86,7 +86,9 @@ class Handler(BaseHTTPRequestHandler):
             data = upstream.read(1024 * 1024)
             self.send_response(upstream.status)
             for key in ("Content-Type", "X-Content-SHA256", "X-Page-Count", "X-Frame-Count", "X-Frame-Format", "X-Menu-Count", "X-Menu-Conversation"):
-                if upstream.getheader(key): self.send_header(key, upstream.getheader(key))
+                value = upstream.getheader(key)
+                if value:
+                    self.send_header(key, value)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers(); self.wfile.write(data)

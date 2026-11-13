@@ -17,7 +17,7 @@ def test_client_rejects_oversized_input_before_transport(settings):
     class Never:
         def post(self, *args, **kwargs):
             pytest.fail('超长请求不得发送给模型')
-    client._client = Never()
+    client._client = Never()  # pyright: ignore[reportAttributeAccessIssue]
     with pytest.raises(LLMError, match='安全上下文预算'):
         client.chat([{'role':'user','content':'长资料'*20000}])
 
@@ -69,7 +69,7 @@ def test_long_selected_files_cover_all_chunks_and_sources(settings,user,library,
             self.finals.append(messages)
             return SimpleNamespace(content='# 合同统计报告\n\n三份合同分别列示。',model='test')
     model=Model()
-    result=services.compose_document(user,title='合同统计报告',topic='合同金额',source_file_ids=[f.pk for f in files],client=model)
+    result=services.compose_document(user,title='合同统计报告',topic='合同金额',source_file_ids=[f.pk for f in files],client=model)  # pyright: ignore[reportArgumentType]
     assert result['source_preparation']['summarized']
     assert result['source_preparation']['chunks']==165
     assert result['source_preparation']['files']==3

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from pptx import Presentation
+from pptx.shapes.autoshape import Shape
 from pptx.util import Inches
 
 from apps.knowledge.models import DocumentChunk
@@ -57,8 +58,10 @@ def pptx_bytes():
     presentation = Presentation()
     presentation.slide_width = Inches(12)
     slide = presentation.slides.add_slide(presentation.slide_layouts[1])
-    slide.shapes.title.text = "项目汇报范本"
-    slide.placeholders[1].text = "项目概况\n进度安排\n风险分析"
+    title, body = slide.shapes.title, slide.placeholders[1]
+    assert title is not None and isinstance(body, Shape)
+    title.text_frame.paragraphs[0].add_run().text = "项目汇报范本"
+    body.text_frame.paragraphs[0].add_run().text = "项目概况\n进度安排\n风险分析"
     stream = io.BytesIO()
     presentation.save(stream)
     return stream.getvalue()
@@ -88,7 +91,7 @@ def test_ppt_upload_classification_and_export(auth_api, user):
     presentation = Presentation(io.BytesIO(export.content))
     assert presentation.slide_width == Inches(12)
     assert len(presentation.slides) == 2
-    text = "\n".join(s.text for slide in presentation.slides for s in slide.shapes if s.has_text_frame)
+    text = "\n".join(s.text for slide in presentation.slides for s in slide.shapes if isinstance(s, Shape))
     assert "本期完成任务" in text and "资源不足" in text
     assert "项目汇报范本" not in text
 
@@ -175,7 +178,7 @@ def test_ppt_template_prompt_reaches_writer(user, library, grant_member, make_fi
             calls.append(messages)
             return SimpleNamespace(content="## 进展\n- 已完成验收", model="test", usage={})
     result = services.compose_document(user, title="汇报", topic="验收", source_file_ids=[file.pk],
-                                       template_id=template.pk, client=Writer())
+                                       template_id=template.pk, client=Writer())  # pyright: ignore[reportArgumentType]
     assert result["template_id"] == template.pk
     assert "演示模板" in calls[0][0]["content"]
     assert "项目概况" in calls[0][0]["content"]
@@ -187,7 +190,11 @@ def test_word_template_keeps_page_setup_header_and_style(user):
     original = Document()
     original.sections[0].left_margin = Inches(1.6)
     original.sections[0].header.paragraphs[0].text = "单位公文抬头"
-    original.styles["Normal"].font.size = Pt(16)
+    from docx.styles.style import ParagraphStyle
+
+    original_style = original.styles["Normal"]
+    assert isinstance(original_style, ParagraphStyle)
+    original_style.font.size = Pt(16)
     original.add_paragraph("模板旧正文")
     source = io.BytesIO()
     original.save(source)
@@ -196,7 +203,9 @@ def test_word_template_keeps_page_setup_header_and_style(user):
     output = Document(io.BytesIO(export.content))
     assert output.sections[0].left_margin == Inches(1.6)
     assert "单位公文抬头" in output.sections[0].header.paragraphs[0].text
-    assert output.styles["Normal"].font.size == Pt(16)
+    output_style = output.styles["Normal"]
+    assert isinstance(output_style, ParagraphStyle)
+    assert output_style.font.size == Pt(16)
     assert "这是真实正文。" in "\n".join(p.text for p in output.paragraphs)
     assert "模板旧正文" not in "\n".join(p.text for p in output.paragraphs)
 

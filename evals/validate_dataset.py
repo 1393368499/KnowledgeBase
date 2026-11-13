@@ -181,7 +181,7 @@ def main(argv: list[str]) -> int:
         actual = bucket_count.get(bucket, 0)
         if actual != expected:
             problems.append(f"[bucket 计数] {bucket} 应有 {expected} 条，实际 {actual} 条")
-    for bucket in sorted(k for k in bucket_count if k not in EXPECTED_BUCKETS):
+    for bucket in sorted((k for k in bucket_count if k not in EXPECTED_BUCKETS), key=str):
         problems.append(f"[bucket 计数] 出现未知 bucket {bucket!r}")
 
     ids = [rec.get("id") for rec in records if isinstance(rec.get("id"), str)]

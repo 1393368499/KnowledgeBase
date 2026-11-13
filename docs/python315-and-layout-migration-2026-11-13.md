@@ -65,6 +65,8 @@
 
 > 环境备注：Docker Desktop 启动时曾因 `%LOCALAPPDATA%\Docker\run` 目录缺失/残留而反复弹出 Ingest server 初始化错误；重建 `run` 目录并单实例启动后恢复，与项目代码无关。
 
+> WSL 注册补充（2026-11-13 16:05）：移动虚拟盘后 WSL 注册表 BasePath 仍指向旧目录，`test_storage_migrate_safety` 的 WSL 用例因此失败。已用 `wsl --unregister KnowledgeBase-Runtime` + `wsl --import-in-place KnowledgeBase-Runtime <新路径>/ext4.vhdx` 重新注册，发行版可从新路径启动，该用例恢复通过。
+
 ## 4. 验证
 
 | 检查 | 结果 |

@@ -308,6 +308,8 @@ UNTRUSTED_CONTEXT_FOOTER = "===== 引用数据结束 ====="
 class PlannerError(RuntimeError):
     """会话/操作流程中的可预期错误（会被翻译成 4xx）。"""
 
+    library_reference_retryable: bool
+
 
 # --------------------------------------------------------------- 工具模式 ----
 
@@ -473,6 +475,8 @@ def check_permission(user, spec: OperationSpec, params: dict[str, Any]) -> None:
         # 这里**必须按会话归属判定**，不能沿用库级权限（那样任何登录用户
         # 都能凭别人的会话 id 删掉别人的聊天记录）。
         conversation_id = params.get("conversation")
+        if conversation_id is None:
+            raise PlannerError("会话不存在：None")
         conversation = Conversation.objects.filter(pk=conversation_id).first()
         if conversation is None:
             raise PlannerError(f"会话不存在：{conversation_id}")
@@ -1124,21 +1128,21 @@ def reply_to_message(
     dialogue = list(messages)
     reply: LlmReply | None = None
     for _round in range(max_rounds):
-        candidate = research.chat(llm, dialogue, tools=tools)
-        if candidate is None:
+        round_reply = research.chat(llm, dialogue, tools=tools)
+        if round_reply is None:
             break
-        reply = candidate
-        all_calls.extend(reply.tool_calls)
-        if not reply.tool_calls:
-            repair = research.assess(llm, reply.content)
+        reply = round_reply
+        all_calls.extend(round_reply.tool_calls)
+        if not round_reply.tool_calls:
+            repair = research.assess(llm, round_reply.content)
             if repair and _round + 1 < max_rounds:
-                dialogue.append({"role": "assistant", "content": reply.content})
+                dialogue.append({"role": "assistant", "content": round_reply.content})
                 dialogue.append({"role": "user", "content": repair})
                 continue
             break
         auto_executed: list[tuple[Any, dict[str, Any]]] = []
         library_repairs: list[tuple[Any, dict[str, Any]]] = []
-        for call in reply.tool_calls:
+        for call in round_reply.tool_calls:
             # **协议无效的工具调用必须直接拒绝**（独立审查条目 3）。
             # 不能因为"参数恰好都是可选的"就把畸形输入（非法 JSON / 非对象 /
             # 无名函数）当成有效提案 —— 那等于凭偶然通过。
@@ -1214,8 +1218,8 @@ def reply_to_message(
                 auto_executed.append((call, proposal))
         # 没有"已执行"的结果可回填：停在这里
         # （只有删除仍等待用户确认）。
-        if not auto_executed and len(library_repairs) == len(reply.tool_calls):
-            dialogue.append(_assistant_tool_call_message(reply))
+        if not auto_executed and len(library_repairs) == len(round_reply.tool_calls):
+            dialogue.append(_assistant_tool_call_message(round_reply))
             for call, error in library_repairs:
                 dialogue.append({"role": "tool", "tool_call_id": call.call_id,
                                  "content": json.dumps(error, ensure_ascii=False)})
@@ -1223,7 +1227,7 @@ def reply_to_message(
         if not auto_executed:
             break
         # 结果回填给模型：下一轮它就能基于**真实的**命中内容写正文。
-        dialogue.append(_assistant_tool_call_message(reply))
+        dialogue.append(_assistant_tool_call_message(round_reply))
         for call, proposal in auto_executed:
             dialogue.append(
                 {
@@ -1255,8 +1259,8 @@ def reply_to_message(
         )
         if final_reply is not None:
             reply = final_reply
-            all_calls.extend(reply.tool_calls)
-            research.assess(llm, reply.content)
+            all_calls.extend(final_reply.tool_calls)
+            research.assess(llm, final_reply.content)
     # 循环至少跑一轮，reply 必非空；显式断言是为了让 type checker 与后来人放心
     if reply is None:  # pragma: no cover - 防御性分支
         raise PlannerError("模型没有返回任何内容")
@@ -1408,13 +1412,13 @@ def propose_operation(
             ),
         }
     operation = OperationRecord.objects.create(
-        conversation=conversation,
+        conversation=conversation,  # pyright: ignore[reportArgumentType]
         user=user,
         intent=intent,
         risk=spec.risk,
         status=OperationRecord.Status.ARMED if spec.auto_execute else OperationRecord.Status.PROPOSED,
-        armed_at=armed_at,
-        armed_expires_at=armed_at + _armed_ttl() if armed_at else None,
+        armed_at=armed_at,  # pyright: ignore[reportArgumentType]
+        armed_expires_at=armed_at + _armed_ttl() if armed_at else None,  # pyright: ignore[reportArgumentType]
         params=params,
         # 范围与提案同生共死：确认卡可能隔几分钟（甚至跨一轮对话）才点，
         # 执行时必须还能知道"这一问用户只勾了哪些库"。
@@ -1764,8 +1768,8 @@ def issue_ticket(
     raw, digest = new_token()
     ActionTicket.objects.create(
         user=user,
-        conversation=conversation,
-        operation=operation,
+        conversation=conversation,  # pyright: ignore[reportArgumentType]
+        operation=operation,  # pyright: ignore[reportArgumentType]
         token_hash=digest,
         scope=scope,
         intent=operation.intent if operation else "",
@@ -2006,8 +2010,10 @@ def confirm_operation(
             locked.status = OperationRecord.Status.ARMED
             locked.confirmations = 1
             # 进入可执行状态时**开始计时**：ARMED 不是永久的
-            locked.armed_at = timezone.now()
-            locked.armed_expires_at = locked.armed_at + _armed_ttl()
+            armed_at = timezone.now()
+            armed_expires_at = armed_at + _armed_ttl()
+            locked.armed_at = armed_at
+            locked.armed_expires_at = armed_expires_at
             locked.save(
                 update_fields=[
                     "status",
@@ -2022,7 +2028,7 @@ def confirm_operation(
                 "status": locked.status,
                 "confirmations": locked.confirmations,
                 "next": "execute",
-                "armed_expires_at": locked.armed_expires_at.isoformat(),
+                "armed_expires_at": armed_expires_at.isoformat(),
                 "message": "已确认，可以执行。",
             }
 
@@ -2108,8 +2114,10 @@ def confirm_operation(
         )
         locked.status = OperationRecord.Status.ARMED
         locked.confirmations = DESTRUCTIVE_CONFIRMATIONS
-        locked.armed_at = timezone.now()
-        locked.armed_expires_at = locked.armed_at + _armed_ttl()
+        armed_at = timezone.now()
+        armed_expires_at = armed_at + _armed_ttl()
+        locked.armed_at = armed_at
+        locked.armed_expires_at = armed_expires_at
         locked.save(
             update_fields=[
                 "status",
@@ -2124,10 +2132,10 @@ def confirm_operation(
             "status": locked.status,
             "confirmations": locked.confirmations,
             "next": "execute",
-            "armed_expires_at": locked.armed_expires_at.isoformat(),
+            "armed_expires_at": armed_expires_at.isoformat(),
             "message": (
                 "三次确认全部完成，可以执行。"
-                f"执行窗口至 {locked.armed_expires_at.isoformat()}，"
+                f"执行窗口至 {armed_expires_at.isoformat()}，"
                 "超时需重新发起提案。"
             ),
         }
@@ -2552,7 +2560,7 @@ def _payload_filter(*, file_id, content_sha256: str):
 
     if not file_id:
         return None
-    conditions = [
+    conditions: list[qmodels.Condition] = [
         qmodels.FieldCondition(key="file_id", match=qmodels.MatchValue(value=int(file_id)))
     ]
     if content_sha256:
@@ -5246,7 +5254,7 @@ def set_operation_template(user, operation: OperationRecord, raw_template_id) ->
       不能因为"只是改个参数"就绕过校验。
     """
     spec = get_spec(operation.intent)
-    if operation.intent != "compose_document":
+    if operation.intent != "compose_document" or spec is None:
         raise PlannerError("只有「编写新文档」的待办可以选模板")
     if operation.status not in TEMPLATE_EDITABLE_STATUSES:
         raise PlannerError(
@@ -5332,7 +5340,7 @@ def set_operation_sources(
     spec = get_spec(operation.intent)
     if operation.user_id != user.pk:
         raise PlannerError("该操作不属于当前用户")
-    if operation.intent != "compose_document":
+    if operation.intent != "compose_document" or spec is None:
         raise PlannerError("只有「编写新文档」的待办可以选参考文件")
     if operation.status not in PENDING_EDITABLE_STATUSES:
         raise PlannerError(
@@ -5368,7 +5376,7 @@ def set_operation_sources(
             raise PlannerError(f"参考文件不存在：{pk}")
         if allowed is not None and row.library_id not in allowed:
             raise PlannerError(f"没有该资料的查看权限：{row.original_name}")
-        if scope_pks is not None and row.library_id not in scope_pks:
+        if scoped is not None and scope_pks is not None and row.library_id not in scope_pks:
             raise PlannerError(
                 f"资料《{row.original_name}》不在本次检索范围内"
                 f"（本次范围：{_scope_names(scoped)}）"
@@ -5539,7 +5547,7 @@ def compose_document(
                 "没有检索到可用于撰写的资料：请先上传相关资料、改用勾选来源，"
                 "或把主题写得更具体一些。为避免生成没有依据的内容，本次不撰写。"
             )
-        selected_ids = [item.get("file_id") for item in results if item.get("file_id")]
+        selected_ids = [file_id for item in results if (file_id := item.get("file_id"))]
 
     # 只能有一条 system（见 reply_to_message 处的说明：AS711 会拒绝
     # "System message must be at the beginning."）。撰写怎么写的规则、资料片段
@@ -5709,8 +5717,8 @@ def compose_document(
             content_markdown=body,
             status=DerivedDocument.Status.DRAFT,
             # 模板外键 + 名字快照：模板被删后解除了外键，但"当时套的是哪份模板"仍在。
-            template=template,
-            template_name=(template.name if template is not None else ""),
+            template=template,  # pyright: ignore[reportCallIssue]
+            template_name=(template.name if template is not None else ""),  # pyright: ignore[reportCallIssue]
         )
         # 记录来源：两种来源选择方式都归一到 ``selected_ids``
         # （早期这里写的是 ``source_ids``，与上面分支里的变量名不一致 →

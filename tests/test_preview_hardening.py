@@ -343,6 +343,7 @@ def test_xlsx_trims_trailing_empty_columns(db, user, auth_api, make_library, mak
 
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.title = "三列"
     sheet.append(["名称", "", "数量"])      # 中间列故意留空
     sheet.append(["螺丝", "", 12])
@@ -369,6 +370,7 @@ def test_xlsx_trims_trailing_empty_rows(db, user, auth_api, make_library, make_f
 
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.append(["A", "B"])
     sheet.append([None, None])          # 中间空行：保留
     sheet.append(["C", "D"])
@@ -394,6 +396,7 @@ def test_xlsx_column_cap_is_still_reported_after_trimming(
 
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.append([f"c{index}" for index in range(preview.MAX_TABLE_COLS + 5)])
     buffer = _io.BytesIO()
     workbook.save(buffer)

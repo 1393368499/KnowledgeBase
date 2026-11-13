@@ -72,7 +72,9 @@ def test_failure_keeps_last_completed_work_and_does_not_claim_success(cache):
 def test_old_lease_cannot_publish_over_new_run(cache):
     file = record()
     with progress.track_file(file, 'current'):
-        old = progress._file.get().copy()
+        snapshot = progress._file.get()
+        assert snapshot is not None
+        old = snapshot.copy()
         newer = dict(old, run='next', started_at=old['started_at']+1, label='new')
         progress._write('file', newer, start=True)
         progress._write('file', dict(old, label='stale'))
@@ -142,7 +144,7 @@ def test_pdf_reports_only_completed_pages_and_stops_before_failed_page(cache, mo
         return '完整正文'
     with pytest.raises(parsers.ParseError):
         with progress.track_file(file, 'current'):
-            parsers.parse_bytes(source.getvalue(), '三页.pdf', ocr=SimpleNamespace(available=True, recognize_image=recognize))
+            parsers.parse_bytes(source.getvalue(), '三页.pdf', ocr=SimpleNamespace(available=True, recognize_image=recognize))  # pyright: ignore[reportArgumentType]
     assert [s['current'] for s in seen] == [0, 1, 2]
     assert all(s['total'] == 3 and s['stage'] == 'ocr' for s in seen)
     file.parse_status = 'failed'

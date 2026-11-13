@@ -25,7 +25,7 @@ from apps.knowledge.models import ParseStatus
 from apps.knowledge.pipeline import LeaseNotAcquired, PipelineError
 from apps.planner import services
 from apps.planner.models import Conversation, OperationRecord
-from apps.planner.operations import get as get_spec
+from tests.planner_fixtures import require_spec as get_spec
 
 INTENT = "restart_stalled_task"
 

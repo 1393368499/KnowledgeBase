@@ -73,7 +73,7 @@ def test_scope_note_is_delivered_and_degraded_is_retained(monkeypatch, setup_env
             seen["messages"] = messages
             return LlmReply(content=f"质保期为 36 个月。[{evidence['evidence_id']}]", model="fake", finish_reason="stop")
 
-    payload = services.reply_to_message(user, conversation, "质保期多久", client=FakeClient())
+    payload = services.reply_to_message(user, conversation, "质保期多久", client=FakeClient())  # pyright: ignore[reportArgumentType]
 
     system = seen["messages"][0]["content"]
     assert seen["messages"][0]["role"] == "system"
@@ -112,6 +112,6 @@ def test_healthy_retrieval_has_no_scope_note(monkeypatch, setup_env):
             seen["messages"] = messages
             return LlmReply(content="好的", model="fake", finish_reason="stop")
 
-    payload = services.reply_to_message(user, conversation, "在吗", client=FakeClient())
+    payload = services.reply_to_message(user, conversation, "在吗", client=FakeClient())  # pyright: ignore[reportArgumentType]
     assert "检索范围说明" not in seen["messages"][0]["content"]
     assert payload["retrieval_degraded"] is False

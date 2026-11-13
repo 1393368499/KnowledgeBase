@@ -288,6 +288,7 @@ def test_xlsx_is_structured(db, user, auth_api, make_library, make_file, grant_m
 
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.title = "S1"
     sheet.append(["名称", "数量"])
     sheet.append(["螺丝", 3])

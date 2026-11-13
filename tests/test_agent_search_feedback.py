@@ -29,7 +29,7 @@ def readable_file(make_library, make_file, grant_member, user):
 def _armed(user, params):
     """按执行端的要求造一条 ARMED 操作（身份取自同一个解析函数）。"""
     from apps.planner.models import Conversation, OperationRecord
-    from apps.planner.operations import get as get_spec
+    from tests.planner_fixtures import require_spec as get_spec
     from apps.planner.services import _describe_target
 
     ref, label = _describe_target(get_spec(INTENT), params)

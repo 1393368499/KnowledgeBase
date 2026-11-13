@@ -7,7 +7,13 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from apps.planner import services
-from apps.planner.operations import get
+from apps.planner.operations import OperationSpec, get
+
+
+def require_spec(intent: str) -> OperationSpec:
+    spec = get(intent)
+    assert spec is not None, f"Missing operation registration: {intent}"
+    return spec
 
 
 def legacy_proposal(user, **kwargs):

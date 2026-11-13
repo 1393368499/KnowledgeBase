@@ -48,7 +48,7 @@ def delete(device, conversation_id, data):
                 raise ValidationError("删除确认与当前任务不匹配")
             operation = OperationRecord.objects.select_for_update().filter(
                 pk=operation_id, user=device.user, intent="delete_conversation",
-                params__conversation=conversation_id, result__voice_device_id=str(device.pk),
+                params__conversation=conversation_id, result__voice_device_id=str(device.pk),  # pyright: ignore[reportCallIssue]
             ).first()
             if not operation:
                 raise ValidationError("删除确认与当前任务不匹配")
@@ -56,6 +56,7 @@ def delete(device, conversation_id, data):
                 return operation.result
         conversation = owned_conversation(device, conversation_id)
         if action == "abandon":
+            assert operation is not None
             return planner.abandon_operation(device.user, operation)
         if VoiceTurn.objects.filter(conversation=conversation, state__in=services.ACTIVE).exists() or ConversationLease.objects.filter(conversation=conversation).exists():
             raise ValidationError("任务仍在处理中，请完成后再删除")
@@ -64,7 +65,7 @@ def delete(device, conversation_id, data):
             OperationRecord.objects.filter(pk=proposal["operation_id"]).update(result={"voice_device_id": str(device.pk)})
             return {**proposal, "title": conversation.title, "conversation_id": conversation_id,
                 "detail": "将同步删除手机任务和知识库会话及聊天记录。已生成文档、已入库资料和操作审计保留。"}
-        if action != "confirm":
+        if action != "confirm" or operation is None:
             raise ValidationError("删除操作无效")
         planner.confirm_operation(device.user, operation, token=str(data.get("confirm_token", "")))
         turns = list(VoiceTurn.objects.filter(conversation=conversation).values_list("pk", "audio_path"))

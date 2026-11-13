@@ -10,7 +10,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from rest_framework import generics, permissions
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -39,9 +42,10 @@ class AuditEventListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = AuditEvent.objects.all()
-        action = self.request.query_params.get("action")
-        resource_key = self.request.query_params.get("resource_key")
-        conversation_key = self.request.query_params.get("conversation_key")
+        params = cast(Request, self.request).query_params
+        action = params.get("action")
+        resource_key = params.get("resource_key")
+        conversation_key = params.get("conversation_key")
         if action:
             queryset = queryset.filter(action=action)
         if resource_key:

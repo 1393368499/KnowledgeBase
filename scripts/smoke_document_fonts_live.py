@@ -27,7 +27,7 @@ try:
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(BASE + "/app/", wait_until="networkidle")
-        csrf = next(c["value"] for c in context.cookies() if c["name"] == "csrftoken")
+        csrf = next(c["value"] for c in context.cookies() if c.get("name") == "csrftoken" and "value" in c)
         title = "字体颜色验收-" + uuid.uuid4().hex[:6]
         settings = {"title_font": "xiaobiaosong", "body_font": "fangsong", "heading_font": "heiti",
                     "subheading_font": "kaiti", "title_color": "red", "text_color": "black"}

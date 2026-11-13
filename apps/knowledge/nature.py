@@ -31,7 +31,7 @@ def is_valid_nature(value: str) -> bool:
     return not text or text in NATURE_VOCABULARY
 
 
-def is_unidentified_filter(value: str) -> bool:
+def is_unidentified_filter(value: str | None) -> bool:
     """是否"按待识别筛选"（只读语义，不写任何字段）。"""
     return str(value or "").strip() == UNIDENTIFIED_SENTINEL
 

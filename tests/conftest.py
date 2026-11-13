@@ -114,7 +114,7 @@ def run_resources(session_run_resources):
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
+from tests.api_client import APIClient
 
 from apps.knowledge.models import (
     IngestedFile,
