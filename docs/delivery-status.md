@@ -360,7 +360,7 @@ SQLite 轮的 13 skip 是**真实基础设施与 PostgreSQL 专项**，**不计�
 3. `execute` 只允许**只读白名单** intent，并与服务端目录的 `is_mutation`
    交叉核对——冲突时按**更严格**一方处理。
 
-**独立负载测试 settings**：`config/loadtest_settings.py`
+**独立负载测试 settings**：`knowledgebase/loadtest_settings.py`
 
 - 先正常导入业务 settings（连接参数来自 `.env`），**再强制改写**模块属性，
   因此 `.env` 的 `override=True` **盖不回去**；
@@ -395,7 +395,7 @@ SQLite 轮的 13 skip 是**真实基础设施与 PostgreSQL 专项**，**不计�
 重启命令（若该服务退出）：
 
 ```powershell
-$env:DJANGO_SETTINGS_MODULE='config.loadtest_settings'
+$env:DJANGO_SETTINGS_MODULE='knowledgebase.loadtest_settings'
 $env:KB_LOADTEST_DB_NAME='kb_loadtest_verify'
 $env:KB_LOADTEST_QDRANT_PREFIX='kb-lt-verify'
 $env:KB_LOADTEST_BROKER_DB='14'

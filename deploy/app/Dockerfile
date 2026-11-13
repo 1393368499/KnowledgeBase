@@ -4,10 +4,10 @@ ARG BASE_IMAGE=source-base
 ARG OFFICE_JARS=empty-office-jars
 FROM scratch AS empty-office-jars
 FROM ${OFFICE_JARS} AS office-jars
-# 基础镜像按 digest 固定（2026-11-11 从本机拉取的 python:3.13-slim manifest 解析所得）：
+# 基础镜像按 digest 固定（2026-11-11 从本机拉取的 python:3.15-slim manifest 解析所得）：
 # 只写 tag 时上游重推同名 tag 会让"复审过的源码"与"实际构建的基座"脱钩。
 # 升级基座时同步更新此 digest，并在构建记录里留痕（deploy/build-app.* 会记录产物 digest）。
-FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS source-base
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS source-base
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 RUN useradd --create-home --uid 10001 kb \
@@ -129,17 +129,17 @@ RUN fc-list :lang=zh | grep -qi noto \
  && python -c "import subprocess;from PIL import Image,ImageDraw,ImageFont;p=subprocess.check_output(['fc-match','-f','%{file}','Noto Sans CJK SC']).decode().strip();assert p, 'fc-match 没找到中文字体';assert ('noto' in p.lower() or 'cjk' in p.lower()), ('字体不是 CJK：%s' % p);f=ImageFont.truetype(p,48);im=Image.new('L',(420,80),0);ImageDraw.Draw(im).text((5,5),'质保期 12 个月',fill=255,font=f);ink=sum(1 for v in im.getdata() if v>0);assert ink>800, ('中文渲染墨迹过少：%d' % ink);print('CJK font ok:', p, 'ink', ink)"
 
 # ---- 用**当前源码**覆盖历史层（交付必须包含本机最新代码）----
-COPY config/ ./config/
+COPY knowledgebase/ ./knowledgebase/
 COPY apps/ ./apps/
 COPY governance/ ./governance/
 COPY manage.py ./
 
-# 静态文件收集目录（STATIC_ROOT=<项目根>/staticfiles），交给运行用户
-RUN mkdir -p /app/staticfiles /app/media/templates /usr/local/share/fonts/kb && chown -R kb:kb /app
+# 静态文件收集目录（STATIC_ROOT=<项目根>/data/staticfiles），交给运行用户
+RUN mkdir -p /app/data/staticfiles /app/data/media/templates /usr/local/share/fonts/kb && chown -R kb:kb /app
 
 USER kb
 
 WORKDIR /app
 
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py collectstatic --noinput && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 300 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "python manage.py collectstatic --noinput && exec gunicorn knowledgebase.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 300 --access-logfile - --error-logfile -"]

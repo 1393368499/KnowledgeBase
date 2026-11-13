@@ -63,7 +63,7 @@ VOCABULARY = [choice.value for choice in FileNature]
 
 @pytest.fixture(autouse=True)
 def _isolated_blobs(isolated_paths):
-    """原件一律落临时目录：绝不往真实 ``media/raw`` 写测试数据。"""
+    """原件一律落临时目录：绝不往真实 ``data/media/raw`` 写测试数据。"""
     return isolated_paths
 
 

@@ -1,6 +1,6 @@
 """把"这次到底连的是哪个库"变成**可断言的证据**（测试基础设施缺陷的回归）。
 
-背景（实测踩到）：``config/test_settings.py`` 在 pytest-django 的 configure 阶段就被
+背景（实测踩到）：``knowledgebase/test_settings.py`` 在 pytest-django 的 configure 阶段就被
 导入，而 ``tests/conftest.py`` 原先在 ``pytest_configure`` 里才
 ``os.environ.setdefault("KB_TEST_DB", config.getoption("--kb-db"))`` —— 为时已晚，
 于是 ``pytest --kb-db=postgres`` **静默跑 SQLite**，报告却写着"已在 Postgres 上验证"。

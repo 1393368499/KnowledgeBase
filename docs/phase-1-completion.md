@@ -13,11 +13,11 @@
 | 文件 | 作用 |
 |---|---|
 | `manage.py` | Django 管理入口 |
-| `config/settings.py` | 全部配置；环境变量优先（`.env`，`load_dotenv(override=True)`）；非 DEBUG + SQLite 直接拒绝启动 |
-| `config/paths.py` | `vector_data/` 强制落在项目根；越界抛 `StoragePathError`；启动即创建并校验 db/media/vector_data |
-| `config/urls.py` / `config/health_urls.py` | `api/v1/` 总路由；`/live/` 直接 200，`/ready/` 真执行 `SELECT 1` 并检查 vector_data |
-| `config/asgi.py` / `config/wsgi.py` | ASGI 部署入口（需求 3：面向大并发） |
-| `config/exceptions.py` | 统一 API 异常结构 |
+| `knowledgebase/settings.py` | 全部配置；环境变量优先（`.env`，`load_dotenv(override=True)`）；非 DEBUG + SQLite 直接拒绝启动 |
+| `knowledgebase/paths.py` | `vector_data/` 强制落在项目根；越界抛 `StoragePathError`；启动即创建并校验 db/media/vector_data |
+| `knowledgebase/urls.py` / `knowledgebase/health_urls.py` | `api/v1/` 总路由；`/live/` 直接 200，`/ready/` 真执行 `SELECT 1` 并检查 vector_data |
+| `knowledgebase/asgi.py` / `knowledgebase/wsgi.py` | ASGI 部署入口（需求 3：面向大并发） |
+| `knowledgebase/exceptions.py` | 统一 API 异常结构 |
 
 ### 1.2 三个业务 app
 

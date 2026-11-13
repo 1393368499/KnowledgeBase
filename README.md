@@ -12,11 +12,13 @@ powershell -File deploy/start.ps1
 首次缺少 `.env` 时会从样例生成，使用随机数据库口令和签名密钥；已有配置与数据卷保留。
 模型接口仍需在 `.env` 中配置为实际可用的服务地址。
 
-浏览器打开 **http://127.0.0.1:8800/**，会自动进入助手（未登录时进入登录页）。
+浏览器打开 **https://localhost:8800/**，会自动进入助手。首次访问需在测试浏览器信任本机 Caddy 的 CA，或在命令行指定 CA 文件。
 初次部署创建账号：
 
 ```powershell
 docker compose exec web python manage.py kbcreateuser --username YOUR_NAME --password YOUR_PASSWORD --staff
+docker compose exec web python manage.py enroll_admin_totp YOUR_NAME
+docker compose cp https:/data/caddy/pki/authorities/local/root.crt ./secrets/kb-local-ca.crt
 ```
 
 已构建镜像与准备好配置后，可直接在 Docker Desktop 中启动容器，或执行：
@@ -37,13 +39,12 @@ bash deploy/preflight.sh
 docker compose up -d --build --wait
 ```
 
-默认镜像从 `python:3.13-slim` 安装仓库固定依赖与中文字体；旧版 Office
+默认镜像从 `python:3.15-slim` 安装仓库固定依赖与中文字体；旧版 Office
 （`.doc` / `.xls` / `.ppt`）与 DOCX→PDF 由独立的 office 转换容器处理
 （Apache POI / docx4j），应用镜像与宿主都**不再需要 LibreOffice**。
 构建脚本会把产物 image ID 与 digest 记到 `snapshots/builds/`，便于把发布制品和复审记录对上。
 
-需要局域网访问时，在 `.env` 设置 `KB_WEB_BIND=0.0.0.0`，并将服务器 IP 或域名加入
-`KB_ALLOWED_HOSTS`，然后重新执行启动命令。端口可用 `KB_WEB_HOST_PORT` 修改。
+本机测试入口绑定回环地址，端口可用 `KB_WEB_HOST_PORT` 修改。局域网部署需另配受信域名、证书和相应访问范围。
 
 当前已使用语音/设备服务的部署，启动或更新使用：
 
@@ -59,19 +60,19 @@ powershell -File deploy/start.ps1 -Voice
 | PostgreSQL | 既有命名卷 `knowledgebase-pgdata` |
 | Redis | 既有命名卷 `knowledgebase-redisdata`；任务使用 DB14 专用队列 |
 | Qdrant | 命名卷 `knowledgebase-qdrantdata-delivery-20261015` |
-| 原件、模板、字体 | `media/raw`、`media/templates`、`media/fonts` |
+| 原件、模板、字体 | `data/media/raw`、`data/media/templates`、`data/media/fonts` |
 
-不要删除数据卷。旧 `vector_data/qdrant` 仅保留回溯，不挂载使用。
+不要删除数据卷。旧 `data/vector_data/qdrant` 仅保留回溯，不挂载使用。
 
 检查服务：`docker compose ps`；查看网页日志：`docker compose logs --tail 100 web`；
-就绪检查：`http://127.0.0.1:8800/api/v1/health/ready/`。
+就绪检查用 `curl --cacert ./secrets/kb-local-ca.crt https://localhost:8800/api/v1/health/ready/`。
 
 ---
 
 > ⚠️ **以下关于 Windows bind mount / 独立 WSL(KnowledgeBase-Runtime)/`56339` 的迁移说明均为历史记录，已废弃。**
 > 当前唯一支持的部署方式就是上面的 Docker Compose（命名卷）。历史迁移方案（`scripts/storage_migrate.py`、
 > `scripts/phase2_storage.ps1`、独立 WSL 发行版等）**不再是部署入口**，仅作为回溯材料保留；
-> **不要**再按它们操作，也不要再用 `vector_data/qdrant` 作为 Qdrant 存储。
+> **不要**再按它们操作，也不要再用 `data/vector_data/qdrant` 作为 Qdrant 存储。
 
 > **当前状态（2026-10-15，独立审查）**：完整系统仍在开发与验收。真实 AS711 问答、指定来源文档生成及保存导出已获得证据；第一阶段独立回归 PG 350通过/1跳过、SQLite 338通过/13跳过。存储迁移、后台任务故障恢复、反馈学习、监控和部分 AI 操作仍待闭合。下文2026-10-14的交付数字与“唯一待补项”为历史快照，不能代表用户最新的完整目标。当前证据见 [恢复记录](docs/resume-2026-10-15.md) 和 [独立问题清单](docs/independent-open-issues-2026-10-15.md)。
 
@@ -108,7 +109,7 @@ Django 6.1 + DRF + PostgreSQL + Redis/Celery + Qdrant 的知识库后端，配�
 
 | 项 | 本机实测版本 |
 |---|---|
-| Python | 3.13.5 |
+| Python | 3.15.2 |
 | Docker Engine | 29.6.1 |
 | Docker Compose | v5.3.0 |
 | 操作系统 | Windows（命令按 PowerShell 写；Linux 下把 `.\\.venv\\Scripts\\python.exe` 换成 `./.venv/bin/python`） |
@@ -120,7 +121,7 @@ Django 6.1 + DRF + PostgreSQL + Redis/Celery + Qdrant 的知识库后端，配�
 ### 2.1 建虚拟环境并装依赖
 
 ```powershell
-py -3.13 -m venv .venv
+py -3.15 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m pip check
@@ -139,7 +140,7 @@ docker compose ps
 `knowledgebase-redis`（`127.0.0.1:56379`）和 `knowledgebase-qdrant`。
 正式 Qdrant 只接入内部向量网络，运维检查可通过 `docker compose exec web` 使用应用客户端。宿主开发使用嵌入模式或单独的测试实例。
 Qdrant 数据落在 **Docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015`（由 Docker 管理，不在项目根）。
-> 变更缘由（2026-10-15，用户批准）：原先的 `vector_data/qdrant` bind mount 在 Qdrant **重启后**会出现
+> 变更缘由（2026-10-15，用户批准）：原先的 `data/vector_data/qdrant` bind mount 在 Qdrant **重启后**会出现
 > payload 读取失败（`OutputTooSmall`）；对 id 9–15 共 7 个库重建新代次并逐库验证通过后，仅重启 Qdrant 仍 **7/7 复现**，
 > 因此改用命名卷并从原件重建。旧目录未删除、未拷贝。证据见 `docs/delivery-status-2026-10-15.md`。
 
@@ -169,7 +170,7 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8800
 ```
 
-（生产口径用 ASGI：`.\.venv\Scripts\python.exe -m uvicorn config.asgi:application --host 127.0.0.1 --port 8800`）
+（生产口径用 ASGI：`.\.venv\Scripts\python.exe -m uvicorn knowledgebase.asgi:application --host 127.0.0.1 --port 8800`）
 
 > **宿主端口一律用 8800，不要用 8000。** Windows 的 WinNAT/Hyper-V 会动态预留成段的 TCP 端口，
 > 落在预留段里的端口宿主**根本 bind 不了**（`WinError 10013`，docker 会报
@@ -181,10 +182,10 @@ Copy-Item .env.example .env
 
 | 页面 | URL |
 |---|---|
-| 登录（**session 登录，浏览器不保存 Basic 口令**） | <http://127.0.0.1:8800/app/login/> |
-| **助手首页**（AI 会话、操作提案确认、派生文档右侧预览/编辑/下载、清理与重试、使用说明） | <http://127.0.0.1:8800/app/assistant/> |
-| 文件管理（上传单文件/**整文件夹**、状态、重试、来源只读） | <http://127.0.0.1:8800/app/files/> |
-| 检索（**信息库下拉**） | <http://127.0.0.1:8800/app/search/> |
+| 登录（**session 登录，浏览器不保存 Basic 口令**） | <https://localhost:8800/app/login/> |
+| **助手首页**（AI 会话、操作提案确认、派生文档右侧预览/编辑/下载、清理与重试、使用说明） | <https://localhost:8800/app/assistant/> |
+| 文件管理（上传单文件/**整文件夹**、状态、重试、来源只读） | <https://localhost:8800/app/files/> |
+| 检索（**信息库下拉**） | <https://localhost:8800/app/search/> |
 | 健康检查 | `/api/v1/health/live/`、`/api/v1/health/ready/` |
 
 界面只是壳：所有数据都走 REST API，所以"界面能用"等价于"API 能用"。
@@ -246,7 +247,7 @@ Copy-Item .env.example .env
 
 ```powershell
 docker compose stop                 # 停服务（保留数据）
-docker compose down                 # 删容器（保留卷与 vector_data）
+docker compose down                 # 删容器（保留卷与 data/vector_data）
 docker compose down -v              # 连 Postgres/Redis 卷一起删（Qdrant 目录需手动删）
 
 # 管理命令
@@ -290,17 +291,22 @@ docker compose down -v              # 连 Postgres/Redis 卷一起删（Qdrant �
 ## 6. 目录结构
 
 ```
-config/             Django 配置、ASGI/WSGI、路径强校验、健康检查、Celery app
-governance/         不可篡改底座：登记表、ORM 守卫、HTTP 中间件、数据库触发器
-apps/audit/         append-only 审计事件 + SHA-256 哈希链 + 固定链头
-apps/knowledge/     信息库、已入库资料、解析分段、存储/解析/嵌入/检索/向量索引
-apps/planner/       会话、消息、操作记录、一次性凭证、派生文档、意图登记表
-apps/webui/         浏览器验收界面（登录、文件管理、检索；继承原型灰白风格）
-vector_data/        ★ 向量数据（qdrant server 模式 / embedded 本地模式）
-media/raw/          ★ 已入库资料的原始字节（内容寻址、只读）
-db/                 运行期目录（SQLite 文件）
-docs/               架构、阶段完成记录、审查记录
-tests/              pytest 测试包（含离线与真实依赖标记）
+manage.py             Django 命令行入口
+knowledgebase/        项目包：settings / URLs / ASGI / WSGI / 路径强校验 / 健康检查 / Celery app
+governance/           不可篡改底座：登记表、ORM 守卫、HTTP 中间件、数据库触发器
+apps/audit/           append-only 审计事件 + SHA-256 哈希链 + 固定链头
+apps/knowledge/       信息库、已入库资料、解析分段、存储/解析/嵌入/检索/向量索引
+apps/planner/         会话、消息、操作记录、一次性凭证、派生文档、意图登记表
+apps/webui/           浏览器验收界面（登录、文件管理、检索；继承原型灰白风格）
+tests/                pytest 测试包（含离线与真实依赖标记）
+data/                 运行数据（不入库）：media/raw、media/templates、media/fonts、db、vector_data、staticfiles
+docs/                 文档：design/（设计与产品）、prototype/（原型）、logs/（历史日志）、其余为交付/审查记录
+deploy/               部署：compose、Dockerfile、https、worker、voice-*、fnos
+scripts/              运维与验收脚本（scripts/archive/ 为归档的一次性脚本，不入库）
+artifacts/            构建/测试/审计证据（不入库）
+snapshots/ secrets/   备份与密钥（不入库）
+firmware/ android/    设备端固件与 Android 中继
+evals/                离线/在线评测集
 ```
 
 ---
@@ -331,7 +337,7 @@ tests/              pytest 测试包（含离线与真实依赖标记）
   直接 `rmtree` 只读文件会 `WinError 5`）。
 * **保留小报告**：`artifacts/test-runs/<run_uuid>/` 下的 `manifest.json`、
   `cleanup-report.json`、`heartbeat`、`run.lock` 会保留（小型审计）；
-  只清 `raw/`、`vector_data/` 等大数据与本 run 的向量集合。
+  只清 `data/media/raw/`、`data/vector_data/` 等大数据与本 run 的向量集合。
 
 ### 入口
 
@@ -393,6 +399,6 @@ python evals\live_check.py --limit 10 --rerank                       # 加 reran
 | token / 成本 | 启发式估算，单价默认 0（占位，不是账单） |
 | `--online` | **未实现**，明确非 0 退出并指向 `evals/live_check.py` |
 | 真实栈样本量 | 本次只跑 10 条真实合同（真实语料不可导出，且真值需人工确认） |
-| 工作目录 | 必须在仓库根目录内（`config/paths.py` 强校验）；每次运行自动新建并清理 `artifacts/evals/<run_id>/` |
+| 工作目录 | 必须在仓库根目录内（`knowledgebase/paths.py` 强校验）；每次运行自动新建并清理 `artifacts/evals/<run_id>/` |
 
 评测集与语料：`evals/datasets/kb-50.jsonl`（20 typical / 20 hard / 10 pitfall）、`evals/corpus/`（20 篇脱敏构造语料）。评测过程**不修改主链路代码**，只读 `pipeline.search()` 的返回值。

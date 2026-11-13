@@ -18,7 +18,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-COLLECTIONS_DIR = ROOT / "vector_data" / "qdrant" / "collections"
+COLLECTIONS_DIR = ROOT / "data" / "vector_data" / "qdrant" / "collections"
 
 
 def collection_size_bytes(name: str) -> int:
@@ -38,9 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     import os
     import sys
 
-    # 以脚本方式运行时项目根不在 sys.path 上，`config.settings` 会导入失败
+    # 以脚本方式运行时项目根不在 sys.path 上，`knowledgebase.settings` 会导入失败
     sys.path.insert(0, str(ROOT))
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "knowledgebase.settings")
     django.setup()
 
     from qdrant_client import QdrantClient

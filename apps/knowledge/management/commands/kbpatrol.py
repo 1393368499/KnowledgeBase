@@ -10,7 +10,7 @@
 
 口径
 ----
-* **同一实现**：直接调用 ``config.celery.patrol``，不另写一套检查逻辑；
+* **同一实现**：直接调用 ``knowledgebase.celery.patrol``，不另写一套检查逻辑；
 * **只读**：不修改任何资料、不释放/抢占租约、不写向量；
 * 结论既写日志也写留痕（``source="manual"``，与 beat 的 ``beat`` 区分开）。
 
@@ -39,7 +39,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from apps.knowledge.integrity import patrol_snapshot, verification_snapshot
-        from config.celery import patrol as patrol_task
+        from knowledgebase.celery import patrol as patrol_task
 
         limit = max(1, int(options["limit"] or 200))
         result = patrol_task(limit=limit, source="manual")

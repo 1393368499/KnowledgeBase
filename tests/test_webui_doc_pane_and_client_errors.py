@@ -250,7 +250,7 @@ def test_unauthenticated_redirect_only_for_not_authenticated():
     assert 'body.code === "not_authenticated"' in js
     assert "notAuthenticated" in js
     # 后端必须给出机器可读 code（不靠本地化文案）
-    exc = _read("config/exceptions.py")
+    exc = _read("knowledgebase/exceptions.py")
     assert "not_authenticated" in exc
     assert "permission_denied" in exc
 

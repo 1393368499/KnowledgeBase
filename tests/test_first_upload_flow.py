@@ -166,7 +166,7 @@ def test_queue_mode_first_upload_still_initializes_index(
 ):
     """队列模式 + 无 worker：索引照样先初建，资料明确"待处理"。"""
     library = fresh_library
-    import config.celery as celery_app
+    import knowledgebase.celery as celery_app
 
     monkeypatch.setattr(
         celery_app,

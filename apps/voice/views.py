@@ -26,8 +26,8 @@ class EndpointView(APIView):
         import re
         from pathlib import Path
         from django.conf import settings
-        from config.paths import PROJECT_ROOT
-        path = Path(getattr(settings, "KB_VOICE_ENDPOINT_FILE", PROJECT_ROOT / "media/voice-connection/current.json"))
+        from knowledgebase.paths import PROJECT_ROOT
+        path = Path(getattr(settings, "KB_VOICE_ENDPOINT_FILE", PROJECT_ROOT / "data/media/voice-connection/current.json"))
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, dict) or not isinstance(data.get("server"), str) or not re.fullmatch(r"https://[a-z0-9-]+\.trycloudflare\.com", data.get("server", "")):

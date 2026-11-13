@@ -6,8 +6,8 @@
 
 1. 原迁移脚本不可执行：Invoke-Expression、无条件清空新目录、非冷态快照、路径拼接、配置/版本校验缺失。需唯一新目录、冷态压缩备份、哈希清单及完整还原验证、监测至少5GiB余量、失败回退和重启持久性。
 2. ext4独立环境已由Codex准备并验证；业务迁移尚未执行。65.2GiB实际分配与49.8GiB空闲禁止两次普通完整复制；零占比仅是抽样。
-3. Docker构建缺少.dockerignore，将包含.env、media/raw、vector_data和.venv；不可构建当前草稿。
-4. 原件实际路径media/raw需只读挂载并正确设置RAW_STORE_DIR。beat状态目录必须对uid10001可写，且必须有真实调度任务。
+3. Docker构建缺少.dockerignore，将包含.env、data/media/raw、vector_data和.venv；不可构建当前草稿。
+4. 原件实际路径data/media/raw需只读挂载并正确设置RAW_STORE_DIR。beat状态目录必须对uid10001可写，且必须有真实调度任务。
 5. 需端到端映射broker/backend/队列，web producer与worker同专用RedisDB；不得清空或消费DB0旧消息。注册任务名knowledge.process_ingested_file不匹配apps.*路由。
 6. requirements.txt中pywin32==312需Windows平台标记，否则Linux安装失败。Linux实际安装/运行结果才能证明依赖完整。
 

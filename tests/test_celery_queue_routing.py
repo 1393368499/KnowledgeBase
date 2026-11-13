@@ -33,7 +33,7 @@ def _app_with_queue(monkeypatch, queue: str | None):
         monkeypatch.delenv("KB_CELERY_QUEUE", raising=False)
     else:
         monkeypatch.setenv("KB_CELERY_QUEUE", queue)
-    import config.celery as module
+    import knowledgebase.celery as module
 
     return importlib.reload(module).app
 
@@ -42,14 +42,14 @@ def _app_with_queue(monkeypatch, queue: str | None):
 def _restore_module():
     """测试后恢复模块，避免污染其它用例。"""
     yield
-    import config.celery as module
+    import knowledgebase.celery as module
 
     importlib.reload(module)
 
 
 def test_registered_task_names_are_knowledge_prefixed():
     """先把"任务名长什么样"钉住——路由键依赖它。"""
-    import config.celery as module
+    import knowledgebase.celery as module
 
     names = {t for t in (module.app.tasks or {}) if t.startswith("knowledge.")}
     assert "knowledge.process_ingested_file" in names

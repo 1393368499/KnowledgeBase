@@ -23,7 +23,7 @@
 | # | 用户需求 | 设计落点 | 阶段 |
 |---|---|---|---|
 | 1 | Python Django | Django 6.1 + DRF，ASGI 部署 | P1 |
-| 2 | 向量数据必须在项目根目录 | `config/paths.py` 强制解析到 `<项目根>/vector_data`，settings 启动即校验；Qdrant server 用 bind mount（`docker-compose.yml`），本地嵌入模式说明并发限制 | P1（目录与校验 + 容器挂载）/ P2（真正写入） |
+| 2 | 向量数据必须在项目根目录 | `knowledgebase/paths.py` 强制解析到 `<项目根>/data/vector_data`，settings 启动即校验；Qdrant server 用 bind mount（`docker-compose.yml`），本地嵌入模式说明并发限制 | P1（目录与校验 + 容器挂载）/ P2（真正写入） |
 | 3 | 受支持技术、面向大并发、必须实测容量 | ASGI + PostgreSQL + Redis + Celery 分层；项目隔离 compose 起真实 Postgres/Redis/Qdrant；容量数字标注"实测/预估"两类，绝不虚报 | P1（骨架 + 真实组件连通）/ P6（压测） |
 | 4 | 用 AS711 上的 4 个模型 | 全部实测确认可用（见 §3），只读探测，未改动任何服务 | P1（连通性探测）/ P2 起真正调用 |
 | 5 | 搜索加信息库下拉筛选 | 搜索 API 以 `library` 为结构化筛选参数之一，与关键词/部门/客户/金额并列 | P2 |
@@ -40,12 +40,12 @@
 ```
                        ┌───────────────────────────────┐
    浏览器 (前端壳)  ──►  │  ASGI (uvicorn / daphne)      │
-                       │  config.asgi                  │
+                       │  knowledgebase.asgi                  │
                        └───────────┬───────────────────┘
                                    │
           ┌────────────────────────┼─────────────────────────┐
           ▼                        ▼                         ▼
-   governance            Django apps                 config.paths
+   governance            Django apps                 knowledgebase.paths
    （中间件+守卫）   knowledge / planner / audit   （路径强校验）
           │                        │                         │
           │              ┌─────────┴─────────┐               │
@@ -68,7 +68,7 @@
 
 | 层 | 位置 | 职责 |
 |---|---|---|
-| 路径与运行目录 | `config/paths.py` | 保证 `vector_data/` 落在项目根；提供 collection 子目录；启动即校验 |
+| 路径与运行目录 | `knowledgebase/paths.py` | 保证 `vector_data/` 落在项目根；提供 collection 子目录；启动即校验 |
 | 不可篡改底座 | `governance/`（`immutable.py` + `registry.py` + `middleware.py`） | 登记受保护资源；ORM 层拦截改删；HTTP 层拦截改删；登记变更事件 |
 | 领域数据 | `apps/knowledge` | 信息库、成员、已入库资料、解析分段、向量集合登记 |
 | 会话与操作 | `apps/planner` | 会话、消息、AI 提议、操作记录、一次性凭证 |
@@ -82,7 +82,7 @@
 settings 里加了硬口径：**非 DEBUG 环境连着 SQLite 直接拒绝启动**（`ImproperlyConfigured`），而不是"跑起来了但不可用"。
 
 **D2 · 向量库：本地目录 + 双模式**
-- 生产：`qdrant/qdrant` 容器，`./vector_data/qdrant:/qdrant/storage`，路径固定在项目根。
+- 生产：`qdrant/qdrant` 容器，`./data/vector_data/qdrant:/qdrant/storage`，路径固定在项目根。
 - 本地：`qdrant-client` 嵌入模式（`QdrantClient(path=...)`）。
 **本地嵌入模式的并发限制必须写明**：嵌入模式底层是本地文件锁，同一时刻**只允许一个进程**持有；多 worker（多 uvicorn worker / 多 Celery worker）会抢锁报错。故本地模式仅限单进程开发，任何多进程/多实例部署都必须切到 Qdrant server。
 
@@ -118,12 +118,12 @@ P4 的删除流程将把这个通道绑定到"三次确认 + 一次性凭证（�
 
 **D7 · 本地基础设施：项目隔离的 compose，不碰宿主机既有服务**
 `docker-compose.yml` 固定 `name: knowledgebase`，容器/网络/卷都带该前缀；宿主机端口全部走 5xxxx 段（Postgres 55432 / Redis 56379 / Qdrant HTTP 56333、gRPC 56334），且只绑 `127.0.0.1`。
-Postgres、Redis 的数据放命名卷（`knowledgebase-pgdata` / `knowledgebase-redisdata`，都是本机开发数据）；**Qdrant 用 bind mount `./vector_data/qdrant:/qdrant/storage`**——因为需求硬性要求向量数据落在项目根目录内，容器重建也不该丢。
+Postgres、Redis 的数据放命名卷（`knowledgebase-pgdata` / `knowledgebase-redisdata`，都是本机开发数据）；**Qdrant 用 bind mount `./data/vector_data/qdrant:/qdrant/storage`**——因为需求硬性要求向量数据落在项目根目录内，容器重建也不该丢。
 镜像版本固定（不写 `latest`）：`postgres:17.6-alpine3.22`、`redis:7.4-alpine`、`qdrant/qdrant:v1.15.5`；三者都有健康检查，`docker compose ps` 直接看得到 `healthy`。
 环境变量两套前缀都认：`KB_PG_*` / `KB_REDIS_*` / `KB_QDRANT_*`（项目自己的名字，compose 也用它做容器插值）优先，`POSTGRES_*` / `REDIS_URL` / `QDRANT_URL` 作为兼容回退；`.env` 由 `load_dotenv(..., override=True)` 加载，优先级最高。
 
 **D8 · 向量维度：维度是"配置 + 实测"的事实，不是可以声明的数字（用户 m08374 / m08687）**
-- 维度、模型名、版本、端点全部配置化（`config/settings.py` 的 `MODEL_SERVICES` + `apps/knowledge/embedding.py` 的 profile 注册表）。
+- 维度、模型名、版本、端点全部配置化（`knowledgebase/settings.py` 的 `MODEL_SERVICES` + `apps/knowledge/embedding.py` 的 profile 注册表）。
 - **active profile 明确固定为 `bge1024`**（bge-large-zh-v1.5，实测 1024 维）。
 - 目标 2048 维预配置为 `bge2048` 但**不激活**：任何嵌入请求在没有实测证据前一律被拒（`ProfileNotReady`），`ready` 只能由 `probe_dimension()` 的实测结果置位。
 - **绝不允许**补零、截断，或把 1024 维模型说成 2048 维。服务返回维度 ≠ profile 声明维度时抛 `DimensionMismatch`，**在使用前校验**，拒绝写入、不污染索引；探测报告里同时带上 `expected` / `actual` 便于定位模型版本。

@@ -1,12 +1,12 @@
 """在线模式 HTTP 检索客户端（可选）。
 
 接口取自仓库真实路由 ``apps/knowledge/urls.py``：``POST /api/v1/knowledge/search/``
-（``config/urls.py`` 把 ``apps.knowledge.urls`` 挂在 ``/api/v1/`` 下）。
+（``knowledgebase/urls.py`` 把 ``apps.knowledge.urls`` 挂在 ``/api/v1/`` 下）。
 请求体与 ``SearchRequestSerializer`` 对齐：``{"q": ..., "limit": 10, "libraries": [...]}``。
 响应形如 ``{"query": ..., "results": [{file_id, text, score, original_name, library_code, ...}],
 "report": {...}}``。
 
-鉴权：``config/settings.py`` 的 DRF 默认类是 Session + Basic，且默认 ``IsAuthenticated``。
+鉴权：``knowledgebase/settings.py`` 的 DRF 默认类是 Session + Basic，且默认 ``IsAuthenticated``。
 脚本化最省事的是 **HTTP Basic**：``--api-user/--api-password``（或环境变量
 ``KB_API_USER`` / ``KB_API_PASS``）。也支持 Bearer token（``token=...``）。
 

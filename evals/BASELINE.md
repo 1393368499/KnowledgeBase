@@ -39,7 +39,7 @@
 
 ### 2.1 为什么在 `D:\WorkSpace\kb_mirror` 里跑
 
-`config/paths.py` 的 `assert_inside_project_root()` 要求 `vector_data/`、`media/raw/`、`db/` 等运行期目录**必须落在项目根目录内**（`StoragePathError`）。原仓库对本会话只读，所以把 `manage.py + config/ + apps/ + governance/ + pytest.ini + requirements.txt` 同字节复制到 `D:\WorkSpace\kb_mirror`，仅用于**提供可写的运行根**；代码一份未改，`evals/` 拷回原仓库后同一条命令直接可用。
+`knowledgebase/paths.py` 的 `assert_inside_project_root()` 要求 `vector_data/`、`data/media/raw/`、`db/` 等运行期目录**必须落在项目根目录内**（`StoragePathError`）。原仓库对本会话只读，所以把 `manage.py + config/ + apps/ + governance/ + pytest.ini + requirements.txt` 同字节复制到 `D:\WorkSpace\kb_mirror`，仅用于**提供可写的运行根**；代码一份未改，`evals/` 拷回原仓库后同一条命令直接可用。
 
 ### 2.2 语料：真实合同不能进仓库
 
@@ -261,7 +261,7 @@ python evals\run_eval.py --limit 50
 | # | 坑 | 处理 |
 |---|---|---|
 | K1 | 本会话 Docker 引擎不可用（`permission denied ... dockerDesktopLinuxEngine`），但 PG/Qdrant/AS711/Web **都是别人起好的、在线** | 先 `Test-NetConnection` 探端口，别急着 `docker compose up` |
-| K2 | 运行期目录必须在项目根内，否则 `config.paths.StoragePathError` | `--workdir` 用 `<repo>/artifacts/evals/<run_id>`（默认就是） |
+| K2 | 运行期目录必须在项目根内，否则 `knowledgebase.paths.StoragePathError` | `--workdir` 用 `<repo>/artifacts/evals/<run_id>`（默认就是） |
 | K3 | 每次 run 要独立 workdir（独立 sqlite + embedded qdrant） | run_eval 默认每次生成新 workdir 并自动清理；手动调 harness 时要自己换目录 |
 | K4 | 离线 embedded 模式**不建 payload 索引** → sparse 路结构性不可测 | 别拿离线 `sparse_hits=0` 当"线上也 0"的证据（线上是 F2 的 AND 语义导致的 0，机制不同） |
 | K5 | `KB_TEST_ADAPTER=offline` 时 `pipeline` 会刻意忽略 `KB_SEARCH_DENSE_ENABLED` / `KB_MODEL_CALLS_DISABLED`（`pipeline.py:2038`） | harness 用"检索瞬间临时摘 adapter"实现 `dense=False`；结论以 `meta.dense` 为准 |

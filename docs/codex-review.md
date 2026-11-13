@@ -27,7 +27,7 @@ P4之前必须修正的设计：`governance/triggers.py` 注释计划在受控�
 
 ## P1 基础工程验收通过（功能范围限定）
 
-独立确认：Django 6.1.2；manage.py check零问题；makemigrations --check --dry-run无差异；默认实际连接vendor=postgresql，guards_present=True；同一环境pytest全量94 passed（30.08s）；向量profile实测1024 ready=True、2048未配置ready=False；三个compose服务healthy；Qdrant挂载源为 D:/AProjectScript/KnowledgeBase/vector_data/qdrant。
+独立确认：Django 6.1.2；manage.py check零问题；makemigrations --check --dry-run无差异；默认实际连接vendor=postgresql，guards_present=True；同一环境pytest全量94 passed（30.08s）；向量profile实测1024 ready=True、2048未配置ready=False；三个compose服务healthy；Qdrant挂载源为 D:/AProjectScript/KnowledgeBase/data/vector_data/qdrant。
 
 P1通过范围：基础工程、只读/追加数据底座、基础权限API、profile维度校验。不包含真实上传落盘、解析/检索、删除确认、AI操作或写文档，也未验证超大并发。
 

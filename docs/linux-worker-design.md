@@ -15,8 +15,8 @@ Windows 上 Celery **官方不支持**生产级并发：prefork 池不可用，�
 | `deploy/worker/Dockerfile` | worker/beat 镜像；**显式 COPY**（不用 `COPY . .`）；无 apt 依赖 |
 | `deploy/docker-compose.worker.yml` | worker + beat 两个服务；专用队列；只读挂载原件 |
 | `deploy/worker/worker.env.example` | 地址与口令模板（真实 `worker.env` 已在 `.gitignore`） |
-| `config/celery.py` | 专用队列路由 + `knowledge.sweep_pending` 周期任务 |
-| `config/settings.py` | `KB_CELERY_BROKER_URL`/`KB_CELERY_RESULT_BACKEND` 映射 + beat 调度 |
+| `knowledgebase/celery.py` | 专用队列路由 + `knowledge.sweep_pending` 周期任务 |
+| `knowledgebase/settings.py` | `KB_CELERY_BROKER_URL`/`KB_CELERY_RESULT_BACKEND` 映射 + beat 调度 |
 | `.dockerignore` | 密钥/数据/虚拟环境排除（第二道防线） |
 
 ## 3. 隔离设计（四条硬要求）
@@ -34,12 +34,12 @@ Windows 上 Celery **官方不支持**生产级并发：prefork 池不可用，�
 
 ## 4. 原件挂载（否则 worker 读不到数据）
 
-原件真实路径是 **`media/raw`**（`RAW_STORE_DIR`，由 `config.paths.raw_store_dir()` 决定）。
+原件真实路径是 **`data/media/raw`**（`RAW_STORE_DIR`，由 `knowledgebase.paths.raw_store_dir()` 决定）。
 worker 解析需要读它，因此 compose 里以**只读**方式挂载：
 
 ```yaml
 volumes:
-  - ../media/raw:/app/media/raw:ro
+  - ../data/media/raw:/app/data/media/raw:ro
 ```
 
 只读是刻意的：源资料不可修改（硬约束）。容器内 `RAW_STORE_DIR` 必须指向该路径。

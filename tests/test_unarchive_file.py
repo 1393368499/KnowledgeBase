@@ -16,7 +16,7 @@
 * 失败**如实报**（``complete=false`` + 原因，资料仍不在检索里），绝不假装恢复成功；
 * **同内容重传不会静默保留 archived**：接口如实返回"需要走恢复入口"。
 
-全部使用隔离测试数据（临时原件与隔离向量目录），不触碰主库与真实 `media/raw`。
+全部使用隔离测试数据（临时原件与隔离向量目录），不触碰主库与真实 `data/media/raw`。
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ UPLOAD_URL = "/api/v1/knowledge/files/upload/"
 
 @pytest.fixture(autouse=True)
 def _isolated_blobs(isolated_paths):
-    """原件一律落在临时目录：绝不往真实 ``media/raw`` 写测试数据。"""
+    """原件一律落在临时目录：绝不往真实 ``data/media/raw`` 写测试数据。"""
     return isolated_paths
 
 

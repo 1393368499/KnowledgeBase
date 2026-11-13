@@ -115,7 +115,7 @@ curl -s http://127.0.0.1:10001/v1/chat/completions -H 'Content-Type: application
 
 | 位置 | 改动 | 作用 |
 | --- | --- | --- |
-| `config/settings.py` | 新增 `KB_LLM_GREEDY_ONLY`（默认 1）、`KB_LLM_TEMPERATURE`（默认 0.2，仅在开关关闭时生效） | 显式的止血开关；同时补上"`KB_LLM_TEMPERATURE` 原先只出现在 `getattr` 兜底里、写进环境变量并不生效"的缺陷 |
+| `knowledgebase/settings.py` | 新增 `KB_LLM_GREEDY_ONLY`（默认 1）、`KB_LLM_TEMPERATURE`（默认 0.2，仅在开关关闭时生效） | 显式的止血开关；同时补上"`KB_LLM_TEMPERATURE` 原先只出现在 `getattr` 兜底里、写进环境变量并不生效"的缺陷 |
 | `apps/planner/llm.py` | 新增 `effective_temperature()`；`default_profile()` 与 `chat()` 的请求体都经过它 | **单点出口**：即便有人手搓 `LlmProfile(temperature=0.3)` 或用 `replace` 造随机 profile，发出去的 `temperature` 仍是 0.0 |
 | `apps/knowledge/classification.py` | 只补注释（本来就是 0.0） | 保持与对话同口径，防止后人改回随机 |
 | `tests/test_llm_sampling_mode.py` | 新增回归：默认 greedy、手搓 profile 被压、开关关闭后恢复、分类同口径 | 防止被"顺手调回 0.2" |

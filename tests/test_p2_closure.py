@@ -57,7 +57,7 @@ def test_asset_version_changes_when_a_script_changes(tmp_path, monkeypatch):
       * 断言版本号**取的是最新 mtime**（不只是"变了"，还要求变对）；
       * 真实源码静态目录在整个用例期间一位不改（末尾做 mtime_ns 快照比对）。
     """
-    from config import settings as settings_module
+    from knowledgebase import settings as settings_module
 
     real_static = (
         Path(settings_module.PROJECT_ROOT) / "apps" / "webui" / "static" / "webui"

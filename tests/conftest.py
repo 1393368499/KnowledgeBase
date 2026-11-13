@@ -17,7 +17,7 @@
 
 离线可跑（用户 2026-10-13 指示）
 --------------------------------
-默认由 ``config.test_settings`` 决定库：Postgres 连得上就用真 Postgres
+默认由 ``knowledgebase.test_settings`` 决定库：Postgres 连得上就用真 Postgres
 （建独立测试库），连不上就退回 SQLite —— 所以没网、没容器时单测照样全绿。
 
 - 想强制真 Postgres：``pytest --kb-db=postgres``（连不上会直接报错，不静默降级）
@@ -46,7 +46,7 @@ _SESSION_RUN_DIR = _PROJECT_ROOT / "artifacts" / "test-runs" / _SESSION_RUN_UUID
 _SESSION_RAW_DIR = _SESSION_RUN_DIR / "raw"
 _SESSION_VECTOR_DIR = _SESSION_RUN_DIR / "vector_data"
 
-# **必须**在 Django settings 加载之前设置：config.paths.raw_store_dir() 是调用时
+# **必须**在 Django settings 加载之前设置：knowledgebase.paths.raw_store_dir() 是调用时
 # 读环境变量的，晚设就只对部分用例生效。dotenv/settings 的加载时序不稳，
 # 所以这里**无条件**把测试期间的 raw 指到本 run 隔离目录（不再"仅在未设置时才覆盖"）；
 # 原值保存下来，会话结束再恢复，避免把隔离值留给后续进程。
@@ -55,11 +55,11 @@ _ORIGINAL_RAW_STORE_DIR = os.environ.get("RAW_STORE_DIR")
 os.environ["RAW_STORE_DIR"] = str(_SESSION_RAW_DIR)
 _RAW_OVERRIDDEN = True
 
-# 向量前缀默认是 "kb"（config/settings.py），会与**主实例历史集合**撞名
+# 向量前缀默认是 "kb"（knowledgebase/settings.py），会与**主实例历史集合**撞名
 # （例如哨兵 kb-1-g1）。这里设成会话级唯一前缀，保证 pytest 只会创建/清理
 # 属于自己的集合；原值同样保存并恢复。
 _ORIGINAL_QDRANT_PREFIX = os.environ.get("KB_QDRANT_COLLECTION_PREFIX")
-# 与 RunResources.prefix 保持一致（见 config/test_settings.py 里的说明）
+# 与 RunResources.prefix 保持一致（见 knowledgebase/test_settings.py 里的说明）
 _SESSION_QDRANT_PREFIX = f"kb-{_SESSION_RUN_UUID}"
 os.environ["KB_QDRANT_COLLECTION_PREFIX"] = _SESSION_QDRANT_PREFIX
 
@@ -161,7 +161,7 @@ def pytest_addoption(parser):
 def pytest_load_initial_conftests(early_config, parser, args):
     """**在 Django settings 加载之前**把 ``--kb-db`` 落到环境变量里。
 
-    为什么必须这么早（实测踩到的真实缺陷）：``config/test_settings.py`` 在
+    为什么必须这么早（实测踩到的真实缺陷）：``knowledgebase/test_settings.py`` 在
     **pytest-django 的 configure 阶段**就被导入了，而 ``pytest_configure`` 里再
     ``os.environ.setdefault(...)`` 为时已晚 —— 于是 ``pytest --kb-db=postgres``
     会**静默地照旧跑 SQLite**，报告里却写着"已按开关强制 Postgres"。
@@ -200,7 +200,7 @@ def _verify_test_db_kind(config) -> None:
     try:
         from django.db import connection
 
-        from config import test_settings
+        from knowledgebase import test_settings
     except Exception:  # pragma: no cover - 环境未就绪时不阻塞收集
         return
     requested = str(
@@ -294,7 +294,7 @@ def _no_broker_writes(monkeypatch):
     建好了，事后改 conf 不能可靠重定向连接（实测只改 conf 时
     ``connection_for_write`` 仍解析到 127.0.0.1:6379/0）。
     """
-    from config import celery as celery_module
+    from knowledgebase import celery as celery_module
 
     def fake_dispatch(file_id: int, *, queue: str = "", payload_extra=None) -> dict:
         return {
@@ -443,7 +443,7 @@ def collection(db) -> VectorCollection:
         dimension=1024,
         embedding_model="bge-large-zh-v1.5",
         storage_mode="server",
-        storage_path="vector_data/qdrant",
+        storage_path="data/vector_data/qdrant",
     )
 
 
@@ -482,7 +482,7 @@ def isolated_paths(tmp_path, monkeypatch):
 
     为什么要连 ``PROJECT_ROOT`` 一起换：``storage`` / ``vectorindex`` 会对落盘路径
     做"必须在项目根内"的硬校验（需求 2）。测试要验证真实落盘，就得把项目根也
-    指到临时目录，否则只能把测试数据写进真实 ``media/raw``——那是污染，不是测试。
+    指到临时目录，否则只能把测试数据写进真实 ``data/media/raw``——那是污染，不是测试。
     """
     from pathlib import Path
 
@@ -494,7 +494,7 @@ def isolated_paths(tmp_path, monkeypatch):
     vector_dir.mkdir(parents=True, exist_ok=True)
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    import config.paths as paths
+    import knowledgebase.paths as paths
 
     monkeypatch.setattr(paths, "PROJECT_ROOT", fake_root)
     monkeypatch.setattr(paths, "vector_data_dir", lambda: vector_dir)
@@ -529,7 +529,7 @@ def offline_paths(tmp_path, monkeypatch):
     vector_dir.mkdir(parents=True, exist_ok=True)
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    import config.paths as paths
+    import knowledgebase.paths as paths
 
     monkeypatch.setattr(paths, "PROJECT_ROOT", fake_root)
     monkeypatch.setattr(paths, "vector_data_dir", lambda: vector_dir)

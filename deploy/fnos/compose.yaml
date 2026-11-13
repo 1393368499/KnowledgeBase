@@ -105,7 +105,7 @@ services:
     - sh
     - -c
     - fc-cache -f /usr/local/share/fonts/kb && python manage.py collectstatic --noinput
-      && exec gunicorn config.wsgi:application --bind 0.0.0.0:8800 --workers 2 --threads
+      && exec gunicorn knowledgebase.wsgi:application --bind 0.0.0.0:8800 --workers 2 --threads
       4 --timeout 300 --graceful-timeout 300 --access-logfile - --error-logfile -
     logging: *id001
     stop_grace_period: 300s
@@ -119,11 +119,11 @@ services:
       voice-gateway: 172.29.61.6
       web: 127.0.0.1
     volumes:
-    - ./media/raw:/app/media/raw
-    - ./media/templates:/app/media/templates
-    - ./media/voice-audio:/app/media/voice-audio
-    - ./media/voice-connection:/app/media/voice-connection:ro
-    - ./media/fonts:/usr/local/share/fonts/kb:ro
+    - ./data/media/raw:/app/data/media/raw
+    - ./data/media/templates:/app/data/media/templates
+    - ./data/media/voice-audio:/app/data/media/voice-audio
+    - ./data/media/voice-connection:/app/data/media/voice-connection:ro
+    - ./data/media/fonts:/usr/local/share/fonts/kb:ro
     healthcheck:
       test:
       - CMD-SHELL
@@ -163,13 +163,13 @@ services:
     stop_grace_period: 300s
     user: kb
     volumes:
-    - ./media/raw:/app/media/raw:ro
-    - ./media/templates:/app/media/templates:ro
-    - ./media/fonts:/usr/local/share/fonts/kb:ro
+    - ./data/media/raw:/app/data/media/raw:ro
+    - ./data/media/templates:/app/data/media/templates:ro
+    - ./data/media/fonts:/usr/local/share/fonts/kb:ro
     healthcheck:
       test:
       - CMD-SHELL
-      - celery -A config inspect ping -d celery@$$HOSTNAME --timeout=10 || exit 1
+      - celery -A knowledgebase inspect ping -d celery@$$HOSTNAME --timeout=10 || exit 1
       interval: 60s
       timeout: 45s
       start_period: 300s
@@ -240,9 +240,9 @@ services:
     stop_grace_period: 300s
     user: kb
     volumes:
-    - ./media/raw:/app/media/raw:ro
-    - ./media/voice-audio:/app/media/voice-audio
-    - ./media/fonts:/usr/local/share/fonts/kb:ro
+    - ./data/media/raw:/app/data/media/raw:ro
+    - ./data/media/voice-audio:/app/data/media/voice-audio
+    - ./data/media/fonts:/usr/local/share/fonts/kb:ro
     healthcheck:
       disable: true
     depends_on:
@@ -278,7 +278,7 @@ services:
       kbnet:
         ipv4_address: 172.29.61.5
     volumes:
-    - ./media/voice-models:/models:ro
+    - ./data/media/voice-models:/models:ro
     healthcheck:
       test:
       - CMD
@@ -340,7 +340,7 @@ services:
     tmpfs:
     - /run/voice:size=8m,uid=10001,gid=10001,mode=0700
     volumes:
-    - ./media/voice-connection:/state
+    - ./data/media/voice-connection:/state
     depends_on:
       voice-gateway:
         condition: service_started

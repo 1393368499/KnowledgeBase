@@ -43,7 +43,7 @@ def runs_dir():
 
 def test_readonly_immutable_files_are_cleaned(runs_dir, monkeypatch):
     """真实 `store_bytes` 写只读原件 → cleanup 必须删干净、不报失败。"""
-    from config import paths
+    from knowledgebase import paths
 
     from apps.knowledge import storage
 
@@ -52,7 +52,7 @@ def test_readonly_immutable_files_are_cleaned(runs_dir, monkeypatch):
     res = rr.RunResources.new(endpoint="", identity="readonly-test", runs_dir=runs_dir)
     raw_dir = res.dir / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    # 把 raw 根指到本 run 目录（仓内既有技法，避免写主 media/raw）
+    # 把 raw 根指到本 run 目录（仓内既有技法，避免写主 data/media/raw）
     monkeypatch.setattr(paths, "raw_store_dir", lambda: raw_dir)
 
     blob = storage.store_bytes(b"immutable-original-bytes" * 64)

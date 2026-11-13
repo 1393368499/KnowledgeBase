@@ -15,7 +15,7 @@
 
   场景 B 默认用 `-VisibilityTimeout 30` 启动探针 worker，这样不必等真实默认值
   （1800+300=2100s）就能验证"机制确实按 visibility_timeout 生效"。生产默认值由
-  `config/settings.py` 的 `KB_CELERY_VISIBILITY_TIMEOUT`（默认=任务硬超时+300）给出。
+  `knowledgebase/settings.py` 的 `KB_CELERY_VISIBILITY_TIMEOUT`（默认=任务硬超时+300）给出。
 
   证据写到 `-OutFile`（默认 artifacts/acceptance/worker-crash-recovery.json）；
   退出码 0 = 两个场景都在预算内恢复，1 = 有一个没恢复。
@@ -96,7 +96,7 @@ function Start-ProbeWorker {
     $dockerArgs = @("compose", "-f", $ComposeFile, "run", "--no-deps", "-d", "--name", $ProbeContainer)
     if ($Visibility -gt 0) { $dockerArgs += @("-e", "KB_CELERY_VISIBILITY_TIMEOUT=$Visibility") }
     # 就绪判定读日志里的 "ready."，所以必须 INFO（WARNING 不会打印它）。
-    $dockerArgs += @("worker", "celery", "-A", "config", "worker", "-Q", $Queue,
+    $dockerArgs += @("worker", "celery", "-A", "knowledgebase", "worker", "-Q", $Queue,
         "--concurrency=1", "--loglevel=INFO")
     Invoke-Docker $dockerArgs | Out-Null
     for ($i = 0; $i -lt 40; $i++) {
@@ -157,7 +157,7 @@ function Clear-ProbeLeftovers {
     $code = @'
 import os
 import django
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "knowledgebase.settings")
 django.setup()
 import redis
 from django.conf import settings

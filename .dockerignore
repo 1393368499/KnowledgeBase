@@ -26,8 +26,8 @@ htmlcov/
 .coverage
 
 # --- 业务数据与数据库：绝不进镜像 ---
-media/
-media/raw/
+data/media/
+data/media/raw/
 raw_data/
 vector_data/
 snapshots/
@@ -35,7 +35,7 @@ snapshots/
 *.snapshot
 deploy/worker/beat-state/
 *.vhdx
-db/
+data/db/
 *.sqlite
 *.sqlite3
 *.db

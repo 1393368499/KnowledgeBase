@@ -2,7 +2,7 @@
 
 ## Qdrant 存储
 
-实际证据：`kb-9-g1` 的 query_points 返回500，含 `OutputTooSmall` panic；查询独立验收库11可正常返回两份资料。`docker inspect knowledgebase-qdrant` 确认当前挂载为 Windows `D:/AProjectScript/KnowledgeBase/vector_data/qdrant` → Linux容器 `/qdrant/storage`。
+实际证据：`kb-9-g1` 的 query_points 返回500，含 `OutputTooSmall` panic；查询独立验收库11可正常返回两份资料。`docker inspect knowledgebase-qdrant` 确认当前挂载为 Windows `D:/AProjectScript/KnowledgeBase/data/vector_data/qdrant` → Linux容器 `/qdrant/storage`。
 
 官方文档明确记录不兼容文件系统及Windows共享目录的同类问题；维护者在问题记录中建议使用WSL内部文件系统。这与当前故障和部署方式吻合，属于有依据的根因判断；仍需用迁移与重启完整性试验确认，不能以一次重建成功代替长期修复。
 

@@ -4,10 +4,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "knowledgebase.settings")
 django.setup()
 
-from config.celery import app
+from knowledgebase.celery import app
 
 print("KB_CELERY_QUEUE =", repr(os.environ.get("KB_CELERY_QUEUE", "")))
 print("task_default_queue =", app.conf.task_default_queue)

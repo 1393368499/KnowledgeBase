@@ -1,6 +1,6 @@
 """"从零安装"校验专用配置：**强制 SQLite**，不受 `.env` 影响。
 
-为什么单独一个模块：``config/settings.py`` 会 ``load_dotenv(.env, override=True)``，
+为什么单独一个模块：``knowledgebase/settings.py`` 会 ``load_dotenv(.env, override=True)``，
 所以运维/校验脚本没法靠环境变量把 ``DB_ENGINE`` 从 postgres 改回 sqlite——
 .env 会把它覆盖回去。这个限制对生产是好事（口径唯一），对"验证全新 SQLite 安装链"
 就必须绕开，所以单独一个薄配置：
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from config.settings import *  # noqa: F403,F401
+from knowledgebase.settings import *  # noqa: F403,F401
 
 #: 由调用方传入的临时库路径；没给就用一个进程内内存库（不落盘）
 _SQLITE_PATH = os.environ.get("KB_SQLITE_TEST_PATH") or ":memory:"

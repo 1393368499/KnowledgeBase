@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 RUN_ID = uuid.uuid4().hex[:12]
 RUN_DIR = ROOT / "artifacts" / "test-runs" / RUN_ID
 RUN_DIR.mkdir(parents=True)
-os.environ["DJANGO_SETTINGS_MODULE"] = "config.test_settings"
+os.environ["DJANGO_SETTINGS_MODULE"] = "knowledgebase.test_settings"
 os.environ["KB_TEST_RUN_UUID"] = RUN_ID
 os.environ["KB_SQLITE_TEST_PATH"] = str(RUN_DIR / "browser.sqlite3")
 import django

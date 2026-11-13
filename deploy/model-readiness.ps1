@@ -49,7 +49,7 @@ if (Test-Path $EnvFile) {
     }
     Write-Info "读入 $EnvFile（$($envMap.Count) 个变量）"
 } else {
-    Write-Info "没有 $EnvFile：全部使用 config/settings.py 的默认端点"
+    Write-Info "没有 $EnvFile：全部使用 knowledgebase/settings.py 的默认端点"
 }
 
 $targets = @()
@@ -160,7 +160,7 @@ try {
 } catch {
     Write-Bad "$BaseUrl/api/v1/health/ready/ 不可用：$($_.Exception.Message)"
 }
-$queues = docker exec $WorkerContainer celery -A config inspect active_queues 2>&1 | Select-String -Pattern 'kb_worker_v2|name' | Select-Object -First 4
+$queues = docker exec $WorkerContainer celery -A knowledgebase inspect active_queues 2>&1 | Select-String -Pattern 'kb_worker_v2|name' | Select-Object -First 4
 if ($queues) { $queues | ForEach-Object { Write-Info "worker 队列：$_" } }
 else { Write-Bad "worker 没有报告 kb_worker_v2 队列（检查 deploy/docker-compose.unified.yml:62 与宿主 .env 的 KB_CELERY_QUEUE 是否一致）" }
 

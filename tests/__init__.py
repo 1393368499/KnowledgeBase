@@ -3,7 +3,7 @@
 为什么需要这个文件（而不是只在 ``conftest.pytest_configure`` 里设）
 ------------------------------------------------------------------
 ``tests/conftest.py`` 顶层就 ``from apps.knowledge.models import ...``，
-这会触发 ``django.setup()`` → 加载 ``config.test_settings`` → 决定用哪个数据库。
+这会触发 ``django.setup()`` → 加载 ``knowledgebase.test_settings`` → 决定用哪个数据库。
 而 ``pytest_configure`` 是**之后**才跑的，那时候改环境变量已经晚了
 （审查方实测：标志可能失效）。
 

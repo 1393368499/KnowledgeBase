@@ -453,7 +453,7 @@ def assert_models_disabled(base: str, session: Session) -> None:
             "拒绝发压：目标服务 load_test_mode 不是 True"
             f"（实际 {load_test!r}）。这不是声明过的负载测试实例——"
             "正式服务（如 8000 真实模型配置）不能用来压测。"
-            "请用 config.loadtest_settings 起一套测试服务。"
+            "请用 knowledgebase.loadtest_settings 起一套测试服务。"
         )
     if environment.get("dispatch_disabled") is not True:
         raise SystemExit(

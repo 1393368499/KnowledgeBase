@@ -24,7 +24,7 @@ from pathlib import Path
 from django.conf import settings
 
 from apps.knowledge.parsers import ParseError, parse_bytes
-from config.paths import assert_inside_project_root
+from knowledgebase.paths import assert_inside_project_root
 
 from .models import DocumentTemplate
 
@@ -73,7 +73,7 @@ def templates_root() -> Path:
     这里会拿它去拼用户可控的相对路径，逃出项目目录的路径一律拒绝。
     """
     root = Path(settings.MEDIA_ROOT) / "templates"
-    return assert_inside_project_root(root, label="media/templates")
+    return assert_inside_project_root(root, label="data/media/templates")
 
 
 def suffix_of(original_name: str) -> str:
@@ -175,7 +175,7 @@ def extract_text(raw: bytes, original_name: str) -> str:
 
 
 def _store_raw(raw: bytes, digest: str, suffix: str) -> str:
-    """按内容寻址落盘，返回相对 ``media/templates`` 的路径（幂等：同内容复用）。"""
+    """按内容寻址落盘，返回相对 ``data/media/templates`` 的路径（幂等：同内容复用）。"""
     root = templates_root()
     path = root / f"{digest}{suffix}"
     temp = None

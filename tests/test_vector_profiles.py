@@ -841,7 +841,7 @@ def test_collection_serializer_exposes_no_storage_path(library, api, user):
         dimension=1024,
         embedding_model="m",
         library=library,
-        storage_path="/internal/vector_data/qdrant",
+        storage_path="/internal/data/vector_data/qdrant",
     )
     api.force_authenticate(user=user)
     payload = api.get("/api/v1/knowledge/collections/").json()

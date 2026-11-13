@@ -40,7 +40,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture(autouse=True)
 def _isolated_blobs(isolated_paths):
-    """原件一律落在临时目录：绝不往真实 ``media/raw`` 写测试数据。"""
+    """原件一律落在临时目录：绝不往真实 ``data/media/raw`` 写测试数据。"""
     return isolated_paths
 
 

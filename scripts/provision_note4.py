@@ -28,7 +28,7 @@ def main():
             raise SystemExit("已有设备属于其他账号；请明确处理现有设备后重试")
     else:
         code = (
-            "import os,json;os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');"
+            "import os,json;os.environ.setdefault('DJANGO_SETTINGS_MODULE','knowledgebase.settings');"
             "import django;django.setup();"
             "from django.contrib.auth import get_user_model;"
             "from apps.voice.services import add_device;"

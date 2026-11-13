@@ -130,7 +130,7 @@ def test_one_broken_endpoint_does_not_degrade_the_healthy_group(monkeypatch):
             base_url=prof.base_url,     # **不同端点**
             library=library,
             storage_mode="server",
-            storage_path="vector_data/qdrant",
+            storage_path="data/vector_data/qdrant",
             is_active=True,
             build_status="ready",
         )

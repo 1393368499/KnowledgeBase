@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parent.parent
 #: 向量数据必须落在这个前缀下（专属盘，避免误写到系统目录）
 LINUX_PREFIX = "/var/lib/qdrant-"
 DEFAULT_DISTRO = "KnowledgeBase-Runtime"
-DEFAULT_DATA = "vector_data/qdrant"
+DEFAULT_DATA = "data/vector_data/qdrant"
 DEFAULT_TARGET = "/var/lib/qdrant-data-gen2"
 DEFAULT_BACKUP = "artifacts/qdrant-cold-backup"
 CONFIG_PATH = "/etc/qdrant/config.yaml"
@@ -193,17 +193,17 @@ def assert_linux_target(p: str) -> str:
 
 
 def _inflight_rows_from_project_settings() -> list[dict]:
-    """生产路径：**显式**用 `config.settings` 起子进程查库。
+    """生产路径：**显式**用 `knowledgebase.settings` 起子进程查库。
 
     为什么必须显式指定：子进程默认**继承调用方的环境**。在测试运行器下，
-    环境里可能带着 `DJANGO_SETTINGS_MODULE=config.test_settings` 与测试库变量，
+    环境里可能带着 `DJANGO_SETTINGS_MODULE=knowledgebase.test_settings` 与测试库变量，
     子进程就会去查一个**没有业务表**的库，报 `no such table: kb_ingested_file`，
     于是真实迁移的这道守卫被"环境"而不是被"数据"决定。显式指定后，
     守卫只取决于**部署库的真实状态**。
     """
     code = (
         "import django,os,json;"
-        "os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');"
+        "os.environ.setdefault('DJANGO_SETTINGS_MODULE','knowledgebase.settings');"
         "django.setup();"
         "from apps.knowledge.models import IngestedFile;"
         "rows=list(IngestedFile._base_manager.filter("
@@ -214,9 +214,9 @@ def _inflight_rows_from_project_settings() -> list[dict]:
     if not python.exists():
         say("  ⚠ 找不到 venv Python，跳过在途处理检查（真实迁移前应人工确认）")
         return []
-    # 清掉会改变 settings/数据库选择的测试类变量，并强制 config.settings
+    # 清掉会改变 settings/数据库选择的测试类变量，并强制 knowledgebase.settings
     child_env = dict(os.environ)
-    child_env["DJANGO_SETTINGS_MODULE"] = "config.settings"
+    child_env["DJANGO_SETTINGS_MODULE"] = "knowledgebase.settings"
     for noisy in ("KB_PYTEST_DB", "KB_TEST_RUN_UUID", "KB_SKIP_DOTENV"):
         child_env.pop(noisy, None)
     proc = subprocess.run(

@@ -1,0 +1,10 @@
+{
+    auto_https disable_redirects
+    admin off
+    skip_install_trust
+}
+
+https://localhost, https://127.0.0.1 {
+    tls internal
+    reverse_proxy web:8000
+}

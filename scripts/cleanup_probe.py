@@ -30,7 +30,7 @@ import run_resources as rr  # noqa: E402
 
 #: **主实例只读保护基线**：只读、写一次、永不覆盖
 MAIN_BASELINE = ROOT / "artifacts" / "acceptance" / "cleanup-before-20261015.json"
-RAW_DIR = ROOT / "media" / "raw"
+RAW_DIR = ROOT / "data" / "media" / "raw"
 
 
 def snapshot(endpoint: str, with_raw: bool = False) -> dict:
@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     is_main = "56333" in args.endpoint
     before = snapshot(args.endpoint, with_raw=is_main)
     print(f"[{args.endpoint}] 现有 {before['collections_count']} 个集合"
-          + (f"，media/raw {before['raw_count']} 个文件" if is_main else ""))
+          + (f"，data/media/raw {before['raw_count']} 个文件" if is_main else ""))
 
     # ---- 主实例只读保护：只写一次基线，绝不做任何创建/删除 ----
     if args.protect:
@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         if saved["collections"] != after["collections"]:
             problems.append("与主实例保护基线的集合清单不一致")
         if saved.get("raw_files") != after.get("raw_files"):
-            problems.append("media/raw 文件哈希变化（原件被动）")
+            problems.append("data/media/raw 文件哈希变化（原件被动）")
 
     run.release()
     if problems:

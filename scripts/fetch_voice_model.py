@@ -9,7 +9,7 @@ BASE = f"https://huggingface.co/Systran/faster-whisper-small/resolve/{REVISION}"
 
 
 def main():
-    root = Path(__file__).resolve().parent.parent / "media/voice-models/small"
+    root = Path(__file__).resolve().parent.parent / "data/media/voice-models/small"
     root.mkdir(parents=True, exist_ok=True)
     with httpx.Client(follow_redirects=True, timeout=120) as client:
         for name in ["config.json", "tokenizer.json", "vocabulary.txt", "model.bin"]:

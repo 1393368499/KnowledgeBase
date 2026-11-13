@@ -498,7 +498,7 @@ class IngestedFileViewSet(viewsets.ReadOnlyModelViewSet):
         # - inline：请求内跑完（会阻塞，模型服务掉线时很久）
         # - queue / auto：先入队，立刻返回 202 + 待处理；派发不出去就如实标"待处理"
         # 无论哪种模式，都绝不"假装完成"。
-        from config.celery import dispatch_processing
+        from knowledgebase.celery import dispatch_processing
         from django.conf import settings as _settings
 
         mode = str(getattr(_settings, "KB_UPLOAD_PROCESS_MODE", "auto")).lower()

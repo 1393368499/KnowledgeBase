@@ -131,7 +131,7 @@ def test_rollback_without_execute_changes_nothing(capsys, monkeypatch):
 def test_fixture_mode_rejects_real_data_dir(monkeypatch):
     """夹具模式**技术上**只允许命名夹具源（审查阻断 9）。"""
     monkeypatch.setattr(sm, "set_service_controller", lambda _c: None)
-    code = sm.main(["preflight", "--no-service-control", "--data", "vector_data/qdrant"])
+    code = sm.main(["preflight", "--no-service-control", "--data", "data/vector_data/qdrant"])
     assert code == 1, "真实数据目录竟然允许进入夹具模式"
 
 

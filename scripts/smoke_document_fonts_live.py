@@ -9,7 +9,7 @@ from smoke_template_upload_live import container_python
 BASE = "http://127.0.0.1:8800"
 setup = """
 import os,json,django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');django.setup()
+os.environ.setdefault('DJANGO_SETTINGS_MODULE','knowledgebase.settings');django.setup()
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.backends.db import SessionStore
 u=get_user_model().objects.filter(is_staff=True,is_active=True).first();s=SessionStore()
@@ -71,7 +71,7 @@ try:
 finally:
     cleanup = """
 import os,sys,django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings');django.setup()
+os.environ.setdefault('DJANGO_SETTINGS_MODULE','knowledgebase.settings');django.setup()
 from django.contrib.sessions.models import Session
 Session.objects.filter(session_key=sys.stdin.read().strip()).delete()
 """

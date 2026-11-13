@@ -216,7 +216,7 @@ def resolve_workdir(
 ) -> tuple[Path | None, bool, int]:
     """返回 ``(workdir, 是否由本进程负责清理)``。
 
-    harness 契约要求 workdir **必须位于 repo_root 内**（config/paths.py 的硬约束，
+    harness 契约要求 workdir **必须位于 repo_root 内**（knowledgebase/paths.py 的硬约束，
     ``bootstrap`` 会直接拒绝仓库外路径），所以默认放在
     ``<repo_root>/artifacts/evals/<run_id>``：每个 run 独立目录，天然避开 Qdrant
     embedded 的"同一目录只能有一个客户端"文件锁，跑完即删。显式 ``--workdir``
@@ -236,7 +236,7 @@ def resolve_workdir(
     except ValueError:
         die(
             f"workdir 必须位于仓库根目录内：{path}\n"
-            f"  repo_root={repo_root}（config/paths.py 会拒绝项目根外的运行目录）",
+            f"  repo_root={repo_root}（knowledgebase/paths.py 会拒绝项目根外的运行目录）",
             EXIT_USAGE,
         )
         return None, False, EXIT_USAGE

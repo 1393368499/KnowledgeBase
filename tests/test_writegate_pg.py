@@ -347,7 +347,7 @@ def test_stale_writer_cannot_overwrite_online_state_after_freeze_cycle(
         base_url=profile.base_url,
         library=library,
         storage_mode="server",
-        storage_path="vector_data/qdrant",
+        storage_path="data/vector_data/qdrant",
         is_active=True,
         build_status="ready",
     )

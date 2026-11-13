@@ -26,7 +26,7 @@ import sys
 
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "knowledgebase.settings")
 django.setup()
 
 import redis  # noqa: E402
@@ -35,7 +35,7 @@ from celery.result import AsyncResult  # noqa: E402
 from django.conf import settings  # noqa: E402
 
 from apps.knowledge.integrity import latest_patrol_run  # noqa: E402
-from config.celery import patrol  # noqa: E402
+from knowledgebase.celery import patrol  # noqa: E402
 
 QUEUE = os.environ.get("KB_CRASH_QUEUE", "kb_crash_probe")
 SOURCE = "crash-probe"

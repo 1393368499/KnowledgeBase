@@ -9,18 +9,22 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Docker failed: $($DockerArgs -join ' ')" }
     }
     Invoke-Docker @("info", "--format", "{{.ServerVersion}}")
+    function New-Secret {
+        $bytes = New-Object byte[] 48
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+        return [Convert]::ToBase64String($bytes)
+    }
     if (-not (Test-Path -LiteralPath .env)) {
-        function New-Secret {
-            $bytes = New-Object byte[] 48
-            $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-            try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
-            return [Convert]::ToBase64String($bytes)
-        }
         $sample = [IO.File]::ReadAllText((Join-Path (Get-Location) '.env.example'))
         $sample = $sample.Replace('DJANGO_SECRET_KEY=dev-only-insecure-key-change-me', "DJANGO_SECRET_KEY=$(New-Secret)")
         $sample = $sample.Replace('KB_PG_PASSWORD=kb_local_dev_only', "KB_PG_PASSWORD=$(New-Secret)")
         [IO.File]::WriteAllText((Join-Path (Get-Location) '.env'), $sample, (New-Object Text.UTF8Encoding $false))
         Write-Host 'Created .env with random signing key and database password.'
+    }
+    if (-not (Test-Path -LiteralPath secrets/postgres-runtime.txt)) {
+        New-Item -ItemType Directory -Force -Path secrets | Out-Null
+        [IO.File]::WriteAllText((Join-Path (Get-Location) 'secrets/postgres-runtime.txt'), (New-Secret), (New-Object Text.UTF8Encoding $false))
     }
     # Preserve the existing volumes and data; only create volumes that are absent.
     foreach ($volume in @('knowledgebase-pgdata', 'knowledgebase-redisdata', 'knowledgebase-qdrantdata-delivery-20261015')) {
@@ -32,7 +36,7 @@ try {
         } finally { $ErrorActionPreference = $previousPreference }
         if (-not $volumeExists) { Invoke-Docker @('volume', 'create', $volume) }
     }
-    foreach ($directory in @('media/raw', 'media/templates', 'media/fonts', 'media/voice-audio', 'deploy/worker/beat-state')) {
+    foreach ($directory in @('data/media/raw', 'data/media/templates', 'data/media/fonts', 'data/media/voice-audio', 'deploy/worker/beat-state')) {
         New-Item -ItemType Directory -Force -Path $directory | Out-Null
     }
     Invoke-Docker @('compose', 'config', '--quiet')
@@ -40,6 +44,6 @@ try {
     $composeArgs = @('compose', '-f', 'docker-compose.yml')
     if ($Voice) { $composeArgs += @('-f', 'deploy/docker-compose.voice.yml') }
     Invoke-Docker ($composeArgs + @('up', '-d', '--wait', '--wait-timeout', '240'))
-    Write-Host 'Ready. Open the published web port (default http://127.0.0.1:8800/).'
+    Write-Host 'Ready. Open the published web port (default https://localhost:8800/).'
     Write-Host 'First install: docker compose exec web python manage.py kbcreateuser --help'
 } finally { Pop-Location }

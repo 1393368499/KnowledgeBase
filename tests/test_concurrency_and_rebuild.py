@@ -214,7 +214,7 @@ def test_rebuild_of_done_file_reuses_chunks_and_does_not_touch_budget(library, m
         base_url=online_profile.base_url,
         library=library,
         storage_mode="server",
-        storage_path="vector_data/qdrant",
+        storage_path="data/vector_data/qdrant",
         is_active=True,
         build_status="ready",
     )
@@ -362,7 +362,7 @@ def _register(library, name: str, *, profile=None, is_active=False):
         base_url=profile.base_url,
         library=library,
         storage_mode="server",
-        storage_path="vector_data/qdrant",
+        storage_path="data/vector_data/qdrant",
         is_active=is_active,
         build_status="ready",
     )

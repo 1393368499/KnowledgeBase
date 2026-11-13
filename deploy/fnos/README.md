@@ -10,11 +10,11 @@
 
 三个命名卷保留原来的名称：`knowledgebase-pgdata`、`knowledgebase-redisdata`、`knowledgebase-qdrantdata-delivery-20261015`。
 数据在停止写入和数据库正常关闭后备份、迁移。媒体文件和语音模型单独持久化。
-不要挂载旧的 Windows `vector_data/qdrant` 目录。
+不要挂载旧的 Windows `data/vector_data/qdrant` 目录。
 
 部署配置引用 `secrets/*.env`，这些文件包含现有配置，只保存在迁移包和飞牛部署目录中，不进入源码或镜像。
 首次创建时需要先导入镜像、恢复数据卷，再启动已有容器。
 飞牛首次落盘和初始化较慢，使用较长的健康检查启动宽限期，并按基础服务、迁移、网页、后台及语音服务的顺序启动。
 
-Cloudflare 临时语音隧道重启会生成新地址。新地址通过原有机制写入 `media/voice-connection/current.json`，设备可能需要在手机端同步连接地址。
+Cloudflare 临时语音隧道重启会生成新地址。新地址通过原有机制写入 `data/media/voice-connection/current.json`，设备可能需要在手机端同步连接地址。
 原电脑容器与数据保留，切换成功后停止原电脑服务。

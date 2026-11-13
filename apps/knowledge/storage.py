@@ -6,7 +6,7 @@
 会自动改名（``a.pdf`` → ``a_XXXX.pdf``），这会让"同内容只落一份"变成"同内容落多份"，
 而且改名本身就无法证明"没有覆盖"。所以这里自己实现一层薄的、**按内容寻址**的存储：
 
-- 路径固定为 ``<项目根>/media/raw/<sha256 前两位>/<sha256>``，与文件名无关；
+- 路径固定为 ``<项目根>/data/media/raw/<sha256 前两位>/<sha256>``，与文件名无关；
 - 写入方式：先写 ``*.part`` 临时文件并**边写边算哈希**，全部写完再 ``os.replace``
   原子改名；哈希对不上就删掉临时文件并拒绝——绝不会留下半个文件；
 - 已存在且校验通过就直接复用（幂等）；已存在但内容不符 → 抛 :class:`BlobCorrupt`
@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Iterable
 
-from config.paths import assert_inside_project_root
+from knowledgebase.paths import assert_inside_project_root
 
 #: 流式读写块大小
 CHUNK_BYTES = 1024 * 1024
@@ -63,7 +63,7 @@ class StoredBlob:
         用相对路径入库的理由：项目目录整体搬走后记录仍然有效（绝对路径会立刻失效）。
 
         为什么用 ``raw_root()`` 而不是 ``PROJECT_ROOT`` 算相对：路径真源只有一个
-        （``config.paths.raw_store_dir``）。测试或本地模式把它指向别处时这里跟着走，
+        （``knowledgebase.paths.raw_store_dir``）。测试或本地模式把它指向别处时这里跟着走，
         不会因为"两个根"算出跨盘相对路径（Windows 上跨盘 relpath 会直接抛异常）。
         """
         import os
@@ -79,18 +79,18 @@ class StoredBlob:
 
 
 def raw_root() -> Path:
-    """原始字节根目录：``<项目根>/media/raw``。
+    """原始字节根目录：``<项目根>/data/media/raw``。
 
-    路径真源在 :func:`config.paths.raw_store_dir`（已做项目根内校验），
+    路径真源在 :func:`knowledgebase.paths.raw_store_dir`（已做项目根内校验），
     这里不再自己拼路径，避免两处口径分叉。
     """
-    from config.paths import raw_store_dir
+    from knowledgebase.paths import raw_store_dir
 
     return assert_inside_project_root(raw_store_dir(), label="raw_store_dir")
 
 
 def quarantine_root() -> Path:
-    """受控删除的隔离目录：``<项目根>/media/quarantine``。"""
+    """受控删除的隔离目录：``<项目根>/data/media/quarantine``。"""
     return assert_inside_project_root(raw_root().parent / "quarantine", label="media/quarantine")
 
 
@@ -197,7 +197,7 @@ def read_blob(sha256: str) -> bytes:
 def quarantine_blob(sha256: str, *, reason: str = "") -> Path | None:
     """把原始字节移入隔离目录（受控删除通道专用）。
 
-    **不是**删除：文件仍在项目根下、仍在审计里可追溯，只是从 ``media/raw`` 移走，
+    **不是**删除：文件仍在项目根下、仍在审计里可追溯，只是从 ``data/media/raw`` 移走，
     让系统不再引用它。任何人都不应该直接从业务代码调用它——只有三次确认删除通道可以。
     """
     path = blob_path(sha256)

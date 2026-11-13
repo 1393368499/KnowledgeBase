@@ -9,7 +9,7 @@ PostgreSQL 的测试库是**服务器上的真实数据库**：子进程只要�
 三重隔离（每一重都必须有）
 --------------------------
 1. **数据库**：父进程跑在 ``--kb-db=postgres`` 的测试库上；子进程用
-   ``config.worker_test_settings``，库名由
+   ``knowledgebase.worker_test_settings``，库名由
    ``KB_WORKER_DB_NAME = connection.settings_dict["NAME"]`` 传入
    （Django 实际在用的那个），凭据仍来自 ``.env``（.env 不提供库名）。
 2. **broker**：固定测试专用 Redis DB（``KB_TEST_BROKER_DB``，默认 15）+
@@ -355,7 +355,7 @@ def embedding_stub():
 def _start_worker(queue_name: str, namespace: str, *, embedding_url: str) -> subprocess.Popen:
     """起真实 worker：同一测试库 + 独立 broker DB + **同一 collection 命名空间**。
 
-    传给子进程的是 ``config.worker_test_settings`` 要求的**显式覆盖项**
+    传给子进程的是 ``knowledgebase.worker_test_settings`` 要求的**显式覆盖项**
     （缺任何一项该模块会 fail-closed 拒绝启动）。**连接凭据也由这里显式下传**：
     子进程绝不回读生产 ``.env`` 的 host/port/user/password —— 独立审查发现的真实失败
     正是"父进程传了独占 ``pg:5432``，子进程却被 ``.env`` 的 ``127.0.0.1:55432`` 盖掉"，
@@ -373,7 +373,7 @@ def _start_worker(queue_name: str, namespace: str, *, embedding_url: str) -> sub
 
     env.update(
         {
-            "DJANGO_SETTINGS_MODULE": "config.worker_test_settings",
+            "DJANGO_SETTINGS_MODULE": "knowledgebase.worker_test_settings",
             "KB_WORKER_DB_NAME": _test_db_name(),
             "KB_WORKER_BROKER_URL": _broker_url(),
             "KB_WORKER_QDRANT_PREFIX": namespace,

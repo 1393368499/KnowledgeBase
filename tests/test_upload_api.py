@@ -187,7 +187,7 @@ def test_reshipping_a_failed_file_restores_a_lost_blob_and_requeues(
 
     queued: list[tuple] = []
     monkeypatch.setattr(
-        "config.celery.dispatch_processing",
+        "knowledgebase.celery.dispatch_processing",
         lambda file_id, **kwargs: queued.append((file_id, kwargs))
         or {"dispatched": True, "mode": "queue", "task_id": "t-1"},
     )
@@ -257,7 +257,7 @@ def test_upload_queue_mode_reports_pending_not_fake_done(
     library = library_setup
 
     # 模拟"broker 不可用"（真实环境里没有 worker/broker 就是这个结果）
-    import config.celery as celery_app
+    import knowledgebase.celery as celery_app
 
     monkeypatch.setattr(
         celery_app,

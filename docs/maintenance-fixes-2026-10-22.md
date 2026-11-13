@@ -8,7 +8,7 @@
 2. **巡检无法留痕**：耗时计时与资料推进时间使用不同变量，避免浮点数与 datetime 相减。pending/running 场景都验证了真实新增巡检记录。
 3. **只巡检最新一批**：新增 `PatrolRun.coverage`，按 ID 升序持久化检查范围与续做位置。每轮固定 ID 上界，新资料在下一轮处理，避免持续上传使旧资料饥饿。手动和周期巡检独立续做；留痕失败时不推进游标。并行任务可能重复检查一批，但不会因此跳过未检查资料。界面和命令行明确标注“本批检查”。
 4. **运行代码落后**：重新构建 `kb-app:delivery`，更新 migrate/web/worker/scheduler，应用 `knowledge.0023_patrolrun_coverage`。web、worker、scheduler 各核对 162 个源码/前端文件，均与工作区一致。当前部署关闭 `DJANGO_DEBUG` 和 `KB_DJANGO_DEBUG`，用随机长密钥替换公开开发密钥；密钥只保存在本地未跟踪的 `.env`，未写入日志或本文。既有登录可能需要重新建立。
-5. **Linux 预检遗漏模板目录**：`deploy/preflight.sh` 将 `media/templates` 与原件、调度目录一起创建并交给 uid/gid 10001；同步 README 与运维文档。
+5. **Linux 预检遗漏模板目录**：`deploy/preflight.sh` 将 `data/media/templates` 与原件、调度目录一起创建并交给 uid/gid 10001；同步 README 与运维文档。
 
 巡检结果仍是每批的结论，完成一轮不表示汇总了整轮所有问题；历史明细和检查范围可逐批复盘。每批检查期间资料状态也可能继续变化。
 

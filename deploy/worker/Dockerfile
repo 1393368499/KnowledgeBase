@@ -9,14 +9,14 @@
 #   `vector_data/`(65 GiB) / `.env`，`COPY . .` 会把密钥与海量数据带进镜像层。
 #   这里**逐个显式列出运行所需目录**，实测上下文仅 ~1.6 MB。
 # 基础镜像按 digest 固定（与 deploy/app/Dockerfile 保持一致），避免同名 tag 被上游重推。
-FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 # 不装任何 apt 包：
-#   1) python:3.13-slim **已自带** ca-certificates（HTTPS 访问 AS711 足够）；
+#   1) python:3.15-slim **已自带** ca-certificates（HTTPS 访问 AS711 足够）；
 #   2) worker 不需要 curl —— 健康检查用 Python/httpx（requirements 里已有）；
 #   3) 实测在 Debian 镜像上 apt-get 安装会因上游 500/503 直接 exit 100，
 #      平白让构建失败。少一层依赖 = 少一个不稳定源。
@@ -34,7 +34,7 @@ RUN python -m pip install --no-cache-dir --no-deps -r requirements.txt \
  && python -m pip check
 
 # ---- 只复制运行时真正需要的代码 ----
-COPY config/ ./config/
+COPY knowledgebase/ ./knowledgebase/
 COPY apps/ ./apps/
 COPY governance/ ./governance/
 COPY manage.py ./
@@ -58,6 +58,6 @@ ENV KB_SKIP_DOTENV=1 \
 # 那时 worker 被判 unhealthy 会造成误导。worker 的职责是"能接任务"，
 # 用自身 ping 判定更准确。
 HEALTHCHECK --interval=60s --timeout=20s --start-period=30s --retries=3 \
-  CMD celery -A config inspect ping -d celery@$HOSTNAME --timeout=10 || exit 1
+  CMD celery -A knowledgebase inspect ping -d celery@$HOSTNAME --timeout=10 || exit 1
 
-CMD ["sh", "-c", "celery -A config worker -Q ${KB_CELERY_QUEUE} --concurrency=${KB_CELERY_CONCURRENCY:-4} --loglevel=INFO"]
+CMD ["sh", "-c", "celery -A knowledgebase worker -Q ${KB_CELERY_QUEUE} --concurrency=${KB_CELERY_CONCURRENCY:-4} --loglevel=INFO"]

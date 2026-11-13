@@ -5,7 +5,7 @@
 所以探针改成真去比对 Django 的迁移计划。
 """
 
-from config import health_urls
+from knowledgebase import health_urls
 
 import pytest
 

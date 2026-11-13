@@ -79,6 +79,7 @@ class Handler(BaseHTTPRequestHandler):
             conn.request(self.command, self.path, body=body, headers={
                 "Host": "localhost", "Authorization": authorization,
                 "Content-Type": self.headers.get("Content-Type", "application/octet-stream"),
+                "X-Forwarded-Proto": "https",
                 "Connection": "close",
             })
             upstream = conn.getresponse()

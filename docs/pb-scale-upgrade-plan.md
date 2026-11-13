@@ -118,7 +118,7 @@
 | 资料/分段现状 | `kb_ingested_file` **3 行**、`kb_document_chunk` **3 行**（**2026-10-16 21:31** 审查方在正式库用 ORM `count()` 取得），库大小 **12,962,963 B** | 冻结证据 `artifacts/review/pb-plan-review-20261016/facts.json` |
 | 向量库现状 | Qdrant **4 个集合**（`kb-9-g3`、`kb-8-g2`、`kb-16-g1`、`kb-7-g2`）；`kb-16-g1` 配置：`shard_number:1, replication_factor:1, on_disk_payload:true, hnsw{m:16,ef_construct:100,on_disk:false}, quantization_config:null, optimizer{memmap_threshold:null,indexing_threshold:10000}, wal_capacity_mb:32` | 集合清单 = 同一冻结证据；**配置为作者只读测量（2026-10-16），未独立复核** |
 | PG 统计口径 | 用 `pg_stat_user_tables.n_live_tup`（**估算**）读到的 0 与真实 `count(*)`=3 **并存，原因未知**；凡"是否为空/有多少行"只能用 `count(*)` | §1.2 附注 |
-| 部署形态 | 单机 Docker Desktop，6 容器；web = `gunicorn config.wsgi --workers 2 --threads 4`（**线程化 / gthread 语义、同步阻塞 WSGI**；未显式 `-k`，实际 worker class 需运行时确认）；**无反向代理**；compose 无资源限制 | 实测 |
+| 部署形态 | 单机 Docker Desktop，6 容器；web = `gunicorn knowledgebase.wsgi --workers 2 --threads 4`（**线程化 / gthread 语义、同步阻塞 WSGI**；未显式 `-k`，实际 worker class 需运行时确认）；**无反向代理**；compose 无资源限制 | 实测 |
 | 入口安全 | `DEBUG=false`；`SESSION_COOKIE_SECURE=false`、`CSRF_COOKIE_SECURE=false`、`SECURE_SSL_REDIRECT=false`、`SECURE_PROXY_SSL_HEADER=null`（**本地 HTTP 模式的事实**） | `facts.json` |
 | 模型槽位 | `SlotLimiter` **已按 `service` 键隔离**（`ratelimit.py:179 _key(self, service)`；`KNOWN_SERVICES=("embedding","rerank","ocr","llm")`；嵌入还按 `embed:{profile}` 细分；`DEFAULT_LIMIT=4` 是**每服务**默认额度） | 代码 + `resilience.py:715` |
 
@@ -149,7 +149,7 @@
 | 读取即全量校验 | `open_blob()` 先 `verify_blob()`（整对象重算哈希）再返回句柄 | `storage.py:182-189` |
 | 分段写入/嵌入 | `write_chunks(file, blocks: list[ParsedBlock])` → `bulk_create`；`embed_chunks()` 在**已物化**列表上按 `KB_EMBED_BATCH_SIZE`(默认 16) 分批 | `pipeline.py:376,412,445,508-516` |
 | 解析上限 | `MAX_BLOCK_CHARS=1200`（`parsers.py:36`，真实分段上限来源）、`MAX_BLOCKS=20000`、`ocr_pages` 默认 20 | `parsers.py` |
-| 分段上限的配置坑 | `KB_CHUNK_MAX_CHARS` **在 `config/settings.py:417` 有声明但无任何代码读取**（声明未接线）；`preview.py:39` 另有同名 `MAX_BLOCK_CHARS=2000`（仅预览） | 全仓检索 |
+| 分段上限的配置坑 | `KB_CHUNK_MAX_CHARS` **在 `knowledgebase/settings.py:417` 有声明但无任何代码读取**（声明未接线）；`preview.py:39` 另有同名 `MAX_BLOCK_CHARS=2000`（仅预览） | 全仓检索 |
 | 稀疏召回/覆盖核验 | `search_sparse()` 用 `MatchText(text=…)`；`_verify_collection_coverage()` **逐字比对** `payload["text"] != chunk.text` | `vectorindex.py:862,879,576,628` |
 | 建集合 | `create_collection(..., VectorParams(size, COSINE))`，**不传**分片/量化/on_disk；payload `text` 建 multilingual 全文索引 | `vectorindex.py:163-182,196-209` |
 | 写入/计数 | `upsert(..., wait=True)`；`count(exact=True)` | `vectorindex.py:239-252` |

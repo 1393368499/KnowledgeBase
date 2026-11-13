@@ -2,7 +2,7 @@
 
 一次 :func:`process_file` 的完整步骤（每一步都真实执行，可单独观测）：
 
-1. 读取 ``media/raw/<sha256>`` 的原始字节，**重算哈希**与库里的 ``content_sha256``
+1. 读取 ``data/media/raw/<sha256>`` 的原始字节，**重算哈希**与库里的 ``content_sha256``
    比对；不一致直接失败（说明磁盘上的事实来源被改过）。
 2. 调 :func:`apps.knowledge.parsers.parse_bytes` 得到分段（PDF 扫描页走 AS711 OCR）。
 3. 把分段写入 ``DocumentChunk``（append-only；重复解析不会产生第二份，见下）。

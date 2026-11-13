@@ -12,7 +12,7 @@ AS711 会长时间断开，本机的 Postgres/Qdrant 容器也可能被重启。
 - 真实 Qdrant 的用例统一用 ``--kb-qdrant`` / 环境变量门控，连不上就 skip 并
   在报告里写明 skip 原因，不把 skip 当 pass。
 
-为什么单独一个文件而不改 ``config/settings.py``：生产口径必须是
+为什么单独一个文件而不改 ``knowledgebase/settings.py``：生产口径必须是
 "非 DEBUG 禁 SQLite"（那是 P1 的硬约束），测试口径允许 SQLite——
 把这层差异锁在测试配置里，生产配置一行不动。
 """
@@ -24,10 +24,10 @@ import socket
 import sys
 
 # ------------------------------------------------- 会话级测试隔离（必须最先）----
-# 为什么放在这里而不是 tests/conftest.py：**config.settings 在导入时**就用
+# 为什么放在这里而不是 tests/conftest.py：**knowledgebase.settings 在导入时**就用
 # os.environ.get(...) 取了快照。conftest 执行更晚，设了也不生效（实测：
 # ENV=kb-t<uuid> 但 settings 里仍是 kb）→ 测试会去碰主实例历史集合（kb-1-g1）。
-# 因此必须在 `from config.settings import *` **之前**设好。
+# 因此必须在 `from knowledgebase.settings import *` **之前**设好。
 import os as _os  # noqa: E402
 import uuid as _uuid  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
@@ -36,7 +36,7 @@ _PROJECT_ROOT = _Path(__file__).resolve().parent.parent
 #: 本次测试会话的 run_uuid：conftest 会复用它，保证 raw 目录与资源登记一致
 _TEST_RUN_UUID = _os.environ.get("KB_TEST_RUN_UUID") or _uuid.uuid4().hex[:12]
 _os.environ["KB_TEST_RUN_UUID"] = _TEST_RUN_UUID
-#: 测试期间原件只落本 run 的隔离目录，绝不写项目 media/raw
+#: 测试期间原件只落本 run 的隔离目录，绝不写项目 data/media/raw
 _TEST_RAW_DIR = _PROJECT_ROOT / "artifacts" / "test-runs" / _TEST_RUN_UUID / "raw"
 _TEST_RAW_DIR.mkdir(parents=True, exist_ok=True)
 _os.environ["RAW_STORE_DIR"] = str(_TEST_RAW_DIR)
@@ -57,7 +57,7 @@ _os.environ["KB_QDRANT_COLLECTION_PREFIX"] = f"kb-{_TEST_RUN_UUID}"
 # (56333)，就会出现"在一个端点建集合、在另一个端点清"→ 清不掉、甚至误碰主实例。
 # 所以这里**显式绑定**：有隔离端点就指过去；没有就退回 embedded 隔离，
 # 绝不在共享 server 上建集合（建了也清不掉）。
-# 注意优先级：config/settings.py 用的是
+# 注意优先级：knowledgebase/settings.py 用的是
 #   QDRANT_URL  = _env_first("KB_QDRANT_URL", "QDRANT_URL", ...)
 #   QDRANT_MODE = _env_first("KB_QDRANT_MODE", ...)
 # 即 **KB_QDRANT_URL / KB_QDRANT_MODE 优先**。只设 QDRANT_URL/QDRANT_MODE 会被
@@ -72,16 +72,16 @@ else:
     _os.environ.pop("KB_QDRANT_URL", None)
     _os.environ["KB_QDRANT_MODE"] = "embedded"
 
-from config.settings import *  # noqa: F403,F401 - 继承生产配置
-from config.settings import DATABASES
+from knowledgebase.settings import *  # noqa: F403,F401 - 继承生产配置
+from knowledgebase.settings import DATABASES
 
-# ``ensure_runtime_dirs()`` 在 config.settings 导入时就按环境变量建好了目录；
+# ``ensure_runtime_dirs()`` 在 knowledgebase.settings 导入时就按环境变量建好了目录；
 # 这里再**显式钉一次** MEDIA_ROOT，防止 .env 里的旧值（若有）把隔离目录盖回去。
 MEDIA_ROOT = _os.environ["MEDIA_ROOT_DIR"]
 _os.makedirs(_os.path.join(MEDIA_ROOT, "templates"), exist_ok=True)
 
 # ------------------------------------------------- 端点/模式**强制覆盖** ----
-# config.settings 用 dotenv(**override=True**) 加载 .env，会用 .env 里的主实例值
+# knowledgebase.settings 用 dotenv(**override=True**) 加载 .env，会用 .env 里的主实例值
 # 盖掉我们先前设的环境变量（实测：环境变量设了 56339，settings.QDRANT_URL 仍是
 # http://127.0.0.1:56333）。所以必须在 star-import **之后**直接改模块级属性 ——
 # 这是唯一可靠的位置。否则会出现"在一个端点建集合、在另一个端点清"→ 泄漏。
@@ -91,7 +91,7 @@ if _TEST_QDRANT_URL:
 else:
     QDRANT_MODE = "embedded"           # 无隔离端点 → 绝不用共享 server
 
-# **向量数据目录也必须隔离**：默认是 `<项目根>/vector_data`，嵌入模式下会把索引
+# **向量数据目录也必须隔离**：默认是 `<项目根>/data/vector_data`，嵌入模式下会把索引
 # 写进**主 vector_data/embedded**（与生产/主实例混在一起）。指到本 run 目录下。
 os.environ["VECTOR_DATA_DIR"] = str(_PROJECT_ROOT / "artifacts" / "test-runs"
                                     / _TEST_RUN_UUID / "vector_data")
@@ -138,7 +138,7 @@ KB_BREAKER_STORE = os.environ.get("KB_BREAKER_STORE", "process")
 # （见 ``tests/test_cross_process_rate_limit.py``：它直接构造 ``SlotLimiter``，
 # 指向测试专用 DB15 + 每次唯一的 ``kb:test:model:slots:<uuid>`` 前缀，
 # 所以不受这里影响，也不会碰业务库 DB0）。
-# 生产配置一行不动：``config/settings.py`` 仍是默认启用。
+# 生产配置一行不动：``knowledgebase/settings.py`` 仍是默认启用。
 KB_MODEL_LIMIT_ENABLED = False
 KB_PROGRESS_ENABLED = False  # 普通离线回归不向业务 Redis 写进度。
 #: 连 URL 也显式清空：万一将来有代码在 enabled 之前就构造客户端，
@@ -147,7 +147,7 @@ KB_MODEL_LIMIT_REDIS_URL = ""
 
 # 说明：测试**不允许**向业务队列投递消息（审查意见 22:50）。
 # 实现方式放在 tests/conftest.py 的 autouse 夹具里（替换 dispatch_processing），
-# 而不是在这里改 broker——因为 `config/celery.py` 的 app 在测试配置生效**之前**
+# 而不是在这里改 broker——因为 `knowledgebase/celery.py` 的 app 在测试配置生效**之前**
 # 就已按 business settings 建好了，事后改 conf 并不总能真正重定向连接
 # （实测：只改 conf 时 connection_for_write 仍解析到 127.0.0.1:6379/0）。
 # 调用点替换更可靠：测试里不会有真 broker 调用，真实 worker 用例自己用独立 DB。
@@ -166,7 +166,7 @@ def _tcp_reachable(host: str, port: int, *, timeout: float = 1.5) -> bool:
 def _requested_db() -> str:
     """测试库类型。优先级：``KB_PYTEST_DB`` > ``KB_TEST_DB`` > ``--kb-db`` > 默认 ``sqlite``。
 
-    **为什么优先读 ``KB_PYTEST_DB``**：``config/settings.py`` 会执行
+    **为什么优先读 ``KB_PYTEST_DB``**：``knowledgebase/settings.py`` 会执行
     ``load_dotenv(.env, override=True)``，任何已在环境里的 *同名* 变量都会被 .env
     覆盖。所以本仓库统一用"**.env 里不存在的名字**"（``KB_PYTEST_DB``）来传递这个
     开关，并在 conftest 里同时认 ``--kb-db``。

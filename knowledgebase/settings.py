@@ -9,18 +9,19 @@ import os
 import json
 import secrets
 import sys
+from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
-from config.paths import PROJECT_ROOT, ensure_runtime_dirs
+from knowledgebase.paths import PROJECT_ROOT, ensure_runtime_dirs
 
 # ``override=True``：.env 是本地真相，优先于进程环境变量。
 #
 # 唯一的例外是 ``KB_SKIP_DOTENV=1``：真实 worker 子进程的往返测试需要把
 # broker/DB 换成**测试专用的独立实例**，而这里若还去加载业务 .env 就会把
 # 测试的配置盖回去（表现为"worker 收不到任务"）。测试用
-# ``config.worker_test_settings`` 打开这个开关并加载自己的临时 .env。
+# ``knowledgebase.worker_test_settings`` 打开这个开关并加载自己的临时 .env。
 # 生产与本地开发都不会设这个变量，行为完全不变。
 if os.environ.get("KB_SKIP_DOTENV") != "1":
     load_dotenv(PROJECT_ROOT / ".env", override=True)
@@ -147,16 +148,18 @@ CSRF_TRUSTED_ORIGINS = _env_list("KB_CSRF_TRUSTED_ORIGINS", "")
 # 运行期目录（vector_data 必须在项目根目录内）在导入配置时就创建并校验。
 RUNTIME_DIRS = ensure_runtime_dirs()
 MEDIA_ROOT = RUNTIME_DIRS["media"]
-# 原始字节落盘根目录：真源是 config.paths.raw_store_dir()（默认 <项目根>/media/raw）
+# 原始字节落盘根目录：真源是 knowledgebase.paths.raw_store_dir()（默认 <项目根>/data/media/raw）
 RAW_STORE_DIR = str(RUNTIME_DIRS["raw_store"])
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "governance.admin_config.MfaAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
     "rest_framework",
     # governance 没有模型，注册它是为了让 governance/management/commands/ 下的
     # 管理命令（如 `manage.py guards`）能被 Django 发现。
@@ -175,6 +178,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
     # 登录失败限速：必须在 AuthenticationMiddleware 之后（要读 request.user 判断成功/失败）
     "governance.middleware.LoginThrottleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -194,7 +198,7 @@ else:  # pragma: no cover
     # 紧跟在 SecurityMiddleware 之后，符合官方推荐顺序
     MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
-ROOT_URLCONF = "config.urls"
+ROOT_URLCONF = "knowledgebase.urls"
 
 TEMPLATES = [
     {
@@ -213,18 +217,22 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "config.wsgi.application"
-ASGI_APPLICATION = "config.asgi.application"
+WSGI_APPLICATION = "knowledgebase.wsgi.application"
+ASGI_APPLICATION = "knowledgebase.asgi.application"
 
 # ------------------------------------------------------------------ 数据库 ----
 DB_ENGINE = os.environ.get("DB_ENGINE", "sqlite").strip().lower()
 if DB_ENGINE in {"postgres", "postgresql"}:
+    password_file = os.environ.get("KB_PG_PASSWORD_FILE")
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": _env_first("KB_PG_DB", "POSTGRES_DB", default="kb"),
             "USER": _env_first("KB_PG_USER", "POSTGRES_USER", default="kb"),
-            "PASSWORD": _env_first("KB_PG_PASSWORD", "POSTGRES_PASSWORD", default=""),
+            "PASSWORD": (
+                Path(password_file).read_text(encoding="utf-8").strip()
+                if password_file else _env_first("KB_PG_PASSWORD", "POSTGRES_PASSWORD", default="")
+            ),
             "HOST": _env_first("KB_PG_HOST", "POSTGRES_HOST", default="127.0.0.1"),
             "PORT": _env_first("KB_PG_PORT", "POSTGRES_PORT", default="5432"),
             "CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
@@ -284,7 +292,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
-STATIC_ROOT = PROJECT_ROOT / "staticfiles"
+STATIC_ROOT = PROJECT_ROOT / "data" / "staticfiles"
 
 # ------------------------------------------------------------------ 缓存/队列 ----
 REDIS_URL = _env_first("KB_REDIS_URL", "REDIS_URL", default="redis://127.0.0.1:6379/0")
@@ -388,7 +396,7 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     ),
 }
 
-# 上传后的处理模式（见 config/celery.py 的说明）：
+# 上传后的处理模式（见 knowledgebase/celery.py 的说明）：
 #   inline = 请求内同步处理（本地验收方便）
 #   queue  = 落盘后立刻返回 202，由 worker 处理
 #   auto   = 能派发就派发，否则明确返回"待处理"（默认）
@@ -482,7 +490,7 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
-    "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
+    "EXCEPTION_HANDLER": "knowledgebase.exceptions.api_exception_handler",
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
 }
 
@@ -602,6 +610,6 @@ LOGGING = {
 }
 
 # Dedicated device audio is temporary, not part of the immutable raw store.
-VOICE_AUDIO_ROOT = os.environ.get('KB_VOICE_AUDIO_ROOT', str(PROJECT_ROOT / 'media' / 'voice-audio'))
+VOICE_AUDIO_ROOT = os.environ.get('KB_VOICE_AUDIO_ROOT', str(PROJECT_ROOT / 'data' / 'media' / 'voice-audio'))
 VOICE_ASR_URL = os.environ.get('KB_VOICE_ASR_URL', 'http://voice-asr:8090/transcribe')
 VOICE_FONT_PATH = os.environ.get('KB_VOICE_FONT_PATH', '')

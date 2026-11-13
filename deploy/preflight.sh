@@ -19,6 +19,11 @@ if [ ! -f .env ]; then
   exit 1
 fi
 echo "      .env 已存在"
+if [ ! -f secrets/postgres-runtime.txt ]; then
+  mkdir -p -m 0700 secrets
+  (umask 077; set -o noclobber; openssl rand -base64 48 > secrets/postgres-runtime.txt)
+  chmod 0444 secrets/postgres-runtime.txt
+fi
 
 echo "[2/4] 检查命名卷"
 for volume in knowledgebase-pgdata knowledgebase-redisdata; do
@@ -39,7 +44,7 @@ fi
 
 echo "[3/4] 检查宿主绑定目录与属主（容器内运行用户 uid/gid 10001）"
 uid_gid="${KB_UID_GID:-10001}"
-for dir in media/raw media/templates media/fonts deploy/worker/beat-state; do
+for dir in data/media/raw data/media/templates data/media/fonts deploy/worker/beat-state; do
   mkdir -p "$dir"
   if [ "$(id -u)" = "0" ]; then
     chown -R "$uid_gid:$uid_gid" "$dir"
@@ -60,5 +65,6 @@ cat <<'NEXT'
   1) bash deploy/build-app.sh        # 新机器必须先建镜像（已有 knowledgebase:app 的平台可跳过）
   2) docker compose up -d            # 从**仓库根**执行：这样根 .env 才会参与 ${} 插值
   3) docker compose exec web python manage.py kbcreateuser    # 管理员账号不会被自动创建
-  4) curl -sS http://127.0.0.1:8800/api/v1/health/ready/      # 期望 200 且 migrations = ok
+  4) docker compose cp https:/data/caddy/pki/authorities/local/root.crt ./secrets/kb-local-ca.crt
+  5) curl --cacert ./secrets/kb-local-ca.crt https://localhost:8800/api/v1/health/ready/
 NEXT

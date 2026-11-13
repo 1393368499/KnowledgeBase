@@ -68,7 +68,7 @@ def uploaded_file(api, admin_user, library, isolated_paths):
 )
 def test_task_roundtrip_via_eager(uploaded_file, library_setup_vector):
     """eager 往返：任务被派发 → 真的执行 → 状态落库为 done。"""
-    from config.celery import process_ingested_file
+    from knowledgebase.celery import process_ingested_file
 
     record = uploaded_file
     assert record.parse_status == ParseStatus.PENDING
@@ -95,7 +95,7 @@ def test_task_roundtrip_via_eager(uploaded_file, library_setup_vector):
 )
 def test_duplicate_dispatch_processes_once(uploaded_file, library_setup_vector):
     """重复派发同一份资料：只处理一次（第二次因为已 DONE 而跳过）。"""
-    from config.celery import process_ingested_file
+    from knowledgebase.celery import process_ingested_file
 
     record = uploaded_file
     bound = {

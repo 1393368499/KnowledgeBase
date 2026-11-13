@@ -23,7 +23,7 @@ from django.conf import settings
 
 def _env_defaults() -> dict[str, str]:
     return {
-        "DJANGO_SETTINGS_MODULE": "config.settings",
+        "DJANGO_SETTINGS_MODULE": "knowledgebase.settings",
         "KB_SKIP_DOTENV": "1",
         "KB_PYTEST_DB": "sqlite",
     }
@@ -62,7 +62,7 @@ def test_default_visibility_is_hard_limit_plus_slack() -> None:
 
 def test_celery_app_conf_receives_both_settings() -> None:
     """`app.config_from_object(...namespace="CELERY")` 必须真的把它们交给 Celery。"""
-    from config.celery import app
+    from knowledgebase.celery import app
 
     assert app.conf.broker_transport_options["visibility_timeout"] == (
         settings.CELERY_BROKER_TRANSPORT_OPTIONS["visibility_timeout"]

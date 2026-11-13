@@ -14,7 +14,7 @@
 * **并发重入**：租约在飞时第二个执行者被明确拒绝；租约过期（进程被杀）允许接管且留痕；
 * **只有全部成功才清旧代次**：缺原件等永久不可重建的份仍然阻止清理（安全规则不变）。
 
-全部用隔离测试数据（临时原件与隔离向量目录），不触碰主库与真实 `media/raw`。
+全部用隔离测试数据（临时原件与隔离向量目录），不触碰主库与真实 `data/media/raw`。
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture(autouse=True)
 def _isolated_blobs(isolated_paths):
-    """原件一律落在临时目录：绝不往真实 ``media/raw`` 写测试数据。"""
+    """原件一律落在临时目录：绝不往真实 ``data/media/raw`` 写测试数据。"""
     return isolated_paths
 
 

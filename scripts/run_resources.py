@@ -656,7 +656,7 @@ class RunResources:
         为什么需要：`storage.store_bytes` 按不可变语义写**只读**文件，
         Windows 上 `shutil.rmtree` 删只读文件会 `WinError 5`；Linux 上若目录丢 x 位，
         连进入都失败。这里只对**已通过真实包含校验**的 target 操作，
-        绝不碰主 `media/raw`。补位后若仍失败就抛错 —— **不用** `ignore_errors`。
+        绝不碰主 `data/media/raw`。补位后若仍失败就抛错 —— **不用** `ignore_errors`。
         """
         def _on_error(func, path, exc_info):  # noqa: ANN001
             # 兜底重试：再补一次位再试；仍失败就让它抛出去（保持失败可见）

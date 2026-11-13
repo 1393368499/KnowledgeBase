@@ -1,6 +1,6 @@
 # 备份、恢复与 RPO/RTO 口径
 
-2026-11-11 制定。适用于 Docker 部署的智库实例（PostgreSQL + Qdrant 命名卷 + `media/` 原件）。
+2026-11-11 制定。适用于 Docker 部署的智库实例（PostgreSQL + Qdrant 命名卷 + `data/media/` 原件）。
 
 ## 1. 目标
 
@@ -17,7 +17,7 @@ RPO/RTO 由项目负责人批准；调整需记录变更日期与批准人。
 | --- | --- | --- | --- | --- |
 | PostgreSQL | `pg_dump -Fc`（自定义格式，含 54 条迁移与 6 个不可篡改触发器定义） | 每日 02:00 + 变更前 | 最近 14 份 | `snapshots/kb-*`（本地，不入 Git） |
 | Qdrant | 官方快照 API 全量快照（4 个集合） | 每周日 + 变更前 | 最近 4 份 | `snapshots/kb-*` |
-| 原件 `media/raw` | 内容寻址、只读；记录逐文件 SHA-256 清单 | 变更前记录清单 | 随备份保留 | `snapshots/kb-*` |
+| 原件 `data/media/raw` | 内容寻址、只读；记录逐文件 SHA-256 清单 | 变更前记录清单 | 随备份保留 | `snapshots/kb-*` |
 | 向量冷备卷 | Docker 卷冷备副本（逐文件 SHA-256 核验） | 切换/升级前 | 最近 1 份 | `knowledgebase-qdrantdata-rollback-*` |
 
 ## 3. 恢复步骤（演练与实战同一套）
@@ -25,7 +25,7 @@ RPO/RTO 由项目负责人批准；调整需记录变更日期与批准人。
 1. 停止写入：`docker compose stop web worker scheduler voice-worker`。
 2. 恢复 PostgreSQL：`pg_restore -U kb -d <空库> --no-owner --no-privileges <dump>`；核对 `django_migrations` 条数与触发器 `kb_guard_*` 数量。
 3. 恢复 Qdrant：按官方快照恢复接口恢复到隔离实例，核对四个集合点数与 payload 抽样。
-4. 恢复原件：按 `media/raw` 清单核验 SHA-256，缺文件按内容重新上传/从冷备拷回。
+4. 恢复原件：按 `data/media/raw` 清单核验 SHA-256，缺文件按内容重新上传/从冷备拷回。
 5. 启动服务：`docker compose up -d --wait`；检查 `/api/v1/health/ready/`、登录、文件列表、检索、预览。
 6. 记录：恢复耗时（分阶段）、丢失窗口（最后一次备份到故障时刻）、完整性核对结果，归档到 `snapshots/`。
 

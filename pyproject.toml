@@ -3,16 +3,13 @@
 # 这里补最小配置，CI 见 .github/workflows/ci.yml。
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"  # ruff 0.14.4 尚无 py315 目标；升到支持 py315 的 ruff 后再改
 line-length = 100
 extend-exclude = [
     ".venv",
     "artifacts",
     "snapshots",
-    "staticfiles",
-    "db",
-    "vector_data",
-    "media",
+    "data",
     "firmware",
     "android",
     "evals",
@@ -26,9 +23,9 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
 # Django settings 的"先改环境变量、再 import settings"是刻意写法（E402 必然触发）。
-"config/test_settings.py" = ["E402"]
-"config/worker_test_settings.py" = ["E402"]
-"config/loadtest_settings.py" = ["E402"]
+"knowledgebase/test_settings.py" = ["E402"]
+"knowledgebase/worker_test_settings.py" = ["E402"]
+"knowledgebase/loadtest_settings.py" = ["E402"]
 # 中段导入用于装饰器注册，且避开与 apps.voice 的循环导入（模块底部导入是刻意安排）。
 "apps/planner/services.py" = ["E402"]
 # 测试夹具常以"创建对象但其副作用才是目的"的写法赋值（如先建一个库供后续断言），

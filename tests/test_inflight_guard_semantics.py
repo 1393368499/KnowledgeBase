@@ -32,9 +32,9 @@ def test_no_rows_is_clean():
 
 
 def test_subprocess_forces_project_settings():
-    """生产取数必须**显式**用 config.settings，不能继承调用方的 settings 模块。"""
+    """生产取数必须**显式**用 knowledgebase.settings，不能继承调用方的 settings 模块。"""
     import inspect
     sm = _sm()
     src = inspect.getsource(sm._inflight_rows_from_project_settings)
-    assert 'DJANGO_SETTINGS_MODULE' in src and 'config.settings' in src
+    assert 'DJANGO_SETTINGS_MODULE' in src and 'knowledgebase.settings' in src
     assert 'KB_PYTEST_DB' in src, "必须清掉测试库变量，否则守卫会被环境影响"

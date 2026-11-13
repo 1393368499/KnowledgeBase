@@ -2,13 +2,16 @@ name: ci
 
 # 全栈开发规则第 5/6 节：把能自动验证的条件固化到 CI。
 # 覆盖：静态检查、依赖漏洞、密钥扫描、Django 自检/迁移检查、离线全量回归、部署安全检查。
-# 说明：真实 PostgreSQL/Redis/Qdrant 与真实模型链路由发布前人工专项验证（见 docs/deployment-and-operations.md）；
-# CI 里跑的是 SQLite 全量回归，它必须保持 0 失败。
+# Redis、Qdrant、模型链路和实际部署配置由发布前专项验证。
 
 on:
   push:
     branches: ["**"]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -18,37 +21,62 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.13"
+          python-version: "3.15"
       - name: Install linters
         run: python -m pip install --upgrade pip ruff pip-audit
       - name: Ruff
-        run: ruff check apps config governance tests scripts
+        run: ruff check apps knowledgebase governance tests scripts
       - name: Dependency audit
         run: pip-audit -r requirements.txt
 
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.15"
+      - name: Source security scan
+        run: |
+          python -m pip install bandit==1.9.4
+          python -m bandit -r apps knowledgebase governance deploy/voice-gateway deploy/office -lll -iii
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:17.12-alpine@sha256:34261f594522cf41dfcb76aefd42b9d201098b0e6b23c9c68733f169e4218b6f
+        env:
+          POSTGRES_USER: kb_ci
+          POSTGRES_DB: kb_ci
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: --health-cmd "pg_isready -U kb_ci -d kb_ci" --health-interval 5s --health-timeout 3s --health-retries 12
     env:
-      DJANGO_SETTINGS_MODULE: config.test_settings
+      DJANGO_SETTINGS_MODULE: knowledgebase.test_settings
+      KB_PYTEST_DB: ${{ matrix.database }}
+      KB_PG_HOST: 127.0.0.1
+      KB_PG_PORT: ${{ job.services.postgres.ports[5432] }}
+      KB_PG_USER: kb_ci
+      KB_PG_DB: kb_ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.13"
+          python-version: "3.15"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -58,13 +86,13 @@ jobs:
         run: python manage.py check
       - name: Migrations are up to date
         run: python manage.py makemigrations --check --dry-run
-      - name: Offline regression (SQLite)
-        run: python -m pytest -q --kb-db=sqlite
+      - name: Offline regression
+        run: python -m pytest -q --kb-db=${{ matrix.database }}
 
   deploy-check:
     runs-on: ubuntu-latest
     env:
-      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SETTINGS_MODULE: knowledgebase.settings
       DJANGO_DEBUG: "0"
       DJANGO_SECRET_KEY: "ci-only-4d8f3f2a9c7b1e6d5a0f3c8b2e7d4a1f9c6b3e8d5a2f7c4b1e9d6a3f8c5b2e7d"
       KB_HTTPS_ONLY: "1"
@@ -73,13 +101,13 @@ jobs:
       DB_ENGINE: postgres
       KB_PG_HOST: 127.0.0.1
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.13"
+          python-version: "3.15"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install --no-deps -r requirements.txt
       - name: Production security check
-        run: python manage.py check --deploy
+        run: python manage.py check --deploy --fail-level WARNING

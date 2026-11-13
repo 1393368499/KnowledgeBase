@@ -701,7 +701,7 @@ class PatrolRun(models.Model):
 
     约束：
       * 只追加，不修改历史记录（它是运维留痕，不是业务数据）；
-      * 巡检本身是**只读**的（见 ``config/celery.py`` 的 ``patrol``），
+      * 巡检本身是**只读**的（见 ``knowledgebase/celery.py`` 的 ``patrol``），
         留痕不会碰任何资料。
     """
 

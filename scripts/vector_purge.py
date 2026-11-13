@@ -7,9 +7,9 @@
     （即使误写进报告也不删，双保险）；
   * 默认 `--dry-run`；真正执行要 `--execute` **且** `--authorized-by "<授权说明>"`；
   * 先经 Qdrant API 删集合 → **复核它确实从列表消失** → 再清残留磁盘目录；
-  * 磁盘目录删除有**真实包含校验**（必须落在 `vector_data/qdrant/collections/` 下、
+  * 磁盘目录删除有**真实包含校验**（必须落在 `data/vector_data/qdrant/collections/` 下、
     不是该根目录本身、拒绝链接）；
-  * **不碰** `media/raw` 原件、不碰任何数据库记录、不碰 C 类索引；
+  * **不碰** `data/media/raw` 原件、不碰任何数据库记录、不碰 C 类索引；
   * 逐条记录到审计报告；任何一条失败 → 非零退出 + 列出残留。
 """
 
@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-COLLECTIONS_DIR = ROOT / "vector_data" / "qdrant" / "collections"
+COLLECTIONS_DIR = ROOT / "data" / "vector_data" / "qdrant" / "collections"
 INVENTORY = ROOT / "artifacts" / "vector-inventory.json"
 REPORT = ROOT / "artifacts" / "vector-purge-report.json"
 QDRANT_URL = "http://127.0.0.1:56333"

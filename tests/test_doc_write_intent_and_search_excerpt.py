@@ -9,7 +9,7 @@ search_knowledge 就结束了 —— 空正文 + 合法 tool_call 是合法返�
 **第二处**：搜索页结果卡里的"命中分片小字摘要"（``.chunk``）需要撤掉
 （用户原话："不要这些红框中的小字"）。撤掉的是**渲染**，不是数据：
 后端返回的 ``text`` / ``ordinal`` 一个字段没动，"准确 / 不准确"反馈仍然
-按真实分片序号落库。原型文件 ``knowledge-base-prototype.html`` 保持只读。
+按真实分片序号落库。原型文件 ``docs/prototype/knowledge-base-prototype.html`` 保持只读。
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ def test_search_result_card_keeps_the_useful_parts():
 
 def test_prototype_file_itself_is_untouched():
     """去掉的是**实现**里的渲染；原型文件一个字节都不许改（只读基线）。"""
-    proto = _read("knowledge-base-prototype.html")
+    proto = _read("docs/prototype/knowledge-base-prototype.html")
     assert '<div class="chunk">' in proto, "原型被改了（它应当保持只读）"
     # 死代码清理（2026-11-11 全栈复审 P1）：`kb-proto.css`（29 KB）没有任何页面
     # 或脚本引用，属于死文件，已删除。反向守卫：它不能复活，也不能再被模板/JS 引入

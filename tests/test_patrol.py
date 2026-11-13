@@ -10,14 +10,14 @@ from apps.knowledge.models import IngestedFile
 
 
 def _patrol():
-    from config.celery import patrol
+    from knowledgebase.celery import patrol
 
     # 直接调用任务函数体（不经过 broker），得到真实返回
     return patrol.run(limit=500)
 
 
 def test_patrol_registered_and_scheduled():
-    from config.celery import app
+    from knowledgebase.celery import app
 
     assert "knowledge.patrol" in app.tasks, "任务未注册 → beat 调度会失败"
     from django.conf import settings

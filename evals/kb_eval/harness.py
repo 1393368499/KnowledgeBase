@@ -326,7 +326,7 @@ def bootstrap(
     ----
     repo_root : 仓库根（含 ``manage.py``/``config``）。默认 = 本文件向上两级。
     workdir   : 运行目录（sqlite / vector_data / raw / media 全在里面）。
-                必须位于 ``repo_root`` 内（``config/paths.py`` 的硬约束），
+                必须位于 ``repo_root`` 内（``knowledgebase/paths.py`` 的硬约束），
                 默认 ``<repo_root>/artifacts/evals/offline``。
     dense     : 是否启用稠密检索（默认 False，只走 sparse+DB 关键词）。
                 注意实现方式：``pipeline.py:2038`` 在**测试适配器开启**时会故意
@@ -344,14 +344,14 @@ def bootstrap(
     repo = Path(repo_root).expanduser().resolve() if repo_root else _DEFAULT_REPO_ROOT
     if not (repo / "manage.py").is_file() and not (repo / "config" / "settings.py").is_file():
         raise HarnessError(
-            f"repo_root 看起来不是本项目根目录（找不到 manage.py / config/settings.py）：{repo}"
+            f"repo_root 看起来不是本项目根目录（找不到 manage.py / knowledgebase/settings.py）：{repo}"
         )
     work = Path(workdir).expanduser().resolve() if workdir else repo / "artifacts" / "evals" / "offline"
     try:
         work.relative_to(repo)
     except ValueError:
         raise HarnessError(
-            f"workdir 必须位于 repo_root 内（config/paths.py 会拒绝项目根外的路径）：{work}"
+            f"workdir 必须位于 repo_root 内（knowledgebase/paths.py 会拒绝项目根外的路径）：{work}"
         ) from None
 
     if fresh:

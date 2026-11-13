@@ -35,7 +35,7 @@ def build(suffix: str, broker_db: str, port: str, run_id: str = "") -> dict[str,
     于是客户端能**精确**回收本次压测建出的集合。
     """
     rid = run_id or suffix
-    # 本 run 的隔离目录：压测上传的原件必须落这里，**不能**写主 media/raw。
+    # 本 run 的隔离目录：压测上传的原件必须落这里，**不能**写主 data/media/raw。
     run_root = (
         Path(__file__).resolve().parent.parent / "artifacts" / "test-runs" / rid
     )
@@ -93,7 +93,7 @@ def main(argv: list[str]) -> int:
     print("# ---- 1) 设置环境变量（PowerShell）----")
     for key, value in env.items():
         print(f'$env:{key} = "{value}"')
-    print('$env:DJANGO_SETTINGS_MODULE = "config.loadtest_settings"')
+    print('$env:DJANGO_SETTINGS_MODULE = "knowledgebase.loadtest_settings"')
     print()
     print("# ---- 2) 建库并迁移（只影响上面这套隔离目标）----")
     print("#   先在容器里建库：")

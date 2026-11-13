@@ -2,8 +2,8 @@
 
 数据位置（硬约束）
 ------------------
-所有向量数据都在项目根下：真源是 :func:`config.paths.qdrant_server_dir`（server 模式，
-容器 bind mount 到这里）与 :func:`config.paths.qdrant_embedded_dir`（本地模式）。
+所有向量数据都在项目根下：真源是 :func:`knowledgebase.paths.qdrant_server_dir`（server 模式，
+容器 bind mount 到这里）与 :func:`knowledgebase.paths.qdrant_embedded_dir`（本地模式）。
 本模块**不允许**出现任何自拼路径。
 
 generation 与"切换不抖动"
@@ -31,7 +31,7 @@ from typing import Any, Iterable, Sequence
 from django.conf import settings
 from django.db import transaction
 
-from config.paths import qdrant_embedded_dir, qdrant_server_dir
+from knowledgebase.paths import qdrant_embedded_dir, qdrant_server_dir
 
 from .models import IngestedFile, KnowledgeLibrary, ParseStatus, VectorCollection
 

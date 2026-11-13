@@ -24,15 +24,15 @@ P2 的**离线可验证部分全部完成**：真实文件按内容寻址落盘�
 |---|---|
 | `requirements.txt` | **全部固定版本**，`pip install -r requirements.txt` 即可；`pip check` 干净 |
 | `README.md` | 从零启动、compose、迁移、管理命令、浏览器入口、测试命令 |
-| `config/test_settings.py` | 测试专用配置：默认 SQLite（离线确定），`--kb-db=postgres` 用独立命名库 |
-| `config/install_check_settings.py` | "从零安装"校验专用（强制 SQLite，不被 .env 覆盖） |
-| `config/celery.py` | Celery app + 入库任务 + 派发函数（queue/inline/auto 三种口径） |
+| `knowledgebase/test_settings.py` | 测试专用配置：默认 SQLite（离线确定），`--kb-db=postgres` 用独立命名库 |
+| `knowledgebase/install_check_settings.py` | "从零安装"校验专用（强制 SQLite，不被 .env 覆盖） |
+| `knowledgebase/celery.py` | Celery app + 入库任务 + 派发函数（queue/inline/auto 三种口径） |
 
 ### 1.2 存储与解析
 
 | 文件 | 说明 |
 |---|---|
-| `apps/knowledge/storage.py` | 内容寻址（`media/raw/<sha2>/<sha256>`）、写 `.part` → 校验 → 原子改名 → 只读；已存在则复用，内容不符抛 `BlobCorrupt`（**绝不覆盖**） |
+| `apps/knowledge/storage.py` | 内容寻址（`data/media/raw/<sha2>/<sha256>`）、写 `.part` → 校验 → 原子改名 → 只读；已存在则复用，内容不符抛 `BlobCorrupt`（**绝不覆盖**） |
 | `apps/knowledge/parsers.py` | PDF（文本层 + 扫描页 OCR）、DOCX、XLSX、TXT、MD、CSV；不支持格式显式报错；扫描页超上限**报错中止**（不静默丢页）；空工作簿显式报错 |
 | `apps/knowledge/ocr.py` | AS711 PaddleOCR-VL 客户端（OpenAI 兼容 `/chat/completions`，图片 base64） |
 | `apps/knowledge/rerank.py` | AS711 bge-reranker-large 客户端（`/rerank`） |

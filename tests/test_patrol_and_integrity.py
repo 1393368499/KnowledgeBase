@@ -274,7 +274,7 @@ def test_run_patrol_calls_the_same_task_and_reports_truthfully(db, admin_user, m
             "findings": {"blob_missing": [{"file_id": 1}]},
         }
 
-    monkeypatch.setattr("config.celery.patrol", fake_patrol)
+    monkeypatch.setattr("knowledgebase.celery.patrol", fake_patrol)
 
     payload = _execute(admin_user, "run_patrol", {"limit": 25})
 

@@ -7,12 +7,12 @@ import json
 import os
 import sys
 
-# 脚本在 scripts/ 下，项目根不在 sys.path 里 → 需要显式加入才能 import config
+# 脚本在 scripts/ 下，项目根不在 sys.path 里 → 需要显式加入才能 import knowledgebase
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "knowledgebase.settings")
 django.setup()
 
 from django.conf import settings

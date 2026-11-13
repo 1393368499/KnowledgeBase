@@ -244,7 +244,7 @@ def test_sweep_converges_stale_executing_but_not_the_live_one(
     user, library, make_file, pending_op
 ):
     """周期扫尾把僵死的 executing 收敛为 failed；真正在执行的那条不动。"""
-    from config.celery import converge_stale_executing_operations
+    from knowledgebase.celery import converge_stale_executing_operations
 
     _, stale = pending_op(user, name="僵死.md")
     # 第二张待办直接自己提案：pending_op 会再授一次库成员（同一 user+library 唯一约束）

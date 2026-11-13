@@ -59,7 +59,7 @@
 
 ### 1.4 配置：轮数预算必须真的从环境变量读
 
-文件：`config/settings.py`、`.env.example`
+文件：`knowledgebase/settings.py`、`.env.example`
 
 新增 `KB_LLM_MAX_TOOL_ROUNDS`（默认 3）并**在 settings 里真正定义**。
 此前代码只有 `getattr(settings, "KB_LLM_MAX_TOOL_ROUNDS", 3)` 兜底，
@@ -87,7 +87,7 @@
   - 会话接口隐藏已执行/已放弃的卡、保留待确认卡；
   - 工具结果文本包含"命中条数/文件名/页码/正文"。
 - 全量 `pytest` exit code 0（改动后、以及补 `KB_LLM_MAX_TOOL_ROUNDS` 后各跑一次）。
-- `ruff check` 只报 `config/settings.py:379` 的既有 F401（与本次改动无关）。
+- `ruff check` 只报 `knowledgebase/settings.py:379` 的既有 F401（与本次改动无关）。
 
 ### 3.2 镜像与部署
 

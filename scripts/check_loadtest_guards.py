@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import sys
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.loadtest_settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "knowledgebase.loadtest_settings")
 os.environ.setdefault("KB_LOADTEST_DB_NAME", "kb_loadtest_verify")
 os.environ.setdefault("KB_LOADTEST_QDRANT_PREFIX", "kb-lt-verify")
 os.environ.setdefault("KB_LOADTEST_BROKER_DB", "14")
@@ -42,7 +42,7 @@ check("broker 是独立 Redis DB", settings.CELERY_BROKER_URL.endswith("/14"),
       settings.CELERY_BROKER_URL)
 
 # ---- 2) 禁止派发真的生效（不产生队列消息）----
-from config.celery import dispatch_processing  # noqa: E402
+from knowledgebase.celery import dispatch_processing  # noqa: E402
 
 result = dispatch_processing(999999)
 check("派发被拒绝且不产生 task_id",

@@ -1,6 +1,6 @@
 """真实 worker 子进程 settings 的连接保护（独立审查发现的 PG 覆盖缺陷）。
 
-旧行为：`config/worker_test_settings.py` 无条件把 `.env` 的 `KB_PG_HOST/PORT`
+旧行为：`knowledgebase/worker_test_settings.py` 无条件把 `.env` 的 `KB_PG_HOST/PORT`
 写进环境 → 独占网络里父进程显式传的 `pg:5432` 被 `.env` 的 `127.0.0.1:55432`
 盖掉，子 worker 连错主机，任务全部失败。
 
@@ -40,7 +40,7 @@ def _base_env(tmp_path: Path) -> dict[str, str]:
     }
     env.update(
         {
-            "DJANGO_SETTINGS_MODULE": "config.worker_test_settings",
+            "DJANGO_SETTINGS_MODULE": "knowledgebase.worker_test_settings",
             "PYTHONPATH": str(REPO),
             "PYTHONIOENCODING": "utf-8",
             "KB_WORKER_DB_NAME": "kb_worker_guard_test",

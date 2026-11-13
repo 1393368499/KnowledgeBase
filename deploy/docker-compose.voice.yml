@@ -10,7 +10,7 @@ services:
       ASR_MODEL: /models/small
       HF_HUB_DISABLE_XET: "1"
     volumes:
-      - ./media/voice-models:/models:ro
+      - ./data/media/voice-models:/models:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=5)"]
       interval: 20s
@@ -27,6 +27,10 @@ services:
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
       KB_PG_HOST: postgres
       KB_PG_PORT: "5432"
+      KB_PG_USER: kb_runtime
+      KB_PG_PASSWORD: ""
+      POSTGRES_PASSWORD: ""
+      KB_PG_PASSWORD_FILE: /run/secrets/postgres_runtime
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       KB_QDRANT_URL: http://qdrant:6333
@@ -35,17 +39,19 @@ services:
       KB_BREAKER_REDIS_URL: redis://redis:6379/14
       KB_MODEL_LIMIT_REDIS_URL: redis://redis:6379/14
       KB_VOICE_ASR_URL: http://voice-asr:8090/transcribe
-      KB_VOICE_AUDIO_ROOT: /app/media/voice-audio
+      KB_VOICE_AUDIO_ROOT: /app/data/media/voice-audio
       KB_OFFICE_SOCKET: /run/kb-office/convert.sock
     command: ["python", "manage.py", "voiceworker"]
+    secrets:
+      - postgres_runtime
     networks:
       - default
       - vector
     restart: unless-stopped
     volumes:
-      - ./media/voice-audio:/app/media/voice-audio
-      - ./media/fonts:/usr/local/share/fonts/kb:ro
-      - ./media/raw:/app/media/raw:ro
+      - ./data/media/voice-audio:/app/data/media/voice-audio
+      - ./data/media/fonts:/usr/local/share/fonts/kb:ro
+      - ./data/media/raw:/app/data/media/raw:ro
       - office_socket:/run/kb-office:ro
     depends_on:
       office:
@@ -59,8 +65,8 @@ services:
 
   web:
     volumes:
-      - ./media/voice-audio:/app/media/voice-audio
-      - ./media/voice-connection:/app/media/voice-connection:ro
+      - ./data/media/voice-audio:/app/data/media/voice-audio
+      - ./data/media/voice-connection:/app/data/media/voice-connection:ro
 
   voice-gateway:
     image: knowledgebase:voice-gateway
@@ -80,7 +86,7 @@ services:
     restart: unless-stopped
     init: true
     volumes:
-      - ./media/voice-connection:/state
+      - ./data/media/voice-connection:/state
     tmpfs:
       - /run/voice:size=8m,uid=10001,gid=10001,mode=0700
     command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--edge-ip-version", "4", "--url", "http://voice-gateway:8080"]

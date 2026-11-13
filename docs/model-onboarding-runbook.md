@@ -31,7 +31,7 @@ powershell -ExecutionPolicy Bypass -File deploy\model-readiness.ps1
 
 ## 二、配置：默认值已可用，改端点/模型/口令才需要动 `.env`
 
-默认值在 `config/settings.py:457-478`，登记清单在 `.env.example:118-131`。**仓库根
+默认值在 `knowledgebase/settings.py:457-478`，登记清单在 `.env.example:118-131`。**仓库根
 `.env` 当前不含这些变量**（即当前走代码默认值），要改就在 `.env` 里加同名变量。
 
 | 变量 | 默认值 | 说明 |
@@ -43,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File deploy\model-readiness.ps1
 | `AS711_OCR_BASE_URL` / `_MODEL` / `_MAX_NUM_SEQS` | `...:8003/v1` / `PaddleOCR-VL-1.5` / `16` | 扫描件与图片 |
 | `KB_MODEL_CALLS_DISABLED` | `0` | 置 `1` 时所有模型外呼立刻以"服务未启用"失败（`.env.example:91`） |
 
-超时与限额（`.env.example:93-103`、`config/settings.py:50-53`、`:423-440`）：
+超时与限额（`.env.example:93-103`、`knowledgebase/settings.py:50-53`、`:423-440`）：
 LLM 60s / LLM 文档 180s / 嵌入 10s（入库 60s）/ 重排 15s / OCR 120s / Qdrant 10s；
 `KB_SEARCH_USE_RERANK=1`、`KB_RERANK_TOP_N=20`、`KB_SEARCH_DENSE_ENABLED=1`。
 
@@ -90,10 +90,10 @@ docker compose -f deploy/docker-compose.unified.yml --env-file .env up -d --forc
   `-Q ${KB_CELERY_QUEUE:-kb_worker_v2}`；若在宿主 `.env` 把它覆盖成别的值，任务会被投到
   没有消费者的队列 → **任务永不执行且不报错**。检查：
   ```powershell
-  docker exec knowledgebase-worker celery -A config inspect active_queues
+  docker exec knowledgebase-worker celery -A knowledgebase inspect active_queues
   ```
 - **健康检查**：`Invoke-WebRequest http://127.0.0.1:8800/api/v1/health/ready/`（`checks.migrations` 应为 `ok`；
-  路由前缀来自 `config/urls.py:13` → `config/health_urls.py` 的 `live/` 与 `ready/`）。
+  路由前缀来自 `knowledgebase/urls.py:13` → `knowledgebase/health_urls.py` 的 `live/` 与 `ready/`）。
 
 ## 六、边界（如实登记，不在本手册假装已解决）
 

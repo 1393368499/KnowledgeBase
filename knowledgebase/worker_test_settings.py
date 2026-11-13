@@ -1,8 +1,8 @@
 """真实 worker 子进程专用 settings：**显式、fail-closed、禁连 AS711**。
 
-为什么不能只是"import config.settings 再改 DB NAME"
+为什么不能只是"import knowledgebase.settings 再改 DB NAME"
 ----------------------------------------------------
-``config.settings`` 里有 ``load_dotenv(PROJECT_ROOT/".env", override=True)``。
+``knowledgebase.settings`` 里有 ``load_dotenv(PROJECT_ROOT/".env", override=True)``。
 ``override=True`` 意味着 **.env 会盖掉进程环境变量**，于是子进程传进来的
 broker / 模型开关 / 嵌入桩地址会被 .env 里的业务值覆盖——只改 DB NAME 根本
 不够（审查指出的漏洞）。
@@ -11,8 +11,8 @@ broker / 模型开关 / 嵌入桩地址会被 .env 里的业务值覆盖——�
 
 1. **先**校验测试覆盖项，缺任何一项直接**拒绝启动**（fail-closed）；
 2. **再**只把 ``.env`` 里的**连接凭据**（host/port/user/password）读进来；
-3. 设 ``KB_SKIP_DOTENV=1``，让 ``config.settings`` **不要**再加载 .env；
-4. import ``config.settings``；
+3. 设 ``KB_SKIP_DOTENV=1``，让 ``knowledgebase.settings`` **不要**再加载 .env；
+4. import ``knowledgebase.settings``；
 5. 把第 1 步的覆盖**逐项写回** settings 对象（不依赖环境变量优先级）；
 6. 断言"没有任何 AS711 端点被配置上"，否则拒绝启动。
 
@@ -86,9 +86,11 @@ if not os.environ.get("KB_PG_HOST", "").strip() or not os.environ.get("KB_PG_POR
     )
 # 库名只能来自 KB_WORKER_DB_NAME：清掉可能误导的键
 os.environ.pop("KB_PG_DB", None)
+os.environ.pop("KB_PG_PASSWORD_FILE", None)
+os.environ["DB_ENGINE"] = "postgres"
 
 # ---------------------------------------------------------------------------
-# 3) 让 config.settings 不要再加载 .env（否则 override=True 会盖掉一切）
+# 3) 让 knowledgebase.settings 不要再加载 .env（否则 override=True 会盖掉一切）
 # ---------------------------------------------------------------------------
 os.environ["KB_SKIP_DOTENV"] = "1"
 
@@ -119,13 +121,13 @@ os.environ["KB_EMBED_PROFILES"] = json.dumps(
 )
 
 # 4) 继承业务配置（凭据已在环境里）
-from config.settings import *  # noqa: E402,F401,F403
+from knowledgebase.settings import *  # noqa: E402,F401,F403
 
 # ---------------------------------------------------------------------------
 # 4.5) **端点/目录必须显式绑定**（真实端到端复验发现的缺陷）
 # ---------------------------------------------------------------------------
 # 问题：以前只传 `KB_WORKER_QDRANT_PREFIX`，没传 Qdrant 端点。
-# `config.settings` 用 dotenv(override=True) 载入 .env，于是子 worker 拿到的是
+# `knowledgebase.settings` 用 dotenv(override=True) 载入 .env，于是子 worker 拿到的是
 # **主实例 56333**，而父进程已经改到隔离端点 56339 ——
 # 结果"子 worker 往主实例写、父 finally 在隔离端点清"，既泄漏又误碰主实例。
 # 所以这里在 star-import **之后**（唯一可靠位置）直接绑定并**校验**。

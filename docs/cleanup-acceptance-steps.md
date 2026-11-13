@@ -31,7 +31,7 @@ $env:KB_TEST_QDRANT_URL = 'http://127.0.0.1:56339'   # 隔离端点；不设则�
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\cleanup_probe.py --endpoint http://127.0.0.1:56333 --protect
-# 期望：现有 191 个集合，media/raw 271 个文件
+# 期望：现有 191 个集合，data/media/raw 271 个文件
 #       已存在 → 「主实例保护基线已存在（191 集合 / 271 raw 文件），**不覆盖**」
 ```
 
@@ -92,7 +92,7 @@ $env:KB_TEST_QDRANT_URL = 'http://127.0.0.1:56339'   # 隔离端点；不设则�
 
 ```powershell
 "主实例 = " + (Invoke-RestMethod http://127.0.0.1:56333/collections -TimeoutSec 5).result.collections.Count + " / 191"
-"media/raw = " + (Get-ChildItem media\raw -Recurse -File).Count + " / 271"
+"data/media/raw = " + (Get-ChildItem media\raw -Recurse -File).Count + " / 271"
 "隔离端点 = " + (Invoke-RestMethod http://127.0.0.1:56339/collections -TimeoutSec 5).result.collections.Count + " / 1"
 ```
 
@@ -138,7 +138,7 @@ $env:KB_TEST_QDRANT_URL = 'http://127.0.0.1:56339'   # 隔离端点；不设则�
 | 向量前缀 | 本 session 子域 `kb-<KB_TEST_RUN_UUID>-w<短随机>` |
 | raw / vector | 本 run 目录下 `artifacts/test-runs/<uuid>/{raw,vector_data}` |
 
-端点传递已改为 **fail-closed**（`config/worker_test_settings.py` 在 star-import
+端点传递已改为 **fail-closed**（`knowledgebase/worker_test_settings.py` 在 star-import
 之后直接绑定并校验）：
 * 缺 `KB_WORKER_QDRANT_URL` → 拒绝启动；
 * `KB_WORKER_QDRANT_URL` 含 `56333`（主实例）→ 拒绝启动；
@@ -180,7 +180,7 @@ $env:KB_QDRANT_URL      = 'http://127.0.0.1:56339'  # 显式，避免被 .env �
 ```powershell
 "主实例 = " + (Invoke-RestMethod http://127.0.0.1:56333/collections -TimeoutSec 5).result.collections.Count + " / 191"
 "隔离端点 = " + (Invoke-RestMethod http://127.0.0.1:56339/collections -TimeoutSec 5).result.collections.Count + " / 1"
-"media/raw = " + (Get-ChildItem media\raw -Recurse -File).Count + " / 271"
+"data/media/raw = " + (Get-ChildItem media\raw -Recurse -File).Count + " / 271"
 ```
 
 ---
@@ -217,7 +217,7 @@ $env:KB_QDRANT_URL      = 'http://127.0.0.1:56339'  # 显式，避免被 .env �
 ### 三方状态（复跑后必须一致）
 
 ```
-主实例集合 = 191     media/raw 文件 = 271     Redis DB0 队列 = 193
+主实例集合 = 191     data/media/raw 文件 = 271     Redis DB0 队列 = 193
 隔离端点（56339） = 仅 codex-runtime-probe-20261015
-历史 vector_data/qdrant = 36441 文件（**不在**自动删除范围内）
+历史 data/vector_data/qdrant = 36441 文件（**不在**自动删除范围内）
 ```

@@ -9,13 +9,13 @@
 
 运行姿势（为什么必须这样，踩过的坑都在这里）：
 
-1. 在**源码镜像**里以 ``DJANGO_SETTINGS_MODULE=config.settings`` + ``django.setup()``
+1. 在**源码镜像**里以 ``DJANGO_SETTINGS_MODULE=knowledgebase.settings`` + ``django.setup()``
    跑；不经过 HTTP API、不建测试库。
-2. 运行时目录必须落在 ``PROJECT_ROOT`` 内：``config/paths.py::ensure_runtime_dirs``
+2. 运行时目录必须落在 ``PROJECT_ROOT`` 内：``knowledgebase/paths.py::ensure_runtime_dirs``
    会调 ``assert_inside_project_root`` 硬校验，跑在项目外的 run 目录会直接抛
    ``StoragePathError``。所以 ``run_root`` 不在项目内时，会自动挪到
    ``<repo_root>/artifacts/eval-runs/<name>``。
-3. 必须显式 ``DB_ENGINE=postgres``：``config.settings`` 在非 DEBUG + sqlite 的组合下
+3. 必须显式 ``DB_ENGINE=postgres``：``knowledgebase.settings`` 在非 DEBUG + sqlite 的组合下
    直接拒绝启动。
 4. 超管口径检索（``permission_codes=None``）绕开成员权限，这是"验证检索链路"而不是
    "验证授权"的正确姿势；授权另有人测。
@@ -185,7 +185,7 @@ def _resolve_run_root(repo_root: Path, run_root: Path | str) -> Path:
         return candidate
     fallback = root / "artifacts" / "eval-runs" / (candidate.name or "live")
     logger.warning(
-        "run_root 不在项目根内，已改到 %s（config.paths 强制运行时目录必须在项目内）",
+        "run_root 不在项目根内，已改到 %s（knowledgebase.paths 强制运行时目录必须在项目内）",
         fallback,
     )
     return fallback
@@ -209,7 +209,7 @@ def _inject_env(env: Mapping[str, str]) -> dict[str, Any]:
     os.environ["KB_TEST_ADAPTER"] = ""
     os.environ["KB_MODEL_CALLS_DISABLED"] = "0"
     os.environ["KB_SEARCH_DENSE_ENABLED"] = "1"
-    os.environ["DJANGO_SETTINGS_MODULE"] = "config.settings"
+    os.environ["DJANGO_SETTINGS_MODULE"] = "knowledgebase.settings"
     os.environ.setdefault("DJANGO_DEBUG", "1")
     # settings.py 会用 python-dotenv override=True 再读一次 .env；我们已经把需要的键
     # 注入好了，关掉二次加载避免它把运行时目录改回项目默认值（确定性优先）。
@@ -539,7 +539,7 @@ def bootstrap_live(
     参数
     ----
     repo_root
-        含 ``config/settings.py`` 的源码根（默认取 ``evals/`` 的父目录）。
+        含 ``knowledgebase/settings.py`` 的源码根（默认取 ``evals/`` 的父目录）。
         必须是可写目录：运行时目录要落在它里面。
     run_root
         运行期目录；落在项目外会被自动挪进 ``<repo_root>/artifacts/eval-runs/<name>``。
@@ -556,7 +556,7 @@ def bootstrap_live(
 
     root = Path(repo_root).expanduser().resolve()
     if not (root / "config" / "settings.py").is_file():
-        raise FileNotFoundError(f"repo_root 不像 KW 源码根（缺 config/settings.py）：{root}")
+        raise FileNotFoundError(f"repo_root 不像 KW 源码根（缺 knowledgebase/settings.py）：{root}")
 
     resolved_env = _resolve_env_file(root, env_file)
     run_dir = _resolve_run_root(root, run_root)

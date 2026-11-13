@@ -29,7 +29,7 @@ from typing import Any, Iterable, Sequence
 PATROL_KEEP = 200
 #: 每类问题明细最多留多少条
 FINDINGS_KEEP = 20
-#: 巡检认为"疑似停滞"的口径（分钟），与 config/celery.py 的 patrol 一致
+#: 巡检认为"疑似停滞"的口径（分钟），与 knowledgebase/celery.py 的 patrol 一致
 STALE_AFTER_MINUTES = 30
 #: 「看门狗心跳」判定阈值（分钟）：beat 的巡检周期是 900s（15 分钟），
 #: 允许**连续两次**没跑再加一点余量；超过这个时长没有任何巡检留痕，

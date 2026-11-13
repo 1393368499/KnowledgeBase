@@ -5,7 +5,7 @@
 ## 当前部署
 
 - 根 docker-compose.yml 是唯一入口，引用统一配置；web、worker、scheduler、PostgreSQL、Redis、Qdrant均由Docker管理。
-- 用户16:16明确允许Docker数据卷，取代此前向量必须在项目根目录的约束。现役卷：knowledgebase-qdrantdata-delivery-20261015。旧vector_data/qdrant原样保留，独立WSL迁移路线不再使用。
+- 用户16:16明确允许Docker数据卷，取代此前向量必须在项目根目录的约束。现役卷：knowledgebase-qdrantdata-delivery-20261015。旧data/vector_data/qdrant原样保留，独立WSL迁移路线不再使用。
 - 9库、16份既有样例资料的22个已存分段重新嵌入；这是复用分段的索引重建，不是重新解析缺失原件。
 - 重启Qdrant后9库的点/向量/payload摘要全部相同，带library_id过滤查询全部HTTP200。证据：docker-hour-volume-before-restart.json、docker-hour-volume-after-restart.json。
 - 最终应用镜像ID：sha256:eccc5f0e7f6e86a2d16f5d68544dee89d6433ea1badae48baf4393adedd29536。三个应用容器一致；系统检查与依赖检查通过。

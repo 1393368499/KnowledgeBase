@@ -86,7 +86,7 @@ try {
         gitHead     = ((& git rev-parse HEAD 2>$null) | Select-Object -First 1)
         gitDirty    = ($dirtyCount -gt 0)
         dirtyFiles  = $dirtyCount
-        baseImage   = $(if ($usePinned) { "$baseTag ($expectedId)" } else { "source-base（python:3.13-slim@sha256:70729b46… 固定 digest）" })
+        baseImage   = $(if ($usePinned) { "$baseTag ($expectedId)" } else { "source-base（python:3.15-slim@sha256:65a65fc7… 固定 digest）" })
         createdAt   = (Get-Date).ToString("o")
     }
     ($record | ConvertTo-Json -Depth 3) | Set-Content -LiteralPath $recordPath -Encoding UTF8

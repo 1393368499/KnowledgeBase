@@ -38,7 +38,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         import os
 
-        from config.paths import PROJECT_ROOT
+        from knowledgebase.paths import PROJECT_ROOT
 
         tmpdir = tempfile.mkdtemp(prefix="kb-install-check-")
         db_path = Path(tmpdir) / "fresh.sqlite3"
@@ -47,9 +47,9 @@ class Command(BaseCommand):
         env = dict(os.environ)
         env["KB_SQLITE_TEST_PATH"] = str(db_path)
         env["DJANGO_DEBUG"] = "1"
-        # 关键：用"强制 SQLite"的校验配置。config.settings 会 load_dotenv(override=True)，
+        # 关键：用"强制 SQLite"的校验配置。knowledgebase.settings 会 load_dotenv(override=True)，
         # 单靠 DB_ENGINE 环境变量改不动 .env 里的 postgres 口径。
-        env["DJANGO_SETTINGS_MODULE"] = "config.install_check_settings"
+        env["DJANGO_SETTINGS_MODULE"] = "knowledgebase.install_check_settings"
         code = (
             "import django;"
             "django.setup();"

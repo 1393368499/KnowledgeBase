@@ -33,7 +33,7 @@
 
 ## ⑦ 熔断状态跨进程一致
 - 实现：`apps/knowledge/breaker_store.py`（Redis 原子 Lua、索引 TTL 只延长、SCAN 孤儿发现、拒绝 DB0）、`apps/knowledge/resilience.py`、`apps/knowledge/metrics.py`、`apps/planner/services.py::reset_breaker`→`reset_all_breakers()`。
-- 验证：`pytest tests/test_global_breaker_state.py`（独占 Redis 时 18 passed，含真跨进程）；`config/test_settings.py` 强制 `KB_BREAKER_STORE=process`，离线回归不再污染共享状态（实测跑 `test_model_clients.py` 后 DB14 `kb:breaker*` 为空）。
+- 验证：`pytest tests/test_global_breaker_state.py`（独占 Redis 时 18 passed，含真跨进程）；`knowledgebase/test_settings.py` 强制 `KB_BREAKER_STORE=process`，离线回归不再污染共享状态（实测跑 `test_model_clients.py` 后 DB14 `kb:breaker*` 为空）。
 
 ## ⑧ OCR 自检与模型探测
 - 实现：`apps/knowledge/ocr_selfcheck.py` + `apps/knowledge/data/ocr_selfcheck.png`（固定样图进镜像）、`kbprobe` 使用固定样图与关键词判定、`apps/knowledge/views.py` 四个探测走**真实客户端**（`RerankClient/OcrClient/LlmClient`，带鉴权与 `trust_env=False`）、`deploy/app/Dockerfile` 构建期硬自检（`soffice --version`＋CJK 字体＋PIL 墨迹，无 `|| true`）。

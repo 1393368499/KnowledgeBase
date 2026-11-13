@@ -14,7 +14,7 @@
 
 1. **一套 Compose 统一管理全栈**（web / worker / beat / PostgreSQL / Redis / Qdrant），服务间用服务名寻址；**停止独立 WSL 路线**。
 2. **存储方案分两步**：
-   - **方案 A（沿用现有 `./vector_data/qdrant` bind mount）**：满足"不搬动数据"，可作为**过渡**运行；但**它不合格为全功能交付**——已知 `kb-9-g1` 检索 500 仍在，且 9p 故障条件未被消除。
+   - **方案 A（沿用现有 `./data/vector_data/qdrant` bind mount）**：满足"不搬动数据"，可作为**过渡**运行；但**它不合格为全功能交付**——已知 `kb-9-g1` 检索 500 仍在，且 9p 故障条件未被消除。
    - **方案 B（Docker named volume）**：是**面向可靠交付**的目标形态（官方明确建议 named volume，见 §4），但它**属于"存储位置变更"**——数据从项目根 `vector_data/` 移到 Docker 管理的卷里。**是否接受这条约束变更，需要你决定**；在获批前**按 A 运行**，且**不把 B 说成"完全没有迁移"**（B 仍要把现有索引搬进卷，或重建索引）。
 3. 本文**不再把非关键事项推给你**：副本与冷备**默认保留**；`kb-9-g1` 的索引修复属于**既有系统目标内的工作**（需要调用 AS711 嵌入接口），本轮只是还没执行——**不另设永久审批流程**。
 
@@ -29,17 +29,17 @@
 | 根 compose | `docker-compose.yml`：`name: knowledgebase`，**只有** postgres / redis / qdrant |
 | PostgreSQL | `postgres:17.6-alpine3.22`，命名卷 `knowledgebase-pgdata`，`127.0.0.1:55432`；**无 pgvector**（仅 `pg_trgm 1.6`、`unaccent 1.1`） |
 | Redis | `redis:7.4-alpine`，命名卷 `knowledgebase-redisdata`，`127.0.0.1:56379`；**DB0 有 193 条业务消息（不得消费/清空）** |
-| Qdrant | `qdrant/qdrant:v1.15.5`，`127.0.0.1:56333`；**bind mount `./vector_data/qdrant` → `/qdrant/storage`** |
-| 容器内文件系统 | `findmnt -T /qdrant/storage` → **`9p`**，源 `D:\[.../vector_data/qdrant]`，`msize=65536` |
+| Qdrant | `qdrant/qdrant:v1.15.5`，`127.0.0.1:56333`；**bind mount `./data/vector_data/qdrant` → `/qdrant/storage`** |
+| 容器内文件系统 | `findmnt -T /qdrant/storage` → **`9p`**，源 `D:\[.../data/vector_data/qdrant]`，`msize=65536` |
 | 向量数据 | **9 个集合 / 1865 文件 / 实占约 11 MB**（逻辑 3.44 GiB，多为稀疏空洞） |
-| 原件 | `media/raw` 271 文件 / 0.15 MB |
+| 原件 | `data/media/raw` 271 文件 / 0.15 MB |
 | 原件写入实现 | **内容寻址** `<raw>/<sha256 前两位>/<sha256>`；先写 `*.part`（同一文件系统）边写边算哈希，再 `os.replace` **原子替换**；已存在则**复用**（`reused=True`）——见 `apps/knowledge/storage.py` |
 | 镜像 COPY 面 | `requirements.txt`、`config/`、`apps/`、`governance/`、`manage.py` |
 | 模板/静态位置 | **在 `apps/webui/templates`、`apps/webui/static`**（属 `COPY apps/` 范围内） |
 | 生产服务器依赖 | **`gunicorn==26.2.0`、`uvicorn==0.54.0` 已在 `requirements.txt`** |
 | 静态配置 | `STATIC_URL="static/"`、`STATIC_ROOT=<项目根>/staticfiles`；**未安装 whitenoise** |
-| WSGI/ASGI | `config/wsgi.py`、`config/asgi.py` 均存在 |
-| 关键 settings | `KB_QDRANT_URL`/`QDRANT_URL`、`KB_QDRANT_MODE`（默认 server）、`KB_CELERY_BROKER_URL`/`CELERY_BROKER_URL`（默认= `REDIS_URL`）、`REDIS_URL`、`RAW_STORE_DIR`=`<项目根>/media/raw`、`KB_SKIP_DOTENV`、`KB_UPLOAD_PROCESS_MODE`（默认 auto）、`KB_QDRANT_COLLECTION_PREFIX`（默认 `kb`） |
+| WSGI/ASGI | `knowledgebase/wsgi.py`、`knowledgebase/asgi.py` 均存在 |
+| 关键 settings | `KB_QDRANT_URL`/`QDRANT_URL`、`KB_QDRANT_MODE`（默认 server）、`KB_CELERY_BROKER_URL`/`CELERY_BROKER_URL`（默认= `REDIS_URL`）、`REDIS_URL`、`RAW_STORE_DIR`=`<项目根>/data/media/raw`、`KB_SKIP_DOTENV`、`KB_UPLOAD_PROCESS_MODE`（默认 auto）、`KB_QDRANT_COLLECTION_PREFIX`（默认 `kb`） |
 
 ---
 
@@ -98,7 +98,7 @@ name: knowledgebase           # 保持既有项目名与卷名，避免卷被重
 services:
   postgres:  命名卷 knowledgebase-pgdata     （沿用现有）
   redis:     命名卷 knowledgebase-redisdata  （沿用现有）
-  qdrant:    A=./vector_data/qdrant bind mount ；B=named volume（需批准）
+  qdrant:    A=./data/vector_data/qdrant bind mount ；B=named volume（需批准）
   web:       同镜像 → gunicorn（见下），静态资源明确交付
   worker:    同镜像 → celery worker -Q kb_worker_v2 --concurrency=N
   scheduler: celery beat（**仅在确有必要时**独立启用，见下）
@@ -110,8 +110,8 @@ services:
 
 | 服务 | 挂载 | 约束 |
 |---|---|---|
-| **web** | `./media/raw:/app/media/raw`（**可写**） | 只允许**内容寻址新增**与**原子创建**；**禁止覆写既有原件** |
-| **worker** | `./media/raw:/app/media/raw:ro` | **只读**（解析原件，不改原件） |
+| **web** | `./data/media/raw:/app/data/media/raw`（**可写**） | 只允许**内容寻址新增**与**原子创建**；**禁止覆写既有原件** |
+| **worker** | `./data/media/raw:/app/data/media/raw:ro` | **只读**（解析原件，不改原件） |
 
 这条不是"约定"，而是**代码已具备**的保证（`apps/knowledge/storage.py`）：
 - 路径固定为 `<raw>/<sha256 前两位>/<sha256>`，与文件名无关 → **不会按名字覆盖别人**；
@@ -128,7 +128,7 @@ services:
   2. **未安装 whitenoise**，所以"由 Django 自己发静态文件"需要额外方案：加 whitenoise，或用 gunicorn 之外的前端代理/静态卷；
   3. 镜像自带 **worker 的 `CMD` 与 `HEALTHCHECK`**（`celery inspect ping`）→ web 服务必须**同时覆盖 command 与 healthcheck**（beat 早已踩过此坑）；
   4. 运行用户是 uid 10001，`STATIC_ROOT` 的写权限需在构建期处理。
-- **生产不使用 `runserver`**：依赖里已有 **`gunicorn==26.2.0`**（WSGI，配 `config/wsgi.py`）与 **`uvicorn==0.54.0`**（可用 gunicorn 的 uvicorn worker 跑 `config/asgi.py`）。**具体用 WSGI 还是 ASGI、worker 数、超时**需按实测确定，不在本文拍板。
+- **生产不使用 `runserver`**：依赖里已有 **`gunicorn==26.2.0`**（WSGI，配 `knowledgebase/wsgi.py`）与 **`uvicorn==0.54.0`**（可用 gunicorn 的 uvicorn worker 跑 `knowledgebase/asgi.py`）。**具体用 WSGI 还是 ASGI、worker 数、超时**需按实测确定，不在本文拍板。
 - **静态资源优先评估"轻量进程内"方案**（如 WhiteNoise 这类进程内静态服务），目的是**少一个常驻容器**；若评估不成立，再退回到前端代理或静态卷。**选型必须按官方文档确认**后再实施，不在本文预先拍定。
 
 ### 6.3 scheduler（修订）
@@ -145,7 +145,7 @@ services:
 | DB | `KB_PG_HOST=postgres`、`KB_PG_PORT=5432` |
 | Redis | 缓存用 `KB_REDIS_URL`；**Celery 用 `KB_CELERY_BROKER_URL` 指向专用 DB**；**先查该 DB 是否已被占用**（`LLEN`/键扫描）再选用，**不盲用示例 `/15`**；**web（生产者）／worker（消费者）／scheduler 三方必须同一套 broker/backend/队列配置**；`/0` 的 193 条**永不被消费** |
 | Qdrant | `KB_QDRANT_URL=http://qdrant:6333`、`KB_QDRANT_MODE=server` |
-| 原件 | web 可写（内容寻址）／worker 只读；`RAW_STORE_DIR=/app/media/raw` |
+| 原件 | web 可写（内容寻址）／worker 只读；`RAW_STORE_DIR=/app/data/media/raw` |
 | beat 状态目录 | 需对 uid 10001 可写（现有做法：宿主绑定 `deploy/worker/beat-state`） |
 | 模型 | 仅经 `KB_*` 模型接口访问 AS711；`KB_MODEL_CALLS_DISABLED` 按环境设 |
 | 健康检查 | 每服务用**自己的**真实判据（PG `pg_isready`、Redis `ping`、Qdrant `/collections`、worker `inspect ping`、web HTTP、scheduler 心跳推进） |
@@ -186,7 +186,7 @@ services:
 7. **点 payload 校验**：抽查命中点的 payload 与预期资料对应（含库归属）。
 8. **重启一致性**：只重启 Qdrant → 复跑第 5–7 项，活动代次／点数／查询结果与重启前一致。
 9. **有效任务并发与恢复**：并发投递 N 个任务，验证实际并发执行、租约互斥、以及**杀 worker 后任务能恢复**（依赖 §7 的 `acks_late` 接线）。
-10. 端到端：小文件上传 → 落 `media/raw`（内容寻址新增，不改既有原件）→ worker 消费 → 检索命中。
+10. 端到端：小文件上传 → 落 `data/media/raw`（内容寻址新增，不改既有原件）→ worker 消费 → 检索命中。
 11. 权限与审计：无权用户检索不到未授权库；审计事件齐全。
 12. 删除：三次确认流程，且源记录/归属/字节不变。
 13. 回归：全量测试保持 0 失败。
@@ -257,7 +257,7 @@ services:
 ## 11. 需要你决定的**唯一**一件事
 
 **存储方案的约束取舍**：
-- **A**：保持 `./vector_data/qdrant` 原地 → 满足"不搬动数据"，**仅作过渡**，不合格为最终交付；
+- **A**：保持 `./data/vector_data/qdrant` 原地 → 满足"不搬动数据"，**仅作过渡**，不合格为最终交付；
 - **B**：改用 Docker named volume → **面向可靠交付**，但需你同意**调整"向量数据必须落在项目根"这条约束**（数据改由 Docker 管理）。
 
 **边界**：副本与冷备**默认保留**；`kb-9-g1` 等损坏索引的**重建属于既有系统目标内的工作**（需调用 AS711 接口），纳入 §9 乙推进，**不另设永久审批流程**。
@@ -275,4 +275,4 @@ services:
 3. **部署保持数据基线与独立回退**：
    - 部署前先落**数据基线**（各在用库的活动代次／点数／维度／payload 抽样）；回退路径**独立可执行**（不依赖新栈）。
    - **用新代次修复时允许集合名改变**（如 `kb-9-g1` → `kb-9-g2`）：最终验收比较的是**所有在用库的"活动代次／点数／向量／payload"**，**不做"必须永远存在那 9 个旧名字"的死断言**。
-   - **旧原件哈希必须保持不变**（`media/raw` 既有 blob 的 sha256 与字节不得变化；新增走内容寻址新增）。
+   - **旧原件哈希必须保持不变**（`data/media/raw` 既有 blob 的 sha256 与字节不得变化；新增走内容寻址新增）。

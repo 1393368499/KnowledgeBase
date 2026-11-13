@@ -18,18 +18,19 @@
 
 | 组件 | 容器名 | 宿主端口 | 数据位置 |
 |---|---|---|---|
-| web（gunicorn） | `knowledgebase-web` | **`8800`** → 容器内 8000 | bind mount `media/raw`（原件） |
+| https（Caddy 2.11.9） | `knowledgebase-https-1` | **`127.0.0.1:8800`** → 容器 443 | TLS 本地 CA（命名卷 `https_data`） |
+| web（gunicorn） | `knowledgebase-web` | 不发布（经 Caddy 内网转发到 8000） | bind mount `data/media/raw`、`data/media/templates`（原件/模板） |
 | migrate（一次性） | `knowledgebase-migrate` | 不映射 | —（跑完即退出，失败则应用服务不启动） |
 | worker / scheduler | `knowledgebase-worker` / `-scheduler` | 不映射 | docker volume |
-| PostgreSQL 17.6 | `knowledgebase-postgres` | `55432` | docker volume |
-| Redis 7.4 | `knowledgebase-redis` | `56379` | docker volume |
-| Qdrant v1.15.5 | `knowledgebase-qdrant` | `56333`/`56334` | **docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015` |
+| PostgreSQL 17.12 | `knowledgebase-postgres` | `127.0.0.1:55432` | docker volume |
+| Redis 7.4 | `knowledgebase-redis` | `127.0.0.1:56379` | docker volume |
+| Qdrant 1.16.3 | `knowledgebase-qdrant` | 不发布（仅内部网络） | **docker 命名卷** `knowledgebase-qdrantdata-delivery-20261015` |
 
 > **web 的宿主端口是 8800，不是 8000**：Windows 的 WinNAT/Hyper-V 会动态预留成段的 TCP 端口，
 > 落在预留段里的端口宿主绑定会被拒（`WinError 10013`）。实测 7984–8083 吃掉过 8000，
 > 且换 `0.0.0.0`/`127.0.0.2`/`::1` 都无效。容器内始终是 8000，只有宿主映射可换；
 > 需要临时换端口时设 `KB_WEB_HOST_PORT` 再 `up -d --force-recreate --no-deps web`。
-> **绑定地址**也可换：`KB_WEB_BIND`（默认 `127.0.0.1` 只给本机；要给内网访问才设 `0.0.0.0`）。
+> 本机测试入口为 `https://localhost:8800`，Caddy 只发布回环端口。局域网部署应另外配置受信域名、证书和绑定范围。
 
 ### 1.1 首次部署（全新机器，按顺序执行）
 
@@ -38,7 +39,8 @@ bash deploy/preflight.sh      # 检查 .env、建 external 卷、把绑定目录
 bash deploy/build-app.sh      # 两步建镜像：kb-worker:local-build → kb-app:delivery
 docker compose up -d          # **从仓库根**：根 .env 才会参与 ${} 插值（根 compose 已 include 本文件）
 docker compose exec web python manage.py kbcreateuser --username X --password Y --staff
-curl -sS http://127.0.0.1:8800/api/v1/health/ready/     # 期望 200 且 checks.migrations == "ok"
+docker compose cp https:/data/caddy/pki/authorities/local/root.crt ./secrets/kb-local-ca.crt
+curl --cacert ./secrets/kb-local-ca.crt -sS https://localhost:8800/api/v1/health/ready/
 ```
 
 Windows 上把前两步换成 `powershell -File deploy/build-app.ps1`（preflight 的等价动作见下表末行）。
@@ -49,7 +51,7 @@ Windows 上把前两步换成 `powershell -File deploy/build-app.ps1`（prefligh
 |---|---|
 | external 卷先存在 | `up` 直接中止：`external volume "knowledgebase-pgdata" not found` |
 | 先建镜像，或设 `KB_BASE_IMAGE` | `deploy/app/Dockerfile` 的 `FROM` 是基座 tag，新机器没有它 → BuildKit 去 Docker Hub 解析 `kb-worker` 而失败 |
-| `media/raw` / `media/templates` / `deploy/worker/beat-state` 属主 10001 | 原件或模板上传写不进去；beat 建不了 `celerybeat-schedule`（预检脚本已统一准备；Windows 上由 Docker Desktop 兜住，Linux 上必须 `chown`） |
+| `data/media/raw` / `data/media/templates` / `deploy/worker/beat-state` 属主 10001 | 原件或模板上传写不进去；beat 建不了 `celerybeat-schedule`（预检脚本已统一准备；Windows 上由 Docker Desktop 兜住，Linux 上必须 `chown`） |
 | 根 `.env` 里 `KB_PG_PASSWORD` 等 | 用 `-f deploy/docker-compose.unified.yml` 时根的 `.env` **不参与** `${}` 插值 → postgres 用默认口令初始化、应用读真口令 → `password authentication failed for user "kb"`（要么从根跑，要么加 `--env-file .env`） |
 | 管理员账号 | 镜像**不会**自动建账号；迁移与触发器现在由 `migrate` 服务自动跑（它成功退出后 web/worker/scheduler 才启动） |
 
@@ -63,8 +65,8 @@ docker compose ps            # web/worker/scheduler/postgres/redis/qdrant 都应
 ```
 
 向量数据放在 **docker 命名卷**里（用户 2026-10-15 明确授权：原 bind mount
-`vector_data/qdrant` 在 Qdrant 重启后会出现 payload 读取失败，重建新代次仍 7/7 复现）。
-容器内路径仍是 `/app/vector_data`，所以 `config/paths.py` 的"必须在项目根内"校验照常通过；
+`data/vector_data/qdrant` 在 Qdrant 重启后会出现 payload 读取失败，重建新代次仍 7/7 复现）。
+容器内路径仍是 `/app/data/vector_data`，所以 `knowledgebase/paths.py` 的"必须在项目根内"校验照常通过；
 旧目录**原样保留**（不删除、不拷贝已坏数据），新卷从空开始、由 `kbrebuild` 按原件重建。
 
 ---
@@ -83,7 +85,7 @@ docker compose ps            # web/worker/scheduler/postgres/redis/qdrant 都应
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8800
 ```
 
-生产口径用 ASGI：`.\.venv\Scripts\python.exe -m uvicorn config.asgi:application --host 0.0.0.0 --port 8800`。
+生产口径用 ASGI：`.\.venv\Scripts\python.exe -m uvicorn knowledgebase.asgi:application --host 0.0.0.0 --port 8800`。
 
 > 端口用 8800 的原因见 §1 的说明；8000 在本机可能被 Windows 保留段吃掉而直接 bind 失败。
 
@@ -157,7 +159,7 @@ for p in 10001 8000 8002 8003; do ss -ltn | grep -q ":$p " && \
 
 ```powershell
 # .env: KB_UPLOAD_PROCESS_MODE=queue, CELERY_TASK_ALWAYS_EAGER=0
-.\.venv\Scripts\python.exe -m celery -A config worker --concurrency 2 --loglevel INFO
+.\.venv\Scripts\python.exe -m celery -A knowledgebase worker --concurrency 2 --loglevel INFO
 ```
 
 没有 worker 时用 `manage.py kbprocess` 在进程内推进（只处理租约空闲的资料）。
@@ -201,12 +203,14 @@ for p in 10001 8000 8002 8003; do ss -ltn | grep -q ":$p " && \
 | `KB_MODEL_LIMIT_PREFIX` | `kb:model:slots` | 闸门的 Redis 键前缀（与业务队列的键完全不重叠） |
 | `KB_MODEL_LIMIT_REDIS_URL` | 空（复用 `CELERY_BROKER_URL`，即专用 **DB14**） | 闸门用的 Redis；**不要**指向 DB0（那是共享业务队列） |
 
-### 安全基线开关（2026-10-22 审计收口，`config/settings.py`）
+### 安全基线开关（2026-10-22 审计收口，`knowledgebase/settings.py`）
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `DJANGO_SECRET_KEY` | 开发占位值 | `DJANGO_DEBUG=0` 时**必须显式设置**；仍是那个公开占位字面量时，导入期直接 `ImproperlyConfigured`（会阻止容器启动）。pytest 进程改用进程内随机密钥，不要求测试环境配密钥。 |
-| `KB_HTTPS_ONLY` | `0` | 置 `1` 一次性打开 HTTPS 全套：`SECURE_SSL_REDIRECT`、`SECURE_PROXY_SSL_HEADER`（`X-Forwarded-Proto: https`）、`SESSION_COOKIE_SECURE`、`CSRF_COOKIE_SECURE`、HSTS（含子域与 preload）。默认关闭是因为本机部署形状是 `http://127.0.0.1:8800` 明文回环。 |
+| `KB_HTTPS_ONLY` | Compose 强制 `1` | Caddy 负责 TLS，Django 信任容器内受控反代传来的 HTTPS 标记，并启用 Secure Cookie 与 HSTS。 |
+| `KB_PG_PASSWORD` | 必须配置 | 既有数据库所有者口令，由 PostgreSQL 和一次性迁移服务使用。 |
+| `secrets/postgres-runtime.txt` | 启动预检生成 | `kb_runtime` 使用的独立口令，迁移完成后同步数据库授权，Web 和后台服务通过只读文件读取。 |
 | `KB_HSTS_SECONDS` | 打开时 `31536000`，否则 `0` | HSTS 时长；建议先设小值（如 `3600`）试跑，确认没有明文混用再调大。 |
 | `KB_CSRF_TRUSTED_ORIGINS` | 空 | 逗号分隔的可信来源，例如 `https://kb.example.com`；经反代换域名访问时**必填**，否则表单 POST 会 403。 |
 

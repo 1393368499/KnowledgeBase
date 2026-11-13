@@ -145,7 +145,7 @@ python manage.py kbrebuild --library <库code> --profile bge2048
   `KnowledgeLibrary` 的 `vector_collection` / `active_generation` / `next_generation`
   三个指针/编号字段设为 `readonly`；名称/级别/部门/客户/启用状态等**普通目录字段仍可编辑**。
   要换代/回退必须走 `kbrebuild` 或受控意图（带冻结、覆盖率核验与审计）。
-- **测试隔离**：`config/test_settings.py` 默认 `KB_MODEL_LIMIT_ENABLED=False`（生产配置不变），
+- **测试隔离**：`knowledgebase/test_settings.py` 默认 `KB_MODEL_LIMIT_ENABLED=False`（生产配置不变），
   单测不会经 `SlotLimiter` 触碰共享 Redis 槽位键；需要验证真实限流的用例显式启用，
   并使用独立地址/前缀（或 FakeRedis）。
 - 真实 2048 模型**尚未部署**；隔离环境用**替身**验证过完整链路（重建→查询→增量写入→回退），

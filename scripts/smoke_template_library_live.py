@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright, expect
 
 BOOTSTRAP = """
 import os, json, django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'knowledgebase.settings')
 django.setup()
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.backends.db import SessionStore
@@ -49,7 +49,7 @@ try:
 finally:
     cleanup = """
 import os, sys, django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'knowledgebase.settings')
 django.setup()
 from django.contrib.sessions.models import Session
 Session.objects.filter(session_key=sys.stdin.read().strip()).delete()

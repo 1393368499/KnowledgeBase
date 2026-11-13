@@ -13,7 +13,7 @@
 * **目标一致性**：确认后库内资料或索引代次发生变化 → 必须重新提案；
 * **审计留痕**：授权与完成各有事件。
 
-全部使用隔离测试数据（临时库/临时原件），绝不触碰主库与真实 `media/raw`。
+全部使用隔离测试数据（临时库/临时原件），绝不触碰主库与真实 `data/media/raw`。
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture(autouse=True)
 def _isolated_blobs(isolated_paths):
-    """原件一律落在临时目录：绝不往真实 ``media/raw`` 写测试数据。"""
+    """原件一律落在临时目录：绝不往真实 ``data/media/raw`` 写测试数据。"""
     return isolated_paths
 
 

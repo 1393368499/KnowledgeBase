@@ -369,7 +369,7 @@ def _count_by(items: list[dict], key: str) -> dict[str, int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="从真实语料造 10 条 live 评测集（本地落盘）")
     parser.add_argument("--repo", default=os.environ.get("KB_REPO_ROOT") or str(_EVALS_DIR.parent),
-                        help="源码根（含 config/settings.py）")
+                        help="源码根（含 knowledgebase/settings.py）")
     parser.add_argument("--run-root", default="artifacts/eval-runs/dataset-build")
     parser.add_argument("--env-file", default=None)
     parser.add_argument("--library-code", default=DEFAULT_LIBRARY_CODE)

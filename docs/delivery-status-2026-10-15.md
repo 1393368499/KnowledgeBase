@@ -18,7 +18,7 @@
 |---|---|
 | 统一 Compose（web/worker/scheduler + 现有 PG/Redis/Qdrant） | `deploy/docker-compose.unified.yml` |
 | 交付镜像含**当前源码** | `kb-app:delivery`；基础镜像 `kb-worker:phase2-review-20261015` digest `sha256:63c6532ef74939dee3bb9ceca4abfdc5639ffbcf454c3568774096ba9e4bdea8`；容器内 `whitenoise` 中间件存在 |
-| 挂载来源已核（2026-10-15 晚 **重新核对**） | `docker inspect`：qdrant→**命名卷** `knowledgebase-qdrantdata-delivery-20261015` → `/qdrant/storage`（rw，**已不再**挂项目根 `vector_data/qdrant`，见 §2）；web rw / worker ro→项目根 `media/raw`；宿主与容器内**都是 276 个原件**（合计 0.96 MB） |
+| 挂载来源已核（2026-10-15 晚 **重新核对**） | `docker inspect`：qdrant→**命名卷** `knowledgebase-qdrantdata-delivery-20261015` → `/qdrant/storage`（rw，**已不再**挂项目根 `data/vector_data/qdrant`，见 §2）；web rw / worker ro→项目根 `data/media/raw`；宿主与容器内**都是 276 个原件**（合计 0.96 MB） |
 | web 生产形态 | PID1 = `gunicorn … --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 300 --graceful-timeout 300`（超时覆盖模型最长超时） |
 | 队列隔离 | 三方 `CELERY_BROKER_URL=redis://redis:6379/14`（同时覆盖无前缀变量）；**Redis DB0 的 193 条业务消息未被消费** |
 | 宿主真可用 | `http://127.0.0.1:8800/api/v1/health/ready/` 与 `/static/webui/*.js` 均 HTTP 200（**宿主端口已由 8000 改为 8800**：8000 落进 Windows WinNAT 动态保留段 7984–8083，宿主绑定被拒 WinError 10013；容器内仍是 8000，详见 `docs/deployment-and-operations.md` §1/§5） |
@@ -67,7 +67,7 @@
 | `create_library` 的 `level` | 登记过的 `level` 真正生效；非法值明确报错 | 回归全绿 |
 | AI `search_knowledge` 结构化与权限口径 | 复用搜索 API 的服务端收敛（`department`/`customer`/`amount`）；**显式指定的库不存在或无权直接报错**（不再静默退回全库）；`permission_codes` 用用户可读口径 | 回归全绿 |
 | 派生文档**严格来源校验** | `source_file_ids` 逐项校验：非数组/空数组/非数字/负数/0/浮点/布尔/对象 → **400 且不触发模型调用**；混合不存在 id → **400**（不静默丢弃）；`compose_document` 内任一来源不可用即报错（不再无声缩小范围） | `tests/test_document_source_strict.py` 10/10 |
-| 迁移守卫的**环境独立性** | `assert_no_inflight_processing` 显式使用 `config.settings` 并清除测试库变量；夹具模式不再误查部署库；提供可注入 provider | `tests/test_storage_migrate_safety.py` + `test_storage_verified_binding.py` 12/12；`tests/test_inflight_guard_semantics.py` 4/4 |
+| 迁移守卫的**环境独立性** | `assert_no_inflight_processing` 显式使用 `knowledgebase.settings` 并清除测试库变量；夹具模式不再误查部署库；提供可注入 provider | `tests/test_storage_migrate_safety.py` + `test_storage_verified_binding.py` 12/12；`tests/test_inflight_guard_semantics.py` 4/4 |
 | 前端接通**真实运行指标** | Agent 页六张状态卡**全部**有真实判定来源：「API熔断器」=真实快照（含**口径：进程内**标注）、「资源调控」=真实队列深度（DB14）、「解析看门狗 / 结果校验」=最近一次巡检**留痕**（`PatrolRun`，没跑过就灰点）、「双阶段补扫」=实时候选查询；五个指标（停滞任务/重启次数/熔断失败数/任务成功率/待处理反馈）也全部来自真实查询或审计记录 | JS 符号检查通过；webui 7/7；宿主 HTTP 实测送达；`tests/test_patrol_and_integrity.py`、`tests/test_webui_agent_cards.py` |
 
 ## 5. 仍未完成（**逐项如实列出**）

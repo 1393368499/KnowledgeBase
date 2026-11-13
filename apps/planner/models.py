@@ -371,7 +371,7 @@ class DocumentTemplate(models.Model):
     - 模板的正文只用于**格式**（标题层级、条款顺序、落款、日期、称谓），
       正文内容仍然只能来自检索到的资料片段（见 ``services.compose_document``）。
     - 原件按内容寻址存在 ``<media>/templates/<sha256><后缀>``，与原始字节库
-      （``media/raw``，受控只读）分开存放，避免把"范本"混进受控证据链。
+      （``data/media/raw``，受控只读）分开存放，避免把"范本"混进受控证据链。
     """
 
     class Category(models.TextChoices):

@@ -10,7 +10,7 @@ from django.utils import timezone
 from apps.knowledge import integrity
 from apps.knowledge.models import IngestedFile, LibraryWriteGate, PatrolRun
 from apps.knowledge.writegate import WriteFrozen
-from config.celery import patrol
+from knowledgebase.celery import patrol
 
 pytestmark = pytest.mark.django_db
 

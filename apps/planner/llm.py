@@ -44,7 +44,7 @@ _greedy_downgrade_notified = False
 def greedy_only() -> bool:
     """本系统是否强制所有 LLM 请求走 greedy（默认是）。
 
-    默认值及其原因写在 ``config/settings.py`` 的 ``KB_LLM_GREEDY_ONLY`` 旁边：
+    默认值及其原因写在 ``knowledgebase/settings.py`` 的 ``KB_LLM_GREEDY_ONLY`` 旁边：
     AS711 的算能 vLLM-TPU 引擎一旦在同一 batch 里混到 greedy + random，就因
     ``aten::where.self_out`` 未实现而**整个引擎退出**（2026-10-19 实测两次）。
     我们不发 random 请求，就永远不会是"混采"里那一半。

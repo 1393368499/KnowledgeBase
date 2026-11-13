@@ -4600,7 +4600,7 @@ def _dispatch(user, operation: OperationRecord, spec: OperationSpec) -> dict[str
             raise PlannerError(f"源资料原件不存在：{blob.name}")
         from django.db import IntegrityError
 
-        from config.celery import dispatch_processing
+        from knowledgebase.celery import dispatch_processing
 
         try:
             with transaction.atomic():
@@ -4760,7 +4760,7 @@ def _dispatch(user, operation: OperationRecord, spec: OperationSpec) -> dict[str
         # 这样界面的「解析看门狗 / 结果校验」马上有真实读数（不必等 beat 的 900 秒）。
         # 巡检本身**只读**：不改资料、不改状态，只写一行巡检记录供界面读取。
         from apps.knowledge.integrity import patrol_snapshot, verification_snapshot
-        from config.celery import patrol as patrol_task
+        from knowledgebase.celery import patrol as patrol_task
 
         try:
             limit = int(params.get("limit") or 200)

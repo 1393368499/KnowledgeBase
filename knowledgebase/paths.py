@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# config/paths.py -> config/ -> 项目根
+# knowledgebase/paths.py -> knowledgebase/ -> 项目根
 PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
 
@@ -23,8 +23,8 @@ def _from_env(name: str, default: Path) -> Path:
 
 
 def vector_data_dir() -> Path:
-    """向量数据根目录，默认 ``<项目根>/vector_data``。"""
-    return _from_env("VECTOR_DATA_DIR", PROJECT_ROOT / "vector_data")
+    """向量数据根目录，默认 ``<项目根>/data/vector_data``。"""
+    return _from_env("VECTOR_DATA_DIR", PROJECT_ROOT / "data" / "vector_data")
 
 
 def qdrant_server_dir() -> Path:
@@ -41,7 +41,7 @@ def qdrant_embedded_dir() -> Path:
 
 
 def raw_store_dir() -> Path:
-    """已入库资料的**原始字节**存放根目录，默认 ``<项目根>/media/raw``。
+    """已入库资料的**原始字节**存放根目录，默认 ``<项目根>/data/media/raw``。
 
     为什么放在项目根而不是外部对象存储：
     - 需求 2 的同类约束（数据可自证位置）；原始字节是本系统的"事实来源"，
@@ -49,7 +49,7 @@ def raw_store_dir() -> Path:
     - 内容寻址（按 sha256 分片）让"重试不重复写"是天然的：同一份内容
       重复落盘就是同一个路径，写之前先校验，存在且哈希一致就直接复用。
     """
-    return _from_env("RAW_STORE_DIR", PROJECT_ROOT / "media" / "raw")
+    return _from_env("RAW_STORE_DIR", PROJECT_ROOT / "data" / "media" / "raw")
 
 
 def assert_inside_project_root(path: Path, *, label: str) -> Path:
@@ -74,8 +74,8 @@ def ensure_runtime_dirs() -> dict[str, Path]:
         ("vector_data", vector_data_dir()),
         ("qdrant", qdrant_server_dir()),
         ("embedded", qdrant_embedded_dir()),
-        ("db", _from_env("DB_DIR", PROJECT_ROOT / "db")),
-        ("media", _from_env("MEDIA_ROOT_DIR", PROJECT_ROOT / "media")),
+        ("db", _from_env("DB_DIR", PROJECT_ROOT / "data" / "db")),
+        ("media", _from_env("MEDIA_ROOT_DIR", PROJECT_ROOT / "data" / "media")),
         ("raw_store", raw_store_dir()),
     ):
         safe = assert_inside_project_root(path, label=label)

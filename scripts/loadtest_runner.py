@@ -16,7 +16,7 @@
   * 默认 `--dry-run`（**只打印计划，不做任何变更**）；真正执行要 `--execute`；
   * 拒绝指向主实例（`56333`）、业务 DB、业务 Redis DB；
   * 只删自己创建的那个库（名字必须匹配 `kb_loadtest_<suffix>`）；
-  * 不碰共享 content-addressed 原件（主 `media/raw` 只读参照，永不修改）。
+  * 不碰共享 content-addressed 原件（主 `data/media/raw` 只读参照，永不修改）。
 
 用法：
     python scripts/loadtest_runner.py --dry-run                     # 看计划
@@ -150,7 +150,7 @@ class LoadTestRun:
         env = dict(os.environ)
         env.update(
             {
-                "DJANGO_SETTINGS_MODULE": "config.loadtest_settings",
+                "DJANGO_SETTINGS_MODULE": "knowledgebase.loadtest_settings",
                 "KB_LOADTEST_RUN_ID": self.run_id,
                 "KB_LOADTEST_DB_NAME": self.db_name,
                 "KB_LOADTEST_QDRANT_PREFIX": self.qdrant_prefix,

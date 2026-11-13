@@ -2,14 +2,14 @@
 
 为什么需要独立模块
 ------------------
-``config/settings.py`` 用 ``load_dotenv(PROJECT_ROOT/".env", override=True)``，
+``knowledgebase/settings.py`` 用 ``load_dotenv(PROJECT_ROOT/".env", override=True)``，
 **override=True 意味着文件值会覆盖环境变量**。所以"在命令前设
 ``KB_PG_DB=xxx``"是**不生效**的。压测最危险的后果是把压力打到业务库、
 业务队列，甚至打到 AS711。
 
 做法（先导入、**再强制改写**，让 .env 无论写什么都无法翻盘）
 -----------------------------------------------------------
-1. 正常导入 ``config.settings``（这样数据库连接参数仍来自 ``.env``，
+1. 正常导入 ``knowledgebase.settings``（这样数据库连接参数仍来自 ``.env``，
    不必把口令复制到命令行）；
 2. 然后**直接改写 settings 模块属性**：库名、向量前缀、Redis DB、
    模型禁用、测试标识、禁止派发。此后任何来源都改不回去；
@@ -27,7 +27,7 @@
     $env:KB_LOADTEST_DB_NAME = 'kb_loadtest_<随机>'
     $env:KB_LOADTEST_QDRANT_PREFIX = 'kb-lt-<随机>'
     $env:KB_LOADTEST_BROKER_DB = '14'          # 独立 Redis DB，远离业务 DB0
-    $env:DJANGO_SETTINGS_MODULE = 'config.loadtest_settings'
+    $env:DJANGO_SETTINGS_MODULE = 'knowledgebase.loadtest_settings'
 
     .\\.venv\\Scripts\\python.exe manage.py migrate --no-input
     .\\.venv\\Scripts\\python.exe manage.py runserver 127.0.0.1:8011 --noreload
@@ -129,7 +129,7 @@ _settings.DATABASES["default"]["NAME"] = _DB_NAME
 # 压测库是现成的，不允许 Django 再建/销毁它
 _settings.DATABASES["default"]["TEST"] = {"NAME": f"test_{_DB_NAME}"}
 
-# 让 `from config.loadtest_settings import *` 也能拿到改写后的值
+# 让 `from knowledgebase.loadtest_settings import *` 也能拿到改写后的值
 KB_QDRANT_COLLECTION_PREFIX = _QDRANT_PREFIX  # noqa: F405
 KB_MODEL_CALLS_DISABLED = True
 KB_LOAD_TEST_MODE = True
@@ -142,7 +142,7 @@ KB_TEST_ADAPTER = ""
 # **压测上传的原件必须落在本 run 的隔离目录**（真实复验发现的缺口）
 # ---------------------------------------------------------------------------
 # 以前这里没绑 RAW_STORE_DIR / VECTOR_DATA_DIR：`from .settings import *` 已经用
-# dotenv(override=True) 把 raw 指向**主 media/raw**，于是真实压测上传会把原件
+# dotenv(override=True) 把 raw 指向**主 data/media/raw**，于是真实压测上传会把原件
 # 写进生产目录 —— 而客户端收尾只删向量，原件永远留下（正是 42 GiB 同类问题的成因）。
 # 这里在 star-import **之后**（唯一可靠位置）强制绑定，并 fail-closed 校验。
 _RAW_DIR = os.environ.get("KB_LOADTEST_RAW_STORE_DIR", "").strip()
@@ -157,14 +157,14 @@ if not _ENDPOINT:
     _problems.append("缺少 KB_LOADTEST_QDRANT_URL（隔离端点）")
 if _ENDPOINT and "56333" in _ENDPOINT:
     _problems.append(f"KB_LOADTEST_QDRANT_URL={_ENDPOINT} 指向主实例 —— 拒绝压测")
-# 隔离目录必须在项目 root 内（沿用 paths 的唯一真源约束），且不能是主 media/raw
+# 隔离目录必须在项目 root 内（沿用 paths 的唯一真源约束），且不能是主 data/media/raw
 if _RAW_DIR:
     _raw_path = Path(_RAW_DIR).resolve()
     _root = Path(__file__).resolve().parent.parent
     if _root not in _raw_path.parents:
         _problems.append(f"RAW_STORE_DIR 必须在项目 root 内：{_raw_path}")
     if _raw_path == (_root / "media" / "raw").resolve():
-        _problems.append("RAW_STORE_DIR 不能指向主 media/raw（会污染生产原件）")
+        _problems.append("RAW_STORE_DIR 不能指向主 data/media/raw（会污染生产原件）")
 if _problems:
     raise RuntimeError(
         "压测设置不合格，拒绝启动：" + "；".join(_problems)

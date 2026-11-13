@@ -3,14 +3,14 @@
 为什么需要它
 ------------
 评测要在"没有 PostgreSQL / 没有 Qdrant server / 没有模型服务"的机器上可复现。
-本模块在 ``import config.settings`` **之前**把运行期目录与所有开关设成离线值，
+本模块在 ``import knowledgebase.settings`` **之前**把运行期目录与所有开关设成离线值，
 再 star-import 一次正式 settings，最后对少数几个必须"压平"的项做显式覆盖。
 
 用法
 ----
 由 ``evals/kb_eval/harness.py::bootstrap()`` 负责：
 
-1. 设 ``KB_EVAL_WORKDIR``（必须在仓库根目录内，见 ``config/paths.py`` 的硬约束）；
+1. 设 ``KB_EVAL_WORKDIR``（必须在仓库根目录内，见 ``knowledgebase/paths.py`` 的硬约束）；
 2. ``DJANGO_SETTINGS_MODULE=offline_settings`` 并 ``django.setup()``。
 
 手工等价命令::
@@ -22,7 +22,7 @@
 注意
 ----
 * ``KB_SKIP_DOTENV=1`` 是**必须**的：正式仓库里有 ``.env``，而
-  ``config.settings`` 用 ``load_dotenv(..., override=True)`` 读它 —— 不跳过就会把
+  ``knowledgebase.settings`` 用 ``load_dotenv(..., override=True)`` 读它 —— 不跳过就会把
   ``KB_QDRANT_MODE=server`` / 真实模型端点 / PG 口令盖到本模块的离线值上，
   评测会直接外呼真实服务。
 * ``KB_MODEL_CALLS_DISABLED=1`` 是任务要求（真模型调用全关）。它同时被当作
@@ -64,12 +64,12 @@ def _inside_repo_root(path: Path) -> bool:
 
 if not _inside_repo_root(WORKDIR):
     raise RuntimeError(
-        "KB_EVAL_WORKDIR 必须位于仓库根目录内（config/paths.py 的 "
+        "KB_EVAL_WORKDIR 必须位于仓库根目录内（knowledgebase/paths.py 的 "
         f"assert_inside_project_root 硬约束）：{WORKDIR} 不在 {PROJECT_ROOT} 里。"
         "请把评测运行目录设为 <仓库根>/artifacts/evals/<run_id>。"
     )
 
-# ---- 运行期目录重定向（必须在 import config.settings 之前；它导入期就建目录）----
+# ---- 运行期目录重定向（必须在 import knowledgebase.settings 之前；它导入期就建目录）----
 _DIR_ENV = {
     "VECTOR_DATA_DIR": ("vector_data", True),
     "RAW_STORE_DIR": ("raw", True),
@@ -82,7 +82,7 @@ for _var, (_sub, _force) in _DIR_ENV.items():
     if _force or not os.environ.get(_var):
         os.environ[_var] = str(_path)
 
-# ---- 离线开关（同样必须在 import config.settings 之前）----
+# ---- 离线开关（同样必须在 import knowledgebase.settings 之前）----
 os.environ["KB_SKIP_DOTENV"] = "1"        # 别让仓库里的 .env 盖掉离线值
 os.environ["DJANGO_DEBUG"] = "1"          # 非 DEBUG + sqlite 会被 settings 直接拒绝
 os.environ["DB_ENGINE"] = "sqlite"
@@ -103,8 +103,8 @@ os.environ["KB_SEARCH_USE_RERANK"] = "0"  # 离线没有重排服务：禁止外
 os.environ.setdefault("KB_QDRANT_COLLECTION_PREFIX", "kb")
 
 # ---- 正式 settings（此时目录与开关都已就位）----
-from config.settings import *  # noqa: E402,F401,F403  (star-import 是这里的目的)
-from config.settings import DATABASES as _BASE_DATABASES  # noqa: E402
+from knowledgebase.settings import *  # noqa: E402,F401,F403  (star-import 是这里的目的)
+from knowledgebase.settings import DATABASES as _BASE_DATABASES  # noqa: E402
 
 # ============================ 显式覆盖（压平）============================
 # 1) 数据库：固定到 workdir 内的 sqlite 文件（不碰 db/kb.sqlite3）
